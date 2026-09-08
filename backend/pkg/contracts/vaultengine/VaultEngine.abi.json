@@ -159,6 +159,13 @@
   },
   {
     "type": "function",
+    "name": "detachStrategy",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "emergencyDeallocateAll",
     "inputs": [],
     "outputs": [
@@ -809,6 +816,19 @@
       },
       {
         "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StrategyDetached",
+    "inputs": [
+      {
+        "name": "strategy",
         "type": "address",
         "indexed": true,
         "internalType": "address"

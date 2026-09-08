@@ -89,6 +89,12 @@ external functions, `SafeERC20` only, no spot-price-based decisions, replay-resi
 no unbounded loops over user input. Slither runs in CI and fails on MEDIUM; the current suppression
 set is justified in [`contracts/README.md`](contracts/README.md).
 
+## Known gaps
+
+[DEFERRED.md](DEFERRED.md) records what is deliberately unfinished, each with a trigger that will
+actually fire. Anything without a real trigger is recorded as accepted risk rather than deferred
+work, because a deferral nobody reaches is a decision to drop it.
+
 ## Licence
 
 [MIT](LICENSE).

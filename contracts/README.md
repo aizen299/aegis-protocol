@@ -6,7 +6,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 
 | Version | Module | State |
 |---|---|---|
-| v0.1 | `src/vault/` | Implemented |
+| v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
 | v0.2 | `src/oracle/` | Not started |
 | v0.3 | `src/governance/` | Not started |
 | v0.4 | `src/zk/` | Not started |
@@ -16,6 +16,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 ```bash
 forge build --sizes
 forge test -vvv
+forge test --match-path 'test/integration/*' -vvv
 forge coverage --report lcov
 forge inspect VaultEngine storage-layout   # required before any UUPS upgrade
 slither . --config-file slither.config.json
@@ -59,13 +60,23 @@ The `reentrancy-balance` findings previously raised on `withdraw` were resolved 
 suppressed: liquidity sourcing moved into `_ensureLiquidity`, which reads the balance again after
 the strategy call and compares only the post-call value.
 
+**Venue failure.** `totalAssets()` reads the strategy and sits on the path of every deposit and
+withdrawal, so a venue that reverts halts the vault — and `setStrategy` and `emergencyDeallocateAll`
+both call the venue too, so a sufficiently broken one blocks its own removal. `detachStrategy()`
+(DEFAULT_ADMIN_ROLE) clears the slot without calling out, writing off whatever the venue holds. It
+is the only strategy operation that touches nothing external, which is exactly why it works when
+nothing else does. `test/integration/StrategyFailure.t.sol` pins this behaviour; the residual
+halt-until-multisig window is recorded in [DEFERRED.md](../DEFERRED.md).
+
 ## Upgrade procedure
 
-Storage layout is append-only. Before any upgrade:
+Storage layout is append-only, and the released baseline is committed at
+`deployments/layouts/VaultEngine.<release>.json`.
 
 ```bash
-forge inspect VaultEngine storage-layout > new-layout.json
-# diff against the layout committed for the deployed release
+make contracts-layout-check                          # fails if the layout diverged
+make contracts-layout-record RELEASE=v0.2.0          # after a deliberate append
 ```
 
-Never remove or reorder a variable. Consume `__gap` when appending.
+The check runs in CI on every contracts change, so a reordered or removed variable fails the build
+rather than surfacing at deploy time. Consume `__gap` when appending.

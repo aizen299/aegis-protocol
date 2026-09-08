@@ -7,6 +7,7 @@ interface IVaultEngine {
     event Deposited(address indexed user, address indexed asset, uint256 amount, uint256 shares);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount, uint256 shares);
     event StrategyUpdated(address indexed previousStrategy, address indexed newStrategy);
+    event StrategyDetached(address indexed strategy);
     event AllocatedToStrategy(address indexed strategy, uint256 amount);
     event DeallocatedFromStrategy(address indexed strategy, uint256 amount);
     event DepositCapUpdated(uint256 previousCap, uint256 newCap);

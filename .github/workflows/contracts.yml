@@ -27,6 +27,11 @@ jobs:
       - run: forge fmt --check
       - run: forge build --sizes
       - run: forge test -vvv
+      # Storage layout is append-only for UUPS. Diverging from the released baseline is a
+      # corrupted upgrade, so it fails the build rather than waiting to be noticed at deploy time.
+      - name: Storage layout matches the released baseline
+        run: make contracts-layout-check
+        working-directory: .
       - run: forge coverage --report lcov
       - uses: actions/upload-artifact@v4
         with:

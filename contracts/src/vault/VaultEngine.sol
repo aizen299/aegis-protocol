@@ -215,6 +215,32 @@ contract VaultEngine is
         emit DeallocatedFromStrategy(address(strategy_), withdrawn);
     }
 
+    /// @notice Clear the active strategy without calling into it, writing off whatever it holds.
+    /// @dev The escape hatch of last resort, and the only strategy operation that touches nothing
+    ///      external.
+    ///
+    ///      Every other path reads the venue: `totalAssets()` feeds both deposit and withdraw,
+    ///      `setStrategy` checks the outgoing venue is unwound, and `emergencyDeallocateAll` calls
+    ///      the venue to unwind it. A venue that reverts — an ordinary paused lending market, not an
+    ///      exotic failure — therefore halts the vault and blocks its own removal, freezing user
+    ///      funds with no recovery short of a UUPS upgrade.
+    ///
+    ///      Detaching stops counting the venue's assets, so the loss is socialised across
+    ///      shareholders the moment it is called, and deposits and withdrawals resume against the
+    ///      idle balance. That is a deliberate realisation of loss rather than routine management,
+    ///      which is why it sits on DEFAULT_ADMIN_ROLE (a multisig) and not VAULT_MANAGER_ROLE.
+    ///      The written-off amount is recoverable from the AllocatedToStrategy and
+    ///      DeallocatedFromStrategy event history.
+    function detachStrategy() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address previous = address(_strategy);
+        if (previous == address(0)) revert ZeroAddress();
+
+        _strategy = IYieldStrategy(address(0));
+
+        emit StrategyDetached(previous);
+        emit StrategyUpdated(previous, address(0));
+    }
+
     /// @notice Unwind the entire strategy position. Intended for incident response.
     function emergencyDeallocateAll()
         external

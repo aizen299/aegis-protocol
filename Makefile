@@ -2,6 +2,7 @@
 SHELL := /bin/bash
 
 COMPOSE  := docker compose
+LAYOUT_BASELINE ?= v0.1.0
 DB_DSN   ?= postgres://pb:pb_local@localhost:5432/aegis?sslmode=disable
 ANVIL_RPC ?= http://127.0.0.1:8545
 
@@ -72,8 +73,26 @@ contracts-slither: ## Mandatory before any contract is considered complete
 	cd contracts && slither . --config-file slither.config.json
 
 .PHONY: contracts-layout
-contracts-layout: ## Dump storage layout — required before any UUPS upgrade
+contracts-layout: ## Dump the current storage layout
 	cd contracts && forge inspect VaultEngine storage-layout
+
+.PHONY: contracts-layout-check
+contracts-layout-check: ## Fail if storage layout diverges from the released baseline (run before any UUPS upgrade)
+	@cd contracts && forge inspect VaultEngine storage-layout --json \
+		| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' > /tmp/layout-current.json
+	@jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' \
+		contracts/deployments/layouts/VaultEngine.$(LAYOUT_BASELINE).json > /tmp/layout-baseline.json
+	@diff -u /tmp/layout-baseline.json /tmp/layout-current.json \
+		&& echo "storage layout matches $(LAYOUT_BASELINE)" \
+		|| (echo "STORAGE LAYOUT DIVERGED from $(LAYOUT_BASELINE). Append-only: never remove or reorder a variable." && exit 1)
+
+.PHONY: contracts-layout-record
+contracts-layout-record: ## Record the current layout as a new release baseline (RELEASE=v0.2.0)
+	@test -n "$(RELEASE)" || (echo "set RELEASE, e.g. make contracts-layout-record RELEASE=v0.2.0" && exit 1)
+	cd contracts && forge inspect VaultEngine storage-layout --json \
+		| jq -S '{contract: "VaultEngine", release: "$(RELEASE)", storage: [.storage[] | {label, slot, offset, type}], types: .types}' \
+		> deployments/layouts/VaultEngine.$(RELEASE).json
+	@echo "recorded contracts/deployments/layouts/VaultEngine.$(RELEASE).json"
 
 .PHONY: deploy-local
 deploy-local: ## Deploy VaultEngine to local anvil
