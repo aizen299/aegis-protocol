@@ -3,6 +3,10 @@ SHELL := /bin/bash
 
 COMPOSE  := docker compose
 LAYOUT_BASELINE ?= v0.1.0
+
+# Anvil's first default account. Public knowledge and worthless off a local chain, so the local
+# deploy targets work with no setup. Override for anything that is not Anvil.
+ANVIL_DEPLOYER_KEY ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 DB_DSN   ?= postgres://pb:pb_local@localhost:5432/aegis?sslmode=disable
 ANVIL_RPC ?= http://127.0.0.1:8545
 
@@ -95,7 +99,18 @@ contracts-layout-record: ## Record the current layout as a new release baseline 
 	@echo "recorded contracts/deployments/layouts/VaultEngine.$(RELEASE).json"
 
 .PHONY: deploy-local
-deploy-local: ## Deploy VaultEngine to local anvil
+deploy-local: ## Deploy the v0.1 vault and a six-decimal test token to local anvil
+	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployLocal.s.sol:DeployLocal \
+		--rpc-url $(ANVIL_RPC) --broadcast
+
+.PHONY: deploy-oracle-local
+deploy-oracle-local: ## Deploy the v0.2 oracle contracts to local anvil
+	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployOracleLocal.s.sol:DeployOracleLocal \
+		--rpc-url $(ANVIL_RPC) --broadcast
+
+.PHONY: deploy-vault
+deploy-vault: ## Deploy VaultEngine against an existing asset (needs PRIVATE_KEY, VAULT_ASSET, VAULT_ADMIN)
+	@test -n "$(PRIVATE_KEY)" || (echo "set PRIVATE_KEY; this target is not local-only and has no default" && exit 1)
 	cd contracts && forge script script/DeployVault.s.sol:DeployVault \
 		--rpc-url $(ANVIL_RPC) --broadcast
 
