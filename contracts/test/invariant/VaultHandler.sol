@@ -58,6 +58,9 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
 
         amount = bound(amount, vault.minDeposit(), _min(headroom, token.balanceOf(actor)));
         if (amount < vault.minDeposit()) return;
+        // Above the minimum an amount can still round to zero shares once the vault has accrued,
+        // and the vault refuses that rather than minting nothing for real assets.
+        if (vault.convertToShares(amount) == 0) return;
 
         vm.prank(actor);
         vault.deposit(amount, actor);

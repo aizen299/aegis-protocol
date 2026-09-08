@@ -21,7 +21,10 @@ max_test_rejects = 100_000
 [profile.default.invariant]
 runs = 128
 depth = 64
-fail_on_revert = false
+# Strict on purpose. A handler that reverts is a handler that stopped exercising the contract, and
+# the failure is silent under the lenient setting — it hid a seed overflow that turned the oracle
+# submit action into a no-op on a slice of the input space.
+fail_on_revert = true
 call_override = false
 
 [profile.ci.fuzz]
