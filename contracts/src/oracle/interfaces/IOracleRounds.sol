@@ -25,7 +25,7 @@ interface IOracleRounds {
         uint256 aggregatedValue;
     }
 
-    event FeedRegistered(bytes32 indexed feedId, string name);
+    event FeedRegistered(bytes32 indexed feedId, string name, uint8 decimals);
     event FeedDeregistered(bytes32 indexed feedId);
     event RoundStarted(
         uint256 indexed roundId,
@@ -63,6 +63,7 @@ interface IOracleRounds {
     error InvalidNonce(uint256 provided, uint256 expected);
     error NotEnoughEligibleNodes(uint256 eligible, uint256 required);
     error InvalidBps(uint256 bps);
+    error InvalidDecimals(uint8 decimals);
     error NoSettledRound(bytes32 feedId);
     error StaleValue(uint256 settledAt, uint256 maxStaleness);
 

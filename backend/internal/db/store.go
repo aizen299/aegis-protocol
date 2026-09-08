@@ -49,3 +49,11 @@ func New(ctx context.Context, cfg *config.Config) (*Store, error) {
 func (s *Store) Close() { s.pool.Close() }
 
 func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
+// QueryRowForTest runs an arbitrary query against the pool.
+//
+// Only for the end-to-end suite, which asserts on rows the typed accessors deliberately do not
+// expose. Production code uses the parameterised query constants declared beside each method.
+func (s *Store) QueryRowForTest(ctx context.Context, sql string, args ...any) pgx.Row {
+	return s.pool.QueryRow(ctx, sql, args...)
+}

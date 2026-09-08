@@ -72,7 +72,8 @@ jobs:
           fi
           for required in \
             TestDepositFlowPreservesRawSixDecimalAmount \
-            TestOracleRoundSettlesWithGoSignedSubmissions; do
+            TestOracleRoundSettlesWithGoSignedSubmissions \
+            TestOracleEventsAreIndexedFromRealLogs; do
             grep -q -- "--- PASS: $required" /tmp/e2e.log || {
               echo "::error::$required did not run."
               exit 1

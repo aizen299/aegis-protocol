@@ -204,8 +204,9 @@ func TestFeedRegisteredRecordsNameAndScale(t *testing.T) {
 	h := newRoundsHandler(t, store)
 
 	ev := oracleEvent(t, roundsHex, eventFeedRegistered, map[string]any{
-		"feedId": feedID,
-		"name":   "ETH/USD",
+		"feedId":   feedID,
+		"name":     "ETH/USD",
+		"decimals": uint8(18),
 	})
 	if err := h.Handle(context.Background(), ev); err != nil {
 		t.Fatalf("handle: %v", err)
@@ -216,6 +217,38 @@ func TestFeedRegisteredRecordsNameAndScale(t *testing.T) {
 	}
 	if store.feeds[0].Name != "ETH/USD" || store.feeds[0].Decimals != 18 {
 		t.Fatalf("feed = %+v", store.feeds[0])
+	}
+}
+
+// The scale comes from the event. Hardcoding 18 in Go was correct for every feed built so far and
+// silently wrong for the first one that is not — the same mistake as the hardcoded token decimals.
+func TestFeedScaleComesFromTheEventNotAConstant(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newRoundsHandler(t, store)
+
+	ev := oracleEvent(t, roundsHex, eventFeedRegistered, map[string]any{
+		"feedId":   feedID,
+		"name":     "SOFR",
+		"decimals": uint8(8),
+	})
+	if err := h.Handle(context.Background(), ev); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+	if store.feeds[0].Decimals != 8 {
+		t.Fatalf("decimals = %d, want 8 as declared on chain", store.feeds[0].Decimals)
+	}
+}
+
+func TestFeedRegisteredRejectsMissingDecimals(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newRoundsHandler(t, store)
+
+	ev := oracleEvent(t, roundsHex, eventFeedRegistered, map[string]any{
+		"feedId": feedID,
+		"name":   "ETH/USD",
+	})
+	if err := h.Handle(context.Background(), ev); err == nil {
+		t.Fatal("expected an error rather than a defaulted scale")
 	}
 }
 

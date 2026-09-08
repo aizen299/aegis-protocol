@@ -313,10 +313,35 @@ contract OracleRoundsTest is OracleRoundsFixture {
         rounds.openRound(unknown);
     }
 
+    /// The scale is declared at registration and readable from chain, so nothing downstream has to
+    /// assume it. The contract cannot enforce it — it medians whatever nodes submit — but one
+    /// declared value beats every consumer guessing independently.
+    function test_feedDecimalsAreReadableFromChain() public {
+        assertEq(rounds.feedDecimals(FEED), 18);
+
+        bytes32 rateFeed = keccak256("SOFR");
+        vm.prank(oracleManager);
+        rounds.registerFeed(rateFeed, "SOFR", 8);
+
+        assertEq(rounds.feedDecimals(rateFeed), 8, "a feed may declare a scale other than 18");
+    }
+
+    function test_registerFeedRejectsImpossibleDecimals() public {
+        vm.prank(oracleManager);
+        vm.expectRevert(abi.encodeWithSelector(IOracleRounds.InvalidDecimals.selector, uint8(39)));
+        rounds.registerFeed(keccak256("BAD"), "BAD", 39);
+    }
+
+    function test_feedDecimalsRevertsForUnknownFeed() public {
+        bytes32 unknown = keccak256("NOPE");
+        vm.expectRevert(abi.encodeWithSelector(IOracleRounds.FeedNotRegistered.selector, unknown));
+        rounds.feedDecimals(unknown);
+    }
+
     function test_registerFeedRequiresManagerRole() public {
         vm.prank(outsider);
         vm.expectRevert();
-        rounds.registerFeed(keccak256("BTC/USD"), "BTC/USD");
+        rounds.registerFeed(keccak256("BTC/USD"), "BTC/USD", 18);
     }
 
     function test_pauseHaltsSubmissions() public {

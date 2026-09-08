@@ -11,10 +11,15 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
-// OracleRounds scales values to 18 decimals. Recorded on the feed rather than assumed by readers,
-// for the same reason token decimals are recorded on the asset: a value without its scale is
-// uninterpretable regardless of where the scale comes from.
-const oracleFeedDecimals uint8 = 18
+// A feed's scale is declared at registration and carried in FeedRegistered, so nothing here
+// assumes it. An earlier revision hardcoded 18 in Go — the same mistake as the hardcoded token
+// decimals, one level up: correct for every feed built so far and silently wrong for the first
+// one that is not.
+//
+// fallbackFeedDecimals applies only when a round is seen for a feed whose registration event was
+// never indexed, which happens when the indexer starts after deployment. The placeholder row is
+// corrected if the registration is later backfilled.
+const fallbackFeedDecimals uint8 = 18
 
 const (
 	eventFeedRegistered   = "FeedRegistered"
@@ -113,11 +118,16 @@ func (h *OracleRoundsHandler) handleFeedRegistered(ctx context.Context, ev chain
 		return err
 	}
 
+	decimals, err := uint8Field(ev, "decimals")
+	if err != nil {
+		return err
+	}
+
 	return h.store.UpsertOracleFeed(ctx, db.Feed{
 		ChainID:  ev.ChainID,
 		FeedID:   hexBytes32(feedID),
 		Name:     name,
-		Decimals: oracleFeedDecimals,
+		Decimals: decimals,
 	})
 }
 
@@ -150,7 +160,7 @@ func (h *OracleRoundsHandler) handleRoundStarted(ctx context.Context, ev chain.E
 	feed := hexBytes32(feedID)
 	// The round's foreign key requires the feed row. An indexer started after the feed was
 	// registered would otherwise stall on a round it can see but cannot attribute.
-	if err := h.store.EnsureOracleFeed(ctx, ev.ChainID, feed, oracleFeedDecimals); err != nil {
+	if err := h.store.EnsureOracleFeed(ctx, ev.ChainID, feed, fallbackFeedDecimals); err != nil {
 		return err
 	}
 
@@ -250,6 +260,18 @@ func bytes32Field(ev chain.Event, key string) ([32]byte, error) {
 	v, ok := raw.([32]byte)
 	if !ok {
 		return [32]byte{}, fmt.Errorf("event %s: field %q is %T, want [32]byte", ev.Name, key, raw)
+	}
+	return v, nil
+}
+
+func uint8Field(ev chain.Event, key string) (uint8, error) {
+	raw, ok := ev.Payload[key]
+	if !ok {
+		return 0, fmt.Errorf("event %s: missing field %q", ev.Name, key)
+	}
+	v, ok := raw.(uint8)
+	if !ok {
+		return 0, fmt.Errorf("event %s: field %q is %T, want uint8", ev.Name, key, raw)
 	}
 	return v, nil
 }

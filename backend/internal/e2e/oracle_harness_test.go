@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/aizen299/aegis-protocol/backend/internal/chain/evm"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
@@ -184,4 +187,46 @@ func castErr(t *testing.T, args ...string) (string, error) {
 
 	out, err := exec.Command("cast", args...).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+func truncateOracle(t *testing.T, dsn string) {
+	t.Helper()
+
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect for truncate: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	const q = `TRUNCATE oracle_slashings, oracle_submissions, oracle_rounds, oracle_nodes,
+	           oracle_feeds, vaults, assets, indexer_cursors RESTART IDENTITY CASCADE`
+	if _, err := conn.Exec(ctx, q); err != nil {
+		t.Fatalf("truncate oracle tables: %v", err)
+	}
+}
+
+// reasonHex renders a slash reason as the right-padded bytes32 the contract expects.
+func reasonHex(reason string) string {
+	var padded [32]byte
+	copy(padded[:], reason)
+	return "0x" + fmt.Sprintf("%x", padded[:])
+}
+
+func queryString(t *testing.T, s *oracleStack, sql string, args ...any) string {
+	t.Helper()
+	var out string
+	if err := s.store.QueryRowForTest(context.Background(), sql, args...).Scan(&out); err != nil {
+		t.Fatalf("query %q: %v", sql, err)
+	}
+	return out
+}
+
+func queryInt(t *testing.T, s *oracleStack, sql string, args ...any) int64 {
+	t.Helper()
+	var out int64
+	if err := s.store.QueryRowForTest(context.Background(), sql, args...).Scan(&out); err != nil {
+		t.Fatalf("query %q: %v", sql, err)
+	}
+	return out
 }

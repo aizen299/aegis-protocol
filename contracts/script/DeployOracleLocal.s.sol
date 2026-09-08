@@ -65,7 +65,7 @@ contract DeployOracleLocal is Script {
         OracleRounds(roundsProxy).grantRole(Roles.ORACLE_MANAGER_ROLE, deployer);
         OracleRounds(roundsProxy).grantRole(Roles.PAUSER_ROLE, deployer);
 
-        OracleRounds(roundsProxy).registerFeed(keccak256("ETH/USD"), "ETH/USD");
+        OracleRounds(roundsProxy).registerFeed(keccak256("ETH/USD"), "ETH/USD", 18);
 
         vm.stopBroadcast();
 

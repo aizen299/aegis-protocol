@@ -39,7 +39,7 @@ abstract contract OracleRoundsFixture is OracleFixture {
         vm.stopPrank();
 
         vm.prank(oracleManager);
-        rounds.registerFeed(FEED, "ETH/USD");
+        rounds.registerFeed(FEED, "ETH/USD", 18);
     }
 
     /// @dev Registers `count` keyed nodes so their submissions can actually be signed.

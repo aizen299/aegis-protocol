@@ -44,6 +44,10 @@ contract OracleRounds is
 
     struct Feed {
         bool registered;
+        // The scale a feed's values are reported in. The contract cannot enforce it — it medians
+        // whatever numbers nodes submit — but declaring it here gives nodes and the indexer one
+        // place to read it from, rather than each assuming 18 independently.
+        uint8 decimals;
         uint256 currentRoundId;
         uint256 lastSettledRoundId;
     }
@@ -233,13 +237,16 @@ contract OracleRounds is
 
     function registerFeed(
         bytes32 feedId,
-        string calldata name
+        string calldata name,
+        uint8 decimals
     ) external onlyRole(Roles.ORACLE_MANAGER_ROLE) {
         Feed storage feed = _feeds[feedId];
         if (feed.registered) revert FeedAlreadyRegistered(feedId);
+        if (decimals > 38) revert InvalidDecimals(decimals);
 
         feed.registered = true;
-        emit FeedRegistered(feedId, name);
+        feed.decimals = decimals;
+        emit FeedRegistered(feedId, name, decimals);
     }
 
     function deregisterFeed(
@@ -321,6 +328,17 @@ contract OracleRounds is
         bytes32 feedId
     ) external view returns (uint256) {
         return _feeds[feedId].lastSettledRoundId;
+    }
+
+    /// @notice Scale a feed's settled values are reported in, declared at registration.
+    /// @dev The contract cannot enforce it — it medians whatever nodes submit — but one declared
+    ///      value beats every consumer assuming 18 independently.
+    function feedDecimals(
+        bytes32 feedId
+    ) external view returns (uint8) {
+        Feed storage feed = _feeds[feedId];
+        if (!feed.registered) revert FeedNotRegistered(feedId);
+        return feed.decimals;
     }
 
     function isFeedRegistered(
