@@ -35,6 +35,7 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     env:
+      APP_ENV: local
       DB_DSN: postgres://pb:pb@localhost:5432/aegis_test?sslmode=disable
       REDIS_ADDR: localhost:6379
     steps:

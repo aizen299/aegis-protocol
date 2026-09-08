@@ -25,7 +25,8 @@ func main() {
 		panic(err)
 	}
 
-	log := observability.NewLogger(serviceName, cfg.LogSvc)
+	log := observability.NewLogger(serviceName, cfg.LogSvc).
+		With().Str("environment", cfg.Environment).Logger()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

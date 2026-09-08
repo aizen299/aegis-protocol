@@ -11,6 +11,18 @@ type Config struct {
 	Service string `env:"SERVICE_NAME" envDefault:"backend"`
 	LogSvc  string `env:"LOG_LEVEL" envDefault:"info"`
 
+	// Environment is required and has no default. A default would mean an unconfigured process
+	// decides it is in development, which is exactly the inference the secret policy forbids.
+	// See docs/v0.2-oracle-plan.md §2.7.
+	Environment string `env:"APP_ENV,required"`
+	AWSRegion   string `env:"AWS_REGION"`
+
+	Secrets struct {
+		// Interpreted by the environment's provider: a variable name locally, an SSM parameter
+		// path in staging and production.
+		SlasherKeyRef string `env:"SLASHER_KEY_REF"`
+	}
+
 	DB struct {
 		DSN             string        `env:"DB_DSN,required"`
 		MaxOpenConns    int32         `env:"DB_MAX_OPEN_CONNS" envDefault:"25"`
@@ -57,6 +69,18 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	return &cfg, nil
+}
+
+// ValidateAggregator checks the fields the oracle aggregation service needs. The key itself is
+// resolved at startup by internal/secrets, which fails rather than falling back.
+func (c *Config) ValidateAggregator() error {
+	if c.Secrets.SlasherKeyRef == "" {
+		return fmt.Errorf("SLASHER_KEY_REF is required: it names the environment variable locally, or the SSM parameter path otherwise")
+	}
+	if c.Contracts.OracleStaking == "" {
+		return fmt.Errorf("CONTRACT_ORACLE_STAKING is required for the aggregator")
+	}
+	return nil
 }
 
 // ValidateIndexer checks the fields the indexer needs beyond the shared set.

@@ -46,6 +46,7 @@ services:
       dockerfile: docker/indexer.Dockerfile
     environment:
       SERVICE_NAME: indexer
+      APP_ENV: ${APP_ENV:?set APP_ENV to local, staging, or production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
       REDIS_ADDR: redis:6379
@@ -70,6 +71,7 @@ services:
     ports: ["8090:8090"]
     environment:
       SERVICE_NAME: api
+      APP_ENV: ${APP_ENV:?set APP_ENV to local, staging, or production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
       REDIS_ADDR: redis:6379

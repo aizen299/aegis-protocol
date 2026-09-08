@@ -108,6 +108,32 @@ encoding differs per chain.
 
 The API listens on **8090**, not 8080; 8080 is commonly occupied by Jenkins.
 
+## Secrets
+
+`APP_ENV` is required and has no default. It selects where sensitive material comes from, and it is
+declared rather than inferred — a process must never decide it is in development because a
+development variable happens to be set.
+
+| `APP_ENV` | Source for the SLASHER_ROLE key |
+|---|---|
+| `local` | the environment variable named by `SLASHER_KEY_REF` |
+| `staging`, `production` | AWS SSM Parameter Store, at the path in `SLASHER_KEY_REF` |
+
+There is no fallback in either direction. If the required source is unregistered, unreachable,
+empty, or returns malformed material, startup fails. A service that degrades to a weaker source is
+worse than one that will not start, because the degradation is silent and the weaker source is
+usually a development key.
+
+Outside `local` the environment provider is not even registered, so two independent things would
+have to be wrong for a staging process to read a key out of its environment.
+`TestStagingRefusesEvenWithTheDevelopmentVariablePresent` holds that line.
+
+The provider name is logged at startup so an operator can confirm the source from logs alone.
+Material never is: `secrets.Secret` redacts through `String`, `GoString`, `Format`, and
+`MarshalJSON`, so `%v`, `%s`, `%q`, `%#v`, zerolog reflection, and `encoding/json` all print
+`[redacted]`. Reading the value requires `Expose()`, which is greppable — an audit can enumerate
+every place the real value is touched.
+
 ## Amounts and decimals
 
 Token amounts are `types.Raw` end to end — an unscaled `uint256` in the asset's own base units,

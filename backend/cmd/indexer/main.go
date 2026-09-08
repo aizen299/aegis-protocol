@@ -25,7 +25,8 @@ func main() {
 		panic(err)
 	}
 
-	log := observability.NewLogger(serviceName, cfg.LogSvc)
+	log := observability.NewLogger(serviceName, cfg.LogSvc).
+		With().Str("environment", cfg.Environment).Logger()
 
 	if err := cfg.ValidateIndexer(); err != nil {
 		log.Fatal().Err(err).Msg("invalid configuration")

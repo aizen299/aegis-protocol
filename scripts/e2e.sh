@@ -10,6 +10,9 @@ PG_NAME=aegis-e2e-pg
 REDIS_NAME=aegis-e2e-redis
 ANVIL_PID=""
 
+APP_ENV="${APP_ENV:-local}"
+export APP_ENV
+
 DB_DSN="${DB_DSN:-postgres://pb:pb_local@localhost:5432/aegis?sslmode=disable}"
 REDIS_ADDR="${REDIS_ADDR:-localhost:6379}"
 export DB_DSN REDIS_ADDR
