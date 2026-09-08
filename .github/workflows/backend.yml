@@ -1,0 +1,78 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aegis_test
+          POSTGRES_USER: pb
+          POSTGRES_PASSWORD: pb
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_DSN: postgres://pb:pb@localhost:5432/aegis_test?sslmode=disable
+      REDIS_ADDR: localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test ./... -race -count=1
+
+  # The architecture tests enforce the multi-chain boundary from docs/project-spec.md §7.
+  # Run separately so a boundary violation is legible in the job list.
+  boundary:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
+      - run: go test ./internal/architecture/... -v
+
+  abi-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: recursive}
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Fail if the committed ABI is stale
+        run: |
+          cd contracts
+          forge inspect VaultEngine abi --json > /tmp/current.abi.json
+          diff <(jq -S . /tmp/current.abi.json) \
+               <(jq -S . ../backend/pkg/contracts/vaultengine/VaultEngine.abi.json) \
+            || (echo "::error::Committed ABI is stale. Run 'make backend-abi'." && exit 1)

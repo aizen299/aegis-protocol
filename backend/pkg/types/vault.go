@@ -1,0 +1,76 @@
+package types
+
+import (
+	"math/big"
+	"time"
+)
+
+// Amounts throughout are raw base units exactly as the chain reported them — a uint256, never
+// rescaled at write time. Decimals belong to the asset (see AssetMetadata), not to the protocol:
+// scaling on ingest would bake one token's decimals into every row and silently corrupt any asset
+// that does not match.
+//
+// Raw is rendered as a decimal string in JSON so that a uint256 survives a JavaScript client.
+
+// AssetMetadata is what makes a raw amount interpretable.
+type AssetMetadata struct {
+	ChainID  int64  `json:"chainId"`
+	Address  string `json:"address"`
+	Decimals uint8  `json:"decimals"`
+	Symbol   string `json:"symbol,omitempty"`
+	Name     string `json:"name,omitempty"`
+}
+
+// VaultDeposit mirrors a Deposited event.
+type VaultDeposit struct {
+	ChainID      int64     `json:"chainId"`
+	UserAddress  string    `json:"user"`
+	AssetAddress string    `json:"asset"`
+	VaultAddress string    `json:"vault"`
+	Amount       Raw       `json:"amount"`
+	Shares       Raw       `json:"shares"`
+	Decimals     uint8     `json:"decimals"`
+	TxHash       string    `json:"txHash"`
+	LogIndex     uint      `json:"logIndex"`
+	BlockNumber  uint64    `json:"blockNumber"`
+	DepositedAt  time.Time `json:"depositedAt"`
+}
+
+// VaultWithdrawal mirrors a Withdrawn event.
+type VaultWithdrawal struct {
+	ChainID      int64     `json:"chainId"`
+	UserAddress  string    `json:"user"`
+	AssetAddress string    `json:"asset"`
+	VaultAddress string    `json:"vault"`
+	Amount       Raw       `json:"amount"`
+	Shares       Raw       `json:"shares"`
+	Decimals     uint8     `json:"decimals"`
+	TxHash       string    `json:"txHash"`
+	LogIndex     uint      `json:"logIndex"`
+	BlockNumber  uint64    `json:"blockNumber"`
+	WithdrawnAt  time.Time `json:"withdrawnAt"`
+}
+
+// VaultPosition is the aggregated per-user view served by the API and cached in Redis.
+//
+// Shares carry a different scale from assets: the vault's virtual-shares defence offsets them by
+// VaultEngine.virtualSharesOffset() decimal places. ShareDecimals reports the resulting scale so
+// clients do not have to reconstruct it.
+type VaultPosition struct {
+	ChainID        int64      `json:"chainId"`
+	UserAddress    string     `json:"user"`
+	AssetAddress   string     `json:"asset,omitempty"`
+	Shares         Raw        `json:"shares"`
+	DepositedTotal Raw        `json:"depositedTotal"`
+	WithdrawnTotal Raw        `json:"withdrawnTotal"`
+	Decimals       uint8      `json:"decimals"`
+	ShareDecimals  uint8      `json:"shareDecimals"`
+	LastDepositAt  *time.Time `json:"lastDepositAt,omitempty"`
+}
+
+func NewRawFromBig(n *big.Int) Raw {
+	if n == nil {
+		return Raw{}
+	}
+	return Raw{value: new(big.Int).Set(n)}
+}

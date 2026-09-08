@@ -17,6 +17,7 @@ backend/
 │   ├── db/             # PostgreSQL access layer
 │   ├── cache/          # Redis access layer
 │   ├── chain/          # Chain client interface + per-chain implementations (evm/)
+│   ├── architecture/   # Tests enforcing structural rules the compiler cannot
 │   └── api/            # HTTP handlers, WebSocket hub
 ├── pkg/
 │   ├── types/          # Shared domain types
@@ -98,7 +99,7 @@ func main() {
 ## Multi-Chain Readiness
 
 Phase 1 is single-chain (Arbitrum), but Solana is the confirmed Phase 2 target — see
-`project-spec.md` §7. The contracts get rewritten per chain; the backend does not. These two
+`project-spec.md` §7. The contracts get rewritten per chain; the backend does not. These three
 constraints are binding from v0.1 and exist so that adding an SVM chain later is an additive
 change rather than a migration.
 
@@ -136,15 +137,31 @@ type Client interface {
     // Returns normalized events; decoding is the implementation's concern.
     LogsInRange(ctx context.Context, from, to uint64, filters []Filter) ([]Event, error)
     ConfirmationDepth() uint64
+
+    // Canonical identity encoding for this chain: 0x-hex on EVM, base58 on Solana.
+    EncodeIdentity(id Identity) string
+    DecodeIdentity(s string) (Identity, error)
+
+    // Token metadata is chain-specific: an EVM token exposes it through view calls, an SPL mint
+    // carries decimals in its account data.
+    TokenMetadata(ctx context.Context, token Identity) (TokenMeta, error)
 }
 
 type Event struct {
     ChainID     int64
     BlockNumber uint64
+    BlockTime   int64
     TxHash      [32]byte
+    LogIndex    uint
     Contract    Identity
     Name        string
     Payload     map[string]any
+}
+
+type TokenMeta struct {
+    Decimals uint8
+    Symbol   string
+    Name     string
 }
 ```
 
@@ -233,9 +250,10 @@ r.Use(middleware.RealIP)
 r.Use(middleware.Recoverer)
 r.Use(middleware.Timeout(30 * time.Second))
 
+r.Get("/v1/vault/{vaultAddress}/tvl", h.GetVaultTVL)
 r.Get("/v1/vault/positions/{address}", h.GetVaultPosition)
-r.Get("/v1/oracle/latest", h.GetLatestOracleData)
-r.Get("/v1/governance/proposals", h.ListProposals)
+r.Get("/v1/oracle/latest", h.GetLatestOracleData)          // v0.2
+r.Get("/v1/governance/proposals", h.ListProposals)          // v0.3
 ```
 
 - All handlers return `application/json`.
@@ -277,6 +295,21 @@ for _, item := range items {
 }
 ```
 
+## Amounts
+
+Token amounts are carried as `types.Raw` — an unscaled `uint256` in the asset's own base units —
+from the event decoder all the way to the JSON response. They are never converted to a scaled
+decimal on ingest.
+
+Decimals belong to the asset, not to the protocol. The indexer resolves them once per asset via
+`chain.Client.TokenMetadata` and persists them to `assets`; a foreign key from every amount-bearing
+table makes it impossible to store an amount whose scale is unknown. A token that does not expose
+`decimals()` fails the batch rather than defaulting to 18 — guessing a scale is a silent
+twelve-order-of-magnitude error on a six-decimal asset like USDC.
+
+`Raw` marshals to a JSON *string*, because a `uint256` does not survive a `float64`. Scaling happens
+once, at the presentation edge, using the decimals travelling alongside the amount.
+
 ## Database Access Layer
 
 - Use `pgx/v5` directly. No ORM.
@@ -287,10 +320,10 @@ for _, item := range items {
 ```go
 func (s *Store) InsertOracleSubmission(ctx context.Context, sub OracleSubmission) error {
     _, err := s.pool.Exec(ctx, `
-        INSERT INTO oracle_submissions (round_id, node_id, value, signature, submitted_at)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (round_id, node_id) DO NOTHING
-    `, sub.RoundID, sub.NodeID, sub.Value, sub.Signature, sub.SubmittedAt)
+        INSERT INTO oracle_submissions (chain_id, round_id, node_address, value, signature, submitted_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (chain_id, round_id, node_address) DO NOTHING
+    `, sub.ChainID, sub.RoundID, sub.NodeAddress, sub.Value, sub.Signature, sub.SubmittedAt)
     return err
 }
 ```

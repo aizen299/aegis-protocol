@@ -9,7 +9,7 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: project_blockchain
+      POSTGRES_DB: aegis
       POSTGRES_USER: pb
       POSTGRES_PASSWORD: pb_local
     ports: ["5432:5432"]
@@ -31,7 +31,7 @@ services:
       context: ./backend
       dockerfile: docker/indexer.Dockerfile
     environment:
-      DB_DSN: postgres://pb:pb_local@postgres:5432/project_blockchain
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis
       REDIS_ADDR: redis:6379
       CHAIN_RPC_URL: ${CHAIN_RPC_URL}
       CHAIN_WS_URL: ${CHAIN_WS_URL}
@@ -43,9 +43,9 @@ services:
     build:
       context: ./backend
       dockerfile: docker/api.Dockerfile
-    ports: ["8080:8080"]
+    ports: ["8090:8090"]
     environment:
-      DB_DSN: postgres://pb:pb_local@postgres:5432/project_blockchain
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis
       REDIS_ADDR: redis:6379
     depends_on:
       postgres: { condition: service_healthy }
@@ -76,7 +76,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /api ./cmd/api
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=builder /api /api
-EXPOSE 8080
+EXPOSE 8090
 ENTRYPOINT ["/api"]
 ```
 
@@ -164,7 +164,7 @@ terraform {
       "name": "api",
       "image": "ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/pb-api:latest",
       "essential": true,
-      "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
+      "portMappings": [{"containerPort": 8090, "protocol": "tcp"}],
       "secrets": [
         {"name": "DB_DSN", "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT:parameter/pb/staging/db_dsn"},
         {"name": "REDIS_ADDR", "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT:parameter/pb/staging/redis_addr"}
@@ -178,7 +178,7 @@ terraform {
         }
       },
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"],
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:8090/health || exit 1"],
         "interval": 30,
         "timeout": 5,
         "retries": 3

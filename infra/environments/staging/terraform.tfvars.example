@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars. That file is gitignored: it must never hold secrets, which live in
+# SSM Parameter Store as SecureString.
+region            = "us-east-1"
+db_instance_class = "db.t4g.medium"
+redis_node_type   = "cache.t4g.micro"
+api_desired_count = 2

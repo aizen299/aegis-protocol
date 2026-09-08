@@ -1,1 +1,25 @@
 .DS_Store
+
+# Environment
+.env
+.env.local
+*.env.local
+
+# Build output
+out/
+cache/
+target/
+node_modules/
+.next/
+dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+
+# Coverage
+lcov.info
+coverage/

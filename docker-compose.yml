@@ -1,0 +1,90 @@
+name: aegis
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: aegis
+      POSTGRES_USER: pb
+      POSTGRES_PASSWORD: pb_local
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pb -d aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports: ["6379:6379"]
+    volumes: ["redisdata:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--chain-id", "31337", "--block-time", "2"]
+    ports: ["8545:8545"]
+
+  # One-shot. Runs to completion before the services that depend on it start.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: docker/migrate.Dockerfile
+    command: ["-database", "postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable", "up"]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  indexer:
+    build:
+      context: ./backend
+      dockerfile: docker/indexer.Dockerfile
+    environment:
+      SERVICE_NAME: indexer
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
+      REDIS_ADDR: redis:6379
+      CHAIN_RPC_URL: ${CHAIN_RPC_URL:-http://anvil:8545}
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      CHAIN_CONFIRM_BLOCKS: ${CHAIN_CONFIRM_BLOCKS:-1}
+      CHAIN_START_BLOCK: ${CHAIN_START_BLOCK:-0}
+      CONTRACT_VAULT_ENGINE: ${CONTRACT_VAULT_ENGINE:?set CONTRACT_VAULT_ENGINE to the deployed proxy}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: docker/api.Dockerfile
+    # 8080 is deliberately avoided: it is commonly taken by Jenkins on developer machines.
+    ports: ["8090:8090"]
+    environment:
+      SERVICE_NAME: api
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
+      REDIS_ADDR: redis:6379
+      CHAIN_RPC_URL: ${CHAIN_RPC_URL:-http://anvil:8545}
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      API_ADDR: ":8090"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  zk-service:
+    build:
+      context: ./zk
+      dockerfile: Dockerfile
+    ports: ["8081:8081"]
+    profiles: ["zk"]
+
+volumes:
+  pgdata:
+  redisdata:

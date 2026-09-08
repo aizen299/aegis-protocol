@@ -1,0 +1,48 @@
+name: Contracts CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: contracts
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: recursive}
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge fmt --check
+      - run: forge build --sizes
+      - run: forge test -vvv
+      - run: forge coverage --report lcov
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contracts-coverage
+          path: contracts/lcov.info
+
+  # Slither is mandatory before a contract is considered complete. HIGH/MEDIUM findings fail the
+  # build; suppressions are inline and justified in contracts/README.md.
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: recursive}
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: crytic/slither-action@v0.4.0
+        with:
+          target: contracts/
+          slither-config: contracts/slither.config.json
+          fail-on: medium

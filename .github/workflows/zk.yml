@@ -1,0 +1,32 @@
+name: zk CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["zk/**", ".github/workflows/zk.yml"]
+  pull_request:
+    paths: ["zk/**", ".github/workflows/zk.yml"]
+
+concurrency:
+  group: zk-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: zk
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zk
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build --release

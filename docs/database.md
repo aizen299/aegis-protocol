@@ -26,12 +26,21 @@ config.HealthCheckPeriod = 30 * time.Second
 - `updated_at` managed via trigger, not application code.
 - Soft deletes via `deleted_at TIMESTAMPTZ` where audit trail matters. Hard delete otherwise.
 - Foreign keys with `ON DELETE RESTRICT` unless cascade is explicitly required.
-- All monetary/price values: `NUMERIC(38, 18)` — never FLOAT.
+- Never FLOAT for any monetary value.
+- **Token amounts are stored raw, in the asset's own base units: `NUMERIC(78, 0)`, unscaled.**
+  Decimals are a property of the asset, not of the protocol, and live in the `assets` table. Scaling
+  on ingest bakes one token's decimals into every row and misrepresents by twelve orders of
+  magnitude any asset that does not match — a six-decimal USDC amount written as though it were
+  eighteen-decimal. Callers scale once, at the presentation edge, using `assets.decimals`.
+- Protocol-scaled values are the exception and stay `NUMERIC(38, 18)`. An oracle's aggregated value
+  is scaled to 18 decimals by `OracleModule` itself (`docs/oracle.md`), so the scale is contractual
+  rather than a property of any token. Do not copy the vault's raw-units pattern there, or the
+  reverse.
 
 ## Multi-Chain Readiness
 
 Phase 1 is single-chain (Arbitrum), but Solana is the confirmed Phase 2 target — see
-`project-spec.md` §7. Two schema rules are binding from v0.1 so that adding a second chain is an
+`project-spec.md` §7. Three schema rules are binding from v0.1 so that adding a second chain is an
 additive migration rather than a rewrite of every constraint and index.
 
 **1. Identity columns hold 32 bytes, not 20.** An EVM address is 20 bytes; a Solana pubkey is
@@ -50,6 +59,9 @@ non-EVM chains are assigned internal IDs from a reserved high range recorded in
 
 This does not apply to purely off-chain tables (application users, API keys, job state), which
 have no `chain_id`.
+
+Asset metadata is chain-scoped for the same reason: the same symbol on two chains is two different
+tokens, and decimals can differ between a token's deployments.
 
 **3. Governance proposals record a destination, and their state machine is asynchronous.**
 Governance is the only sanctioned cross-chain message (`project-spec.md` §7), so
@@ -72,6 +84,22 @@ unresolved `dispatched` proposal is an operational alert rather than a normal st
 
 In Phase 1 the `dispatched` and `failed` states are unreachable. They exist so that adding them
 later is not a migration of the governance state machine — see the upgrade-cost argument in §7.
+
+## Event Identity
+
+**A chain event is identified by `(chain_id, tx_hash, log_index)`, never by `(chain_id, tx_hash)`.**
+
+One transaction routinely emits several instances of the same event: a router depositing on behalf
+of multiple users, a batch voter casting on several proposals, or two vaults touched in one call.
+Because the indexer writes with `ON CONFLICT DO NOTHING`, a uniqueness constraint that omits
+`log_index` silently discards every event after the first in a transaction — data loss the indexer
+cannot detect and no error surfaces for.
+
+`log_index` is therefore a column on every table holding indexed events, and is part of the
+uniqueness constraint wherever the transaction hash is. Where a table has a natural semantic key as
+well (`(chain_id, proposal_id, voter)` for votes, `(chain_id, round_id, node_address)` for oracle
+submissions), both constraints are declared: the semantic key expresses the protocol rule, the
+event key expresses idempotent ingestion.
 
 ## Core Schema
 
@@ -107,19 +135,38 @@ CREATE TABLE oracle_submissions (
     UNIQUE (chain_id, round_id, node_address)
 );
 
+-- Asset Metadata
+-- Decimals are what make a raw amount interpretable. Every table holding token amounts carries a
+-- foreign key here, so an amount cannot exist without its scale.
+CREATE TABLE assets (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chain_id      BIGINT NOT NULL,
+    address       TEXT NOT NULL,
+    decimals      SMALLINT NOT NULL CHECK (decimals >= 0 AND decimals <= 38),
+    symbol        TEXT,
+    name          TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (chain_id, address)
+);
+
 -- Vault State
+-- amount and shares are raw uint256 base units, unscaled. See "Token amounts" above.
 CREATE TABLE vault_deposits (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chain_id      BIGINT NOT NULL,
     user_address  TEXT NOT NULL,
     asset_address TEXT NOT NULL,
-    amount        NUMERIC(38, 18) NOT NULL,
-    shares        NUMERIC(38, 18) NOT NULL,
+    vault_address TEXT NOT NULL,
+    amount        NUMERIC(78, 0) NOT NULL CHECK (amount >= 0),
+    shares        NUMERIC(78, 0) NOT NULL CHECK (shares >= 0),
     tx_hash       TEXT NOT NULL,
+    log_index     INT NOT NULL,
     block_number  BIGINT NOT NULL,
     deposited_at  TIMESTAMPTZ NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (chain_id, tx_hash)
+    UNIQUE (chain_id, tx_hash, log_index),
+    FOREIGN KEY (chain_id, asset_address) REFERENCES assets(chain_id, address)
 );
 
 CREATE TABLE vault_withdrawals (
@@ -127,13 +174,16 @@ CREATE TABLE vault_withdrawals (
     chain_id      BIGINT NOT NULL,
     user_address  TEXT NOT NULL,
     asset_address TEXT NOT NULL,
-    amount        NUMERIC(38, 18) NOT NULL,
-    shares        NUMERIC(38, 18) NOT NULL,
+    vault_address TEXT NOT NULL,
+    amount        NUMERIC(78, 0) NOT NULL CHECK (amount >= 0),
+    shares        NUMERIC(78, 0) NOT NULL CHECK (shares >= 0),
     tx_hash       TEXT NOT NULL,
+    log_index     INT NOT NULL,
     block_number  BIGINT NOT NULL,
     withdrawn_at  TIMESTAMPTZ NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (chain_id, tx_hash)
+    UNIQUE (chain_id, tx_hash, log_index),
+    FOREIGN KEY (chain_id, asset_address) REFERENCES assets(chain_id, address)
 );
 
 -- Governance
@@ -176,11 +226,12 @@ CREATE TABLE governance_votes (
     weight        NUMERIC(38, 18) NOT NULL,
     reason        TEXT,
     tx_hash       TEXT NOT NULL,
+    log_index     INT NOT NULL,
     block_number  BIGINT NOT NULL,
     voted_at      TIMESTAMPTZ NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     FOREIGN KEY (chain_id, proposal_id) REFERENCES governance_proposals(chain_id, proposal_id),
-    UNIQUE (chain_id, tx_hash),
+    UNIQUE (chain_id, tx_hash, log_index),
     UNIQUE (chain_id, proposal_id, voter)
 );
 
@@ -224,7 +275,10 @@ CREATE INDEX idx_oracle_rounds_feed_state ON oracle_rounds(chain_id, feed_id, st
 -- Vault
 CREATE INDEX idx_vault_deposits_user ON vault_deposits(chain_id, user_address);
 CREATE INDEX idx_vault_deposits_block ON vault_deposits(chain_id, block_number);
+CREATE INDEX idx_vault_deposits_vault ON vault_deposits(chain_id, vault_address);
 CREATE INDEX idx_vault_withdrawals_user ON vault_withdrawals(chain_id, user_address);
+CREATE INDEX idx_vault_withdrawals_block ON vault_withdrawals(chain_id, block_number);
+CREATE INDEX idx_vault_withdrawals_vault ON vault_withdrawals(chain_id, vault_address);
 
 -- Governance
 CREATE INDEX idx_governance_proposals_state ON governance_proposals(chain_id, state);
@@ -238,10 +292,14 @@ Keys for chain-derived data are chain-scoped, for the same reason the tables are
 round ID is only meaningful alongside its chain. The namespace is
 `pb:{module}:{chain_id}:{entity}:{id}`.
 
+Cached amounts are raw base units, exactly as stored. Every cached payload carrying an amount
+carries its `decimals` too, so a cache hit is as interpretable as a database read.
+
 ```
 pb:oracle:{chain_id}:latest:{feed_id}          → JSON: {value, roundId, settledAt, submissionCount}  TTL: 30s
-pb:vault:{chain_id}:position:{address}         → JSON: {shares, assets, lastDepositAt}               TTL: 60s
-pb:vault:{chain_id}:tvl                        → string: decimal value                               TTL: 30s
+pb:vault:{chain_id}:position:{address}         → JSON: {shares, depositedTotal, withdrawnTotal,
+                                                        decimals, shareDecimals, lastDepositAt}      TTL: 60s
+pb:vault:{chain_id}:tvl:{vault_address}        → JSON: {amount, decimals, asset}                     TTL: 30s
 pb:governance:{chain_id}:proposal:{proposalId} → JSON: proposal object                               TTL: 300s
 pb:governance:{chain_id}:proposals:active      → JSON array of active proposal IDs                   TTL: 60s
 pb:node:{chain_id}:info:{address}              → JSON: NodeInfo                                      TTL: 120s
@@ -281,10 +339,26 @@ const q = `
 
 ### Upsert (Idempotent Indexing)
 ```go
+// The conflict target includes log_index. Without it, a transaction carrying two Deposited events
+// silently loses the second — see "Event Identity".
 const q = `
-    INSERT INTO vault_deposits (chain_id, user_address, asset_address, amount, shares, tx_hash, block_number, deposited_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (chain_id, tx_hash) DO NOTHING
+    INSERT INTO vault_deposits
+        (chain_id, user_address, asset_address, vault_address, amount, shares, tx_hash, log_index, block_number, deposited_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
+`
+```
+
+### Reading amounts
+```go
+// Amounts come back as raw base units. Join the asset to get the scale; never assume 18.
+const q = `
+    SELECT d.amount, d.shares, a.decimals, a.symbol
+    FROM vault_deposits d
+    JOIN assets a ON a.chain_id = d.chain_id AND a.address = d.asset_address
+    WHERE d.chain_id = $1 AND d.user_address = $2
+    ORDER BY d.block_number DESC, d.log_index DESC
+    LIMIT $3 OFFSET $4
 `
 ```
 
