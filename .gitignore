@@ -5,16 +5,21 @@
 .env.local
 *.env.local
 
-# Build output
-out/
-cache/
-target/
+# Build output.
+# Anchored with a leading slash on purpose: an unanchored pattern like `cache/` matches a directory
+# of that name at ANY depth, which silently swallowed the backend/internal/cache source package.
+/contracts/out/
+/contracts/cache/
+/contracts/broadcast/
+/contracts/deployments/
+/zk/target/
+/frontend/.next/
+/frontend/out/
+/frontend/tsconfig.tsbuildinfo
 node_modules/
-.next/
-dist/
 
 # Terraform
-.terraform/
+**/.terraform/
 *.tfstate
 *.tfstate.*
 crash.log
@@ -22,4 +27,5 @@ crash.log
 
 # Coverage
 lcov.info
-coverage/
+/contracts/coverage/
+/frontend/coverage/

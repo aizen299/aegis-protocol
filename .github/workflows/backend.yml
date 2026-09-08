@@ -3,21 +3,22 @@ name: Backend CI
 on:
   push:
     branches: [main]
-    paths: ["backend/**", ".github/workflows/backend.yml"]
+    # contracts/src is included because the committed ABI is generated from it: a contract change
+    # that is not mirrored into backend/pkg/contracts must fail here, not at runtime.
+    paths: ["backend/**", "contracts/src/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["backend/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "contracts/src/**", ".github/workflows/backend.yml"]
 
 concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    working-directory: backend
-
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
         image: postgres:16-alpine
@@ -63,16 +64,39 @@ jobs:
           cache-dependency-path: backend/go.sum
       - run: go test ./internal/architecture/... -v
 
+  # Every source file must reach a clean checkout. A .gitignore pattern that swallows a package is
+  # invisible locally and only surfaces as a build failure here, so assert it directly.
+  tracked-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if any Go source file is untracked in the checkout
+        run: |
+          missing=$(comm -23 \
+            <(find backend -name '*.go' -not -path '*/vendor/*' | sort) \
+            <(git ls-files 'backend/**/*.go' | sort))
+          if [ -n "$missing" ]; then
+            echo "::error::These files are not tracked by git — check .gitignore for an unanchored pattern:"
+            echo "$missing"
+            exit 1
+          fi
+
   abi-drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with: {submodules: recursive}
       - uses: foundry-rs/foundry-toolchain@v1
+      # Exporting and comparing are separate steps on purpose: folding them together with `||` made
+      # a failed export report as "ABI is stale", which is the wrong diagnosis.
+      - name: Export the ABI from contracts/
+        working-directory: contracts
+        run: forge inspect VaultEngine abi --json > "$RUNNER_TEMP/current.abi.json"
       - name: Fail if the committed ABI is stale
         run: |
-          cd contracts
-          forge inspect VaultEngine abi --json > /tmp/current.abi.json
-          diff <(jq -S . /tmp/current.abi.json) \
-               <(jq -S . ../backend/pkg/contracts/vaultengine/VaultEngine.abi.json) \
-            || (echo "::error::Committed ABI is stale. Run 'make backend-abi'." && exit 1)
+          if ! diff -u \
+              <(jq -S . backend/pkg/contracts/vaultengine/VaultEngine.abi.json) \
+              <(jq -S . "$RUNNER_TEMP/current.abi.json"); then
+            echo "::error::Committed ABI does not match contracts/. Run 'make backend-abi' and commit the result."
+            exit 1
+          fi
