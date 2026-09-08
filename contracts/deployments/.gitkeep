@@ -1,0 +1,2 @@
+Deployment artifacts are written here by the deploy scripts and are not committed.
+This file keeps the directory present in a fresh clone, because vm.writeJson does not create it.

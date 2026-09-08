@@ -36,9 +36,28 @@ contract DeployVault is Script {
 
         vm.stopBroadcast();
 
+        _writeArtifact(proxy, implementation, asset);
+
         console2.log("VaultEngine proxy:         ", proxy);
         console2.log("VaultEngine implementation:", implementation);
         console2.log("chainId:                   ", block.chainid);
         console2.log("deployed at block:         ", block.number);
+    }
+
+    /// @dev Records the deployment so downstream services read addresses from a file rather than
+    ///      from terminal scrollback. Keyed by chain ID: a deployment is only meaningful per chain.
+    function _writeArtifact(
+        address proxy,
+        address implementation,
+        address asset
+    ) internal {
+        string memory key = "deployment";
+        vm.serializeAddress(key, "vaultEngineProxy", proxy);
+        vm.serializeAddress(key, "vaultEngineImplementation", implementation);
+        vm.serializeAddress(key, "asset", asset);
+        vm.serializeUint(key, "chainId", block.chainid);
+        string memory out = vm.serializeUint(key, "deployedAtBlock", block.number);
+
+        vm.writeJson(out, string.concat("./deployments/", vm.toString(block.chainid), ".json"));
     }
 }

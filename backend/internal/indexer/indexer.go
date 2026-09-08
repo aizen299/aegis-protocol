@@ -72,6 +72,10 @@ func New(client chain.Client, store CursorStore, log zerolog.Logger, opts Option
 // Cursor returns the last block committed to Postgres.
 func (idx *Indexer) Cursor() uint64 { return idx.cursor }
 
+// Restore loads the persisted cursor. Run calls it; a caller driving Step directly must call it
+// first.
+func (idx *Indexer) Restore(ctx context.Context) error { return idx.restoreCursor(ctx) }
+
 // Run resumes from the persisted cursor and blocks until ctx is cancelled.
 func (idx *Indexer) Run(ctx context.Context) error {
 	if err := idx.restoreCursor(ctx); err != nil {
@@ -86,7 +90,7 @@ func (idx *Indexer) Run(ctx context.Context) error {
 			return nil
 		}
 
-		advanced, err := idx.step(ctx)
+		advanced, err := idx.Step(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -106,8 +110,10 @@ func (idx *Indexer) Run(ctx context.Context) error {
 	}
 }
 
-// step processes at most one batch. It reports whether the cursor moved.
-func (idx *Indexer) step(ctx context.Context) (bool, error) {
+// Step processes at most one batch and reports whether the cursor moved. Run drives this in a
+// loop; it is exported so a caller can advance the indexer deterministically instead of waiting on
+// wall-clock polling.
+func (idx *Indexer) Step(ctx context.Context) (bool, error) {
 	head, err := idx.client.Head(ctx)
 	if err != nil {
 		return false, fmt.Errorf("head: %w", err)

@@ -32,6 +32,10 @@ logs: ## Follow service logs
 .PHONY: test
 test: contracts-test backend-test zk-test ## Run every layer's test suite
 
+.PHONY: e2e
+e2e: ## End-to-end smoke test: real chain, real database, real indexer and API
+	./scripts/e2e.sh
+
 .PHONY: build
 build: contracts-build backend-build zk-build frontend-build ## Build every layer
 
@@ -85,6 +89,10 @@ backend-build:
 .PHONY: backend-test
 backend-test:
 	cd backend && go test ./... -race -count=1
+
+.PHONY: backend-e2e
+backend-e2e: ## Assumes anvil, postgres, and redis are already up — prefer `make e2e`
+	cd backend && go test -tags e2e ./internal/e2e/... -count=1 -v
 
 .PHONY: backend-lint
 backend-lint:

@@ -66,8 +66,14 @@ func (i Identity) EVMAddress() ([20]byte, error) {
 	return addr, nil
 }
 
-// EVMHex renders the low 20 bytes as a 0x-prefixed hex string. Valid only for EVM chains; use the
-// chain client's encoder when the chain is not known statically.
+// EVMHex renders the low 20 bytes as a 0x-prefixed, all-lowercase hex string.
+//
+// Lowercase is the canonical stored form: it is what goes into Postgres, into Redis keys, and out
+// of the API, so two references to one account always compare equal. EIP-55 checksummed input
+// (what forge, explorers, and wallets display) parses fine, but is normalised on the way in — never
+// compare a checksummed string to a stored one directly.
+//
+// Valid only for EVM chains; use the chain client's encoder when the chain is not known statically.
 func (i Identity) EVMHex() string {
 	return "0x" + hex.EncodeToString(i[12:])
 }

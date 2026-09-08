@@ -62,3 +62,26 @@ func TestIsEVMChain(t *testing.T) {
 		}
 	}
 }
+
+// The canonical stored form is lowercase. Checksummed input must normalise to it, or a deploy
+// artifact's address will not match the same address read back from Postgres.
+func TestEVMHexIsCanonicalLowercase(t *testing.T) {
+	const checksummed = "0xA513E6E4b8f2a923D98304ec87F64353C4D5C853"
+	const canonical = "0xa513e6e4b8f2a923d98304ec87f64353c4d5c853"
+
+	id, err := IdentityFromEVMHex(checksummed)
+	if err != nil {
+		t.Fatalf("checksummed input must parse: %v", err)
+	}
+	if got := id.EVMHex(); got != canonical {
+		t.Fatalf("got %s, want %s", got, canonical)
+	}
+
+	lower, err := IdentityFromEVMHex(canonical)
+	if err != nil {
+		t.Fatalf("lowercase input must parse: %v", err)
+	}
+	if lower != id {
+		t.Fatal("checksummed and lowercase forms of one address must produce the same Identity")
+	}
+}

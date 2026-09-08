@@ -102,3 +102,28 @@ holds that line.
 
 Every response carrying an amount carries its `decimals` alongside, so scaling happens once, at the
 presentation edge.
+
+## End-to-end test
+
+`make e2e` from the repo root. Every other suite here tests a component against a mock of its
+neighbour; `internal/e2e` is the only place a real contract emits a real log that a real indexer
+writes to a real database and a real handler serves.
+
+It deploys against a **six-decimal** token on purpose. Eighteen is the value every layer would get
+right by accident, so a hardcoded scale anywhere in the path shows up as a factor of 10^12 rather
+than passing silently.
+
+What it covers beyond the happy path:
+
+| Test | What would otherwise go unnoticed |
+|---|---|
+| `TestDepositFlowPreservesRawSixDecimalAmount` | a rescale anywhere between the log and the API |
+| `TestAssetMetadataIsResolvedFromChain` | `decimals()`/`symbol()` never actually being read |
+| `TestAPIServesRawAmountAndDecimals` | a uint256 serialised as a JSON number |
+| `TestAPIAcceptsChecksummedAddress` | checksummed input failing to reach the stored lowercase row |
+| `TestReindexingIsIdempotent` | the conflict target not catching a replayed batch |
+| `TestUnconfirmedBlocksAreNotIndexed` | the reorg window not being respected |
+| `TestTVLReflectsIndexedFlows` | withdrawals not netting against deposits |
+
+The tests skip rather than fail when Anvil or Postgres are unreachable, so CI asserts that they
+actually ran — a silently skipped smoke test is worse than none.

@@ -144,7 +144,7 @@ func TestStepStopsAtConfirmationDepth(t *testing.T) {
 	if err := idx.restoreCursor(context.Background()); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
-	if _, err := idx.step(context.Background()); err != nil {
+	if _, err := idx.Step(context.Background()); err != nil {
 		t.Fatalf("step: %v", err)
 	}
 
@@ -161,7 +161,7 @@ func TestStepDoesNothingWhenHeadBelowConfirmations(t *testing.T) {
 	client := &fakeClient{head: 5, confirms: 12}
 	idx := newTestIndexer(client, &fakeCursors{}, Options{})
 
-	advanced, err := idx.step(context.Background())
+	advanced, err := idx.Step(context.Background())
 	if err != nil {
 		t.Fatalf("step: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestStepRespectsBatchSize(t *testing.T) {
 	client := &fakeClient{head: 1000, confirms: 0}
 	idx := newTestIndexer(client, &fakeCursors{}, Options{BatchSize: 50})
 
-	if _, err := idx.step(context.Background()); err != nil {
+	if _, err := idx.Step(context.Background()); err != nil {
 		t.Fatalf("step: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func TestRestoreCursorResumesFromPersisted(t *testing.T) {
 		t.Fatalf("cursor = %d, want 300", idx.Cursor())
 	}
 
-	if _, err := idx.step(context.Background()); err != nil {
+	if _, err := idx.Step(context.Background()); err != nil {
 		t.Fatalf("step: %v", err)
 	}
 	if got := client.seenRanges()[0]; got != [2]uint64{301, 310} {
@@ -231,7 +231,7 @@ func TestCursorNotAdvancedWhenHandlerFails(t *testing.T) {
 	handler := &recordingHandler{err: errors.New("write failed")}
 	idx := newTestIndexer(client, cursors, Options{}, handler)
 
-	if _, err := idx.step(context.Background()); err == nil {
+	if _, err := idx.Step(context.Background()); err == nil {
 		t.Fatal("expected step to surface the handler error")
 	}
 	if len(cursors.saved()) != 0 {
@@ -253,7 +253,7 @@ func TestReplayDeliversSameEventsAgain(t *testing.T) {
 	for range 2 {
 		client := &fakeClient{head: 50, events: events}
 		idx := newTestIndexer(client, &fakeCursors{}, Options{}, handler)
-		if _, err := idx.step(context.Background()); err != nil {
+		if _, err := idx.Step(context.Background()); err != nil {
 			t.Fatalf("step: %v", err)
 		}
 	}

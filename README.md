@@ -44,11 +44,18 @@ Set `CONTRACT_VAULT_ENGINE` in `.env` to the printed proxy, then `make dev` agai
 The API listens on **8090** — 8080 is deliberately avoided as it is commonly taken by Jenkins.
 
 ```bash
-make test                 # every layer
+make test                 # every layer, in isolation
+make e2e                  # real chain, real database, real indexer and API
 make lint
 make security             # slither
 make help                 # all targets
 ```
+
+`make test` verifies each component against a mock of its neighbour. `make e2e` is the only thing
+that exercises the seam between them: it boots Anvil and Postgres, deploys the vault against a
+**six-decimal** token, moves real value through deposit and withdraw, indexes it, and asserts the
+API returns the exact raw amounts. Six decimals is deliberate — eighteen is the value every layer
+would get right by accident.
 
 ## Prerequisites
 

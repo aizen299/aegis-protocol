@@ -53,9 +53,11 @@ type VaultWithdrawal struct {
 
 // VaultPosition is the aggregated per-user view served by the API and cached in Redis.
 //
-// Shares carry a different scale from assets: the vault's virtual-shares defence offsets them by
-// VaultEngine.virtualSharesOffset() decimal places. ShareDecimals reports the resulting scale so
-// clients do not have to reconstruct it.
+// Shares are raw and deliberately carry no scale here. They are offset from the asset by the
+// vault's virtual-shares defence, and that offset is a property of the deployed contract, which the
+// backend does not read — inventing a value would repeat the hardcoded-decimals mistake one level
+// up. Clients that render share amounts read VaultEngine.virtualSharesOffset() directly; the
+// user-facing number is convertToAssets(shares), which is a chain read regardless.
 type VaultPosition struct {
 	ChainID        int64      `json:"chainId"`
 	UserAddress    string     `json:"user"`
@@ -64,7 +66,6 @@ type VaultPosition struct {
 	DepositedTotal Raw        `json:"depositedTotal"`
 	WithdrawnTotal Raw        `json:"withdrawnTotal"`
 	Decimals       uint8      `json:"decimals"`
-	ShareDecimals  uint8      `json:"shareDecimals"`
 	LastDepositAt  *time.Time `json:"lastDepositAt,omitempty"`
 }
 

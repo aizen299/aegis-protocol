@@ -1,0 +1,73 @@
+name: End-to-End
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", "contracts/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+  pull_request:
+    paths: ["backend/**", "contracts/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Every other suite tests a component against a mock of its neighbour. This is the only job where
+  # a real contract emits a real log that a real indexer writes to a real database.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aegis
+          POSTGRES_USER: pb
+          POSTGRES_PASSWORD: pb_local
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_DSN: postgres://pb:pb_local@localhost:5432/aegis?sslmode=disable
+      REDIS_ADDR: localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: recursive}
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
+
+      - name: Apply migrations
+        run: psql "$DB_DSN" -v ON_ERROR_STOP=1 -f backend/migrations/000001_init_schema.up.sql
+
+      - name: Start anvil
+        run: |
+          anvil --port 8545 --chain-id 31337 --silent &
+          for _ in $(seq 1 30); do
+            cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "::error::anvil did not become reachable"
+          exit 1
+
+      # The suite skips rather than fails when its dependencies are missing, so assert it actually
+      # ran — a silently skipped smoke test is worse than no smoke test.
+      - name: Run the end-to-end suite
+        working-directory: backend
+        run: |
+          go test -tags e2e ./internal/e2e/... -count=1 -v 2>&1 | tee /tmp/e2e.log
+          if grep -q -- "--- SKIP" /tmp/e2e.log; then
+            echo "::error::End-to-end tests skipped — anvil, postgres, or redis was unreachable."
+            exit 1
+          fi
+          grep -q -- "--- PASS: TestDepositFlowPreservesRawSixDecimalAmount" /tmp/e2e.log || {
+            echo "::error::The decimals regression test did not run."
+            exit 1
+          }

@@ -1,6 +1,7 @@
 cache/
 out/
 broadcast/
-deployments/
+deployments/*
+!deployments/.gitkeep
 lcov.info
 .env

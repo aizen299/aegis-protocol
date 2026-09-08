@@ -71,6 +71,10 @@ func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 	}
 }
 
+// Handler returns the routed handler, so the API can be exercised in-process without binding a
+// port.
+func (s *Server) Handler() http.Handler { return s.http.Handler }
+
 func (s *Server) Start() error {
 	s.log.Info().Str("addr", s.cfg.API.Addr).Msg("api listening")
 	if err := s.http.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
