@@ -40,6 +40,7 @@ contract OracleStaking is
         uint256 pendingUnstake;
         uint256 claimableAt;
         uint256 slashedTotal;
+        uint256 activatedAtVersion;
         bool registered;
         bool active;
     }
@@ -52,10 +53,11 @@ contract OracleStaking is
     uint256 private _maxSlashBps;
     uint256 private _maxNodes;
     uint256 private _activeNodeCount;
+    uint256 private _nodeSetVersion;
     mapping(address node => NodeInfo info) private _nodes;
 
     // slither-disable-next-line unused-state
-    uint256[42] private __gap;
+    uint256[41] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -105,9 +107,8 @@ contract OracleStaking is
         if (_activeNodeCount >= _maxNodes) revert NodeSetFull(_maxNodes);
 
         node.registered = true;
-        node.active = true;
         node.stake = amount;
-        _activeNodeCount += 1;
+        _activate(msg.sender, node);
 
         _stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -297,6 +298,18 @@ contract OracleStaking is
         return _activeNodeCount;
     }
 
+    function nodeSetVersion() public view returns (uint256) {
+        return _nodeSetVersion;
+    }
+
+    function isEligibleAt(
+        address node_,
+        uint256 version
+    ) public view returns (bool) {
+        NodeInfo storage node = _nodes[node_];
+        return node.active && node.activatedAtVersion <= version;
+    }
+
     function nodeInfo(
         address node_
     ) public view returns (NodeInfo memory) {
@@ -342,6 +355,8 @@ contract OracleStaking is
     ) private {
         node.active = true;
         _activeNodeCount += 1;
+        _nodeSetVersion += 1;
+        node.activatedAtVersion = _nodeSetVersion;
         emit NodeReactivated(node_);
     }
 
@@ -352,6 +367,7 @@ contract OracleStaking is
     ) private {
         node.active = false;
         _activeNodeCount -= 1;
+        _nodeSetVersion += 1;
         emit NodeDeactivated(node_, reason);
     }
 

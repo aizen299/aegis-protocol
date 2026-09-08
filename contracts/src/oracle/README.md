@@ -5,9 +5,31 @@ Plan and open decisions: [`docs/v0.2-oracle-plan.md`](../../../docs/v0.2-oracle-
 | Component | State |
 |---|---|
 | `OracleStaking.sol` | Implemented — registration, stake, unbonding, capped slashing |
-| Round lifecycle and submissions | Not started |
-| On-chain median and settlement | Not started |
-| `IOracleReader` consumer interface | Not started |
+| `OracleRounds.sol` | Implemented — lifecycle, EIP-712 submissions, on-chain median |
+| `IOracleReader` | Implemented — fail-closed staleness |
+| Aggregation service, node binary | Not started |
+
+## Why two contracts
+
+`docs/oracle.md` describes one `OracleModule.sol`. Combined they compile to 25,859 bytes, past the
+24,576-byte limit — one contract was never going to fit. Beyond size, `OracleStaking` custodies node
+balances and should be upgraded rarely, while round logic is where iteration happens; separate
+proxies keep those risk profiles apart. The coupling is read-only: `OracleRounds` calls
+`nodeSetVersion()` and `isEligibleAt()`, so neither holds a role on the other.
+
+## Why quorum uses a snapshot
+
+Quorum is 2/3 of the node set *as it was when the round opened*. Read live at settlement, the
+denominator would be under the nodes' own control — deactivate mid-round and the bar you must clear
+drops with it. `OracleStaking` keeps a monotonic `nodeSetVersion`; a round records it and judges
+every submission against it. `test_deactivatingMidRoundDoesNotShrinkQuorum` covers nodes leaving,
+`test_lateJoinerCannotSubmit` covers nodes arriving.
+
+## Why the reader has no `latestAnswer()`
+
+`getValue(feedId, maxStaleness)` reverts on a value older than the caller's bound, and there is no
+default. A getter that returns a price without forcing the caller to state a freshness requirement
+is how oracle consumers get exploited: the value looks fine and is hours old.
 
 ## Why unbonding exists
 

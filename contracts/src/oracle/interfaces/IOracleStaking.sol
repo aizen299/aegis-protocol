@@ -53,4 +53,18 @@ interface IOracleStaking {
         address node
     ) external view returns (bool);
     function activeNodeCount() external view returns (uint256);
+
+    /// @notice Monotonic counter bumped on every activation or deactivation.
+    /// @dev A round records this at open so eligibility is judged against a frozen set rather than
+    ///      the live one. A version counter rather than a timestamp, because two membership
+    ///      changes in one block must still be ordered.
+    function nodeSetVersion() external view returns (uint256);
+
+    /// @notice Whether `node` was already active as of `version`.
+    /// @dev A node that deactivated and came back has a later activation version and is not
+    ///      eligible — the conservative answer, since it was not continuously active.
+    function isEligibleAt(
+        address node,
+        uint256 version
+    ) external view returns (bool);
 }
