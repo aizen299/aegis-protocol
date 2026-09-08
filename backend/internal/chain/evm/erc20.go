@@ -65,7 +65,7 @@ func (c *Client) call(ctx context.Context, addr common.Address, method string) (
 		return nil, fmt.Errorf("pack %s: %w", method, err)
 	}
 
-	out, err := c.rpc.CallContract(ctx, ethereum.CallMsg{To: &addr, Data: input}, nil)
+	out, err := c.rpc.CallContract(ctx, ethCallMsg(addr, input), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +74,12 @@ func (c *Client) call(ctx context.Context, addr common.Address, method string) (
 	}
 
 	return erc20ABI.Unpack(method, out)
+}
+
+// ethCallMsg builds a plain read-only call. Shared so every contract reader in this package issues
+// calls the same way.
+func ethCallMsg(to common.Address, data []byte) ethereum.CallMsg {
+	return ethereum.CallMsg{To: &to, Data: data}
 }
 
 func (c *Client) callUint8(ctx context.Context, addr common.Address, method string) (uint8, error) {

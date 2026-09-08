@@ -20,6 +20,7 @@ const (
 // VaultStore is the write surface the vault handler needs.
 type VaultStore interface {
 	UpsertAsset(ctx context.Context, a types.AssetMetadata) error
+	UpsertVault(ctx context.Context, v types.VaultMetadata) error
 	InsertVaultDeposit(ctx context.Context, e db.VaultEvent) error
 	InsertVaultWithdrawal(ctx context.Context, e db.VaultEvent) error
 }
@@ -29,6 +30,14 @@ type AssetResolver interface {
 	TokenMetadata(ctx context.Context, token types.Identity) (chain.TokenMeta, error)
 }
 
+// VaultMetadataReader reads a vault's asset and share offset.
+//
+// Narrow and separate from chain.Client on purpose: a share offset is a property of this protocol's
+// contract, not a chain-generic concept, so an SVM implementation would have nothing to implement.
+type VaultMetadataReader interface {
+	VaultMetadata(ctx context.Context, vault types.Identity) (types.Identity, uint8, error)
+}
+
 // VaultHandler turns VaultEngine events into rows. Writes use ON CONFLICT DO NOTHING keyed on
 // (chain_id, tx_hash, log_index), so replaying a batch is a no-op.
 //
@@ -36,24 +45,27 @@ type AssetResolver interface {
 // decimals and records them alongside, rather than scaling on ingest — scaling here would bake one
 // token's decimals into every row and misrepresent any asset that does not match.
 type VaultHandler struct {
-	vault    types.Identity
-	encode   func(types.Identity) string
-	resolver AssetResolver
-	store    VaultStore
-	chainID  int64
+	vault     types.Identity
+	encode    func(types.Identity) string
+	resolver  AssetResolver
+	vaultMeta VaultMetadataReader
+	store     VaultStore
+	chainID   int64
 
-	mu     sync.Mutex
-	assets map[types.Identity]types.AssetMetadata
+	mu       sync.Mutex
+	assets   map[types.Identity]types.AssetMetadata
+	vaultSet bool
 }
 
-func NewVaultHandler(store VaultStore, client chain.Client, vault types.Identity) *VaultHandler {
+func NewVaultHandler(store VaultStore, client chain.Client, vaultMeta VaultMetadataReader, vault types.Identity) *VaultHandler {
 	return &VaultHandler{
-		vault:    vault,
-		encode:   client.EncodeIdentity,
-		resolver: client,
-		store:    store,
-		chainID:  client.ChainID(),
-		assets:   make(map[types.Identity]types.AssetMetadata),
+		vault:     vault,
+		encode:    client.EncodeIdentity,
+		resolver:  client,
+		vaultMeta: vaultMeta,
+		store:     store,
+		chainID:   client.ChainID(),
+		assets:    make(map[types.Identity]types.AssetMetadata),
 	}
 }
 
@@ -77,9 +89,12 @@ func (h *VaultHandler) Handle(ctx context.Context, ev chain.Event) error {
 		return err
 	}
 
-	// The asset row must exist before the event row: a foreign key enforces that no amount is
-	// stored without the decimals needed to interpret it.
+	// Both metadata rows must exist before the event row. Foreign keys enforce it: no amount
+	// without the decimals that scale it, and no share without the offset that scales it.
 	if err := h.ensureAsset(ctx, asset); err != nil {
+		return err
+	}
+	if err := h.ensureVault(ctx, asset); err != nil {
 		return err
 	}
 
@@ -123,6 +138,43 @@ func (h *VaultHandler) ensureAsset(ctx context.Context, asset types.Identity) er
 
 	h.mu.Lock()
 	h.assets[asset] = record
+	h.mu.Unlock()
+	return nil
+}
+
+// ensureVault resolves and persists the vault's share offset once per process. Like the asset
+// path, a vault that cannot be read fails the batch rather than being given a default — a guessed
+// offset misstates every share amount by a factor of ten to the guess.
+func (h *VaultHandler) ensureVault(ctx context.Context, asset types.Identity) error {
+	h.mu.Lock()
+	done := h.vaultSet
+	h.mu.Unlock()
+	if done {
+		return nil
+	}
+
+	readAsset, offset, err := h.vaultMeta.VaultMetadata(ctx, h.vault)
+	if err != nil {
+		return fmt.Errorf("resolve vault %s: %w", h.encode(h.vault), err)
+	}
+	// The event and the contract must agree on the asset; if they do not, one of them is being
+	// read wrong and storing either would be a guess.
+	if readAsset != asset {
+		return fmt.Errorf("vault %s reports asset %s but emitted %s",
+			h.encode(h.vault), h.encode(readAsset), h.encode(asset))
+	}
+
+	if err := h.store.UpsertVault(ctx, types.VaultMetadata{
+		ChainID:      h.chainID,
+		Address:      h.encode(h.vault),
+		AssetAddress: h.encode(asset),
+		ShareOffset:  offset,
+	}); err != nil {
+		return err
+	}
+
+	h.mu.Lock()
+	h.vaultSet = true
 	h.mu.Unlock()
 	return nil
 }

@@ -93,7 +93,7 @@ func setupStack(t *testing.T) *stack {
 		ServiceName: "e2e",
 		StartBlock:  d.DeployedAtBlock,
 		BatchSize:   500,
-	}, indexer.NewVaultHandler(store, client, vaultID))
+	}, indexer.NewVaultHandler(store, client, evm.NewVaultReader(client), vaultID))
 
 	if err := idx.Restore(ctx); err != nil {
 		t.Fatalf("restore cursor: %v", err)

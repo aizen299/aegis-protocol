@@ -53,22 +53,6 @@ carry no value at risk.
 
 ## Deferred to a named version
 
-### Vault metadata table (`vaults`), mirroring `assets`
-
-`VaultPosition` cannot report the scale of a share amount, because the offset is a property of the
-deployed contract and the backend does not read it. The field was removed rather than guessed. See
-`pkg/types/vault.go`.
-
-**Trigger fired at v0.2, partially satisfied.** The metadata pattern is now established twice more:
-`oracle_feeds` records a feed's scale, and `oracle_nodes` carries a foreign key to `assets` so a
-stake amount cannot exist without its token's decimals. The `vaults` table itself is still
-outstanding — it needs a contract-specific reader for `virtualSharesOffset()`, which is not a
-chain-generic concept and so cannot sit on `chain.Client` the way `TokenMetadata` does.
-
-**Now blocked on:** a narrow `VaultMetadataReader` interface in `internal/indexer`, implemented in
-`internal/chain/evm`. Do it alongside the oracle API endpoints, when there is a second consumer to
-justify the interface.
-
 ### Indexer lag metric and its CloudWatch alarm
 
 `docs/devops.md` lists "indexer lag > 100 blocks" as a required v1.0 alarm. The indexer logs its
@@ -94,4 +78,5 @@ stops being exhaustive.
 | Strategy failure integration tests | Done in v0.1. `test/integration/StrategyFailure.t.sol` — they found the halt-and-jam defect that `detachStrategy` now fixes. |
 | Token decimals | Never assumed. Resolved per asset, stored in `assets`, enforced by a foreign key. |
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
-| Share scale in API responses | Not served. The backend does not read the vault's offset and will not invent one. |
+| Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
+| Vault metadata table | Done in v0.2. `vaults` completes the pattern `assets` and `oracle_feeds` follow: a foreign key from every share-bearing row, so a share cannot be stored without its scale. |

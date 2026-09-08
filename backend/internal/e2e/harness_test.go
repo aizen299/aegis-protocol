@@ -165,7 +165,7 @@ func truncate(t *testing.T, dsn string) {
 	}
 	defer conn.Close(ctx)
 
-	const q = `TRUNCATE vault_deposits, vault_withdrawals, assets, indexer_cursors RESTART IDENTITY CASCADE`
+	const q = `TRUNCATE vault_deposits, vault_withdrawals, vaults, assets, indexer_cursors RESTART IDENTITY CASCADE`
 	if _, err := conn.Exec(ctx, q); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}

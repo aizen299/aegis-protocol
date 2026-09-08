@@ -53,11 +53,10 @@ type VaultWithdrawal struct {
 
 // VaultPosition is the aggregated per-user view served by the API and cached in Redis.
 //
-// Shares are raw and deliberately carry no scale here. They are offset from the asset by the
-// vault's virtual-shares defence, and that offset is a property of the deployed contract, which the
-// backend does not read — inventing a value would repeat the hardcoded-decimals mistake one level
-// up. Clients that render share amounts read VaultEngine.virtualSharesOffset() directly; the
-// user-facing number is convertToAssets(shares), which is a chain read regardless.
+// ShareDecimals is served again as of the vaults metadata table. It was removed when the backend
+// had no way to know the vault's offset, because serving a hardcoded zero was worse than serving
+// nothing. The indexer now reads the offset from the contract and records it, so the value is
+// resolved rather than assumed.
 type VaultPosition struct {
 	ChainID        int64      `json:"chainId"`
 	UserAddress    string     `json:"user"`
@@ -66,6 +65,7 @@ type VaultPosition struct {
 	DepositedTotal Raw        `json:"depositedTotal"`
 	WithdrawnTotal Raw        `json:"withdrawnTotal"`
 	Decimals       uint8      `json:"decimals"`
+	ShareDecimals  uint8      `json:"shareDecimals"`
 	LastDepositAt  *time.Time `json:"lastDepositAt,omitempty"`
 }
 
@@ -74,4 +74,22 @@ func NewRawFromBig(n *big.Int) Raw {
 		return Raw{}
 	}
 	return Raw{value: new(big.Int).Set(n)}
+}
+
+// VaultMetadata is what makes a raw share amount interpretable.
+//
+// Shares are offset from the asset by the vault's virtual-shares defence, so their scale is
+// AssetDecimals + ShareOffset. The offset is a property of the deployed contract, which is why it
+// is read and recorded rather than assumed — the same reason token decimals are.
+type VaultMetadata struct {
+	ChainID       int64  `json:"chainId"`
+	Address       string `json:"address"`
+	AssetAddress  string `json:"asset"`
+	ShareOffset   uint8  `json:"shareOffset"`
+	AssetDecimals uint8  `json:"assetDecimals"`
+}
+
+// ShareDecimals is the scale a share amount is denominated in.
+func (v VaultMetadata) ShareDecimals() uint8 {
+	return v.AssetDecimals + v.ShareOffset
 }

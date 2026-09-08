@@ -91,8 +91,11 @@ func TestAPIServesRawAmountAndDecimals(t *testing.T) {
 	if got := body["decimals"]; got != float64(6) {
 		t.Errorf("decimals = %v, want 6", got)
 	}
-	if _, present := body["shareDecimals"]; present {
-		t.Error("shareDecimals is served again; the backend does not read the vault's offset and must not invent one")
+	// Served again now that the indexer reads the offset from the contract. Six asset decimals
+	// plus a three-place virtual-shares offset. A hardcoded zero here is the exact bug the first
+	// run of this suite caught.
+	if got := body["shareDecimals"]; got != float64(9) {
+		t.Errorf("shareDecimals = %v, want 9 (6 asset decimals + a 3-place offset), resolved not assumed", got)
 	}
 }
 

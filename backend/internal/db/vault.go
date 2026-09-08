@@ -28,24 +28,29 @@ const qInsertWithdrawal = `
 // Aggregation is pushed to Postgres rather than done in Go: the row counts are unbounded and the
 // indexes are already chain-scoped. Sums stay in raw base units; the asset's decimals are joined in
 // so the caller can scale once, at the edge.
+// share_decimals is asset decimals plus the vault's virtual-shares offset, joined in rather than
+// computed by the caller. Both halves come from metadata the indexer resolved from chain.
 const qVaultPosition = `
 	SELECT
-		COALESCE(d.shares, 0) - COALESCE(w.shares, 0) AS shares,
-		COALESCE(d.amount, 0)                         AS deposited_total,
-		COALESCE(w.amount, 0)                         AS withdrawn_total,
-		COALESCE(d.asset, w.asset, '')                AS asset_address,
-		COALESCE(a.decimals, 0)                       AS decimals,
+		COALESCE(d.shares, 0) - COALESCE(w.shares, 0)   AS shares,
+		COALESCE(d.amount, 0)                           AS deposited_total,
+		COALESCE(w.amount, 0)                           AS withdrawn_total,
+		COALESCE(d.asset, w.asset, '')                  AS asset_address,
+		COALESCE(a.decimals, 0)                         AS decimals,
+		COALESCE(a.decimals, 0) + COALESCE(v.share_offset, 0) AS share_decimals,
 		d.last_at
 	FROM (
-		SELECT SUM(shares) AS shares, SUM(amount) AS amount,
-		       MIN(asset_address) AS asset, MAX(deposited_at) AS last_at
+		SELECT SUM(shares) AS shares, SUM(amount) AS amount, MIN(asset_address) AS asset,
+		       MIN(vault_address) AS vault, MAX(deposited_at) AS last_at
 		FROM vault_deposits WHERE chain_id = $1 AND user_address = $2
 	) d
 	FULL OUTER JOIN (
-		SELECT SUM(shares) AS shares, SUM(amount) AS amount, MIN(asset_address) AS asset
+		SELECT SUM(shares) AS shares, SUM(amount) AS amount, MIN(asset_address) AS asset,
+		       MIN(vault_address) AS vault
 		FROM vault_withdrawals WHERE chain_id = $1 AND user_address = $2
 	) w ON TRUE
 	LEFT JOIN assets a ON a.chain_id = $1 AND a.address = COALESCE(d.asset, w.asset)
+	LEFT JOIN vaults v ON v.chain_id = $1 AND v.address = COALESCE(d.vault, w.vault)
 `
 
 const qListDeposits = `
@@ -109,11 +114,13 @@ func (s *Store) VaultPosition(ctx context.Context, chainID int64, user string) (
 	pos := types.VaultPosition{ChainID: chainID, UserAddress: user}
 
 	var (
-		decimals int16
-		lastAt   *time.Time
+		decimals      int16
+		shareDecimals int16
+		lastAt        *time.Time
 	)
 	err := s.pool.QueryRow(ctx, qVaultPosition, chainID, user).
-		Scan(&pos.Shares, &pos.DepositedTotal, &pos.WithdrawnTotal, &pos.AssetAddress, &decimals, &lastAt)
+		Scan(&pos.Shares, &pos.DepositedTotal, &pos.WithdrawnTotal, &pos.AssetAddress,
+			&decimals, &shareDecimals, &lastAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return pos, nil
 	}
@@ -122,6 +129,7 @@ func (s *Store) VaultPosition(ctx context.Context, chainID int64, user string) (
 	}
 
 	pos.Decimals = uint8(decimals)
+	pos.ShareDecimals = uint8(shareDecimals)
 	pos.LastDepositAt = lastAt
 	return pos, nil
 }

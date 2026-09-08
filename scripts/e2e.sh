@@ -41,8 +41,9 @@ done
 docker exec "$PG_NAME" psql -U pb -d aegis -c 'select 1' >/dev/null
 
 echo "==> applying migrations"
-docker exec -i "$PG_NAME" psql -U pb -d aegis -v ON_ERROR_STOP=1 \
-  < "$ROOT/backend/migrations/000001_init_schema.up.sql" >/dev/null
+for migration in "$ROOT"/backend/migrations/*.up.sql; do
+  docker exec -i "$PG_NAME" psql -U pb -d aegis -v ON_ERROR_STOP=1 < "$migration" >/dev/null
+done
 
 echo "==> starting anvil"
 anvil --port 8545 --chain-id 31337 --silent &

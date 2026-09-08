@@ -78,7 +78,9 @@ func main() {
 	}
 	defer client.Close()
 
-	handlers := []indexer.Handler{indexer.NewVaultHandler(store, client, vaultAddress)}
+	handlers := []indexer.Handler{
+		indexer.NewVaultHandler(store, client, evm.NewVaultReader(client), vaultAddress),
+	}
 	if oracleRounds != nil {
 		handlers = append(handlers, indexer.NewOracleRoundsHandler(store, client, *oracleRounds))
 	}

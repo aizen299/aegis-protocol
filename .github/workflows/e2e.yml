@@ -45,7 +45,10 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Apply migrations
-        run: psql "$DB_DSN" -v ON_ERROR_STOP=1 -f backend/migrations/000001_init_schema.up.sql
+        run: |
+          for migration in backend/migrations/*.up.sql; do
+            psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$migration"
+          done
 
       - name: Start anvil
         run: |

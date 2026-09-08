@@ -19,9 +19,15 @@ const (
 
 type fakeVaultStore struct {
 	assets      []types.AssetMetadata
+	vaults      []types.VaultMetadata
 	deposits    []db.VaultEvent
 	withdrawals []db.VaultEvent
 	assetErr    error
+}
+
+func (f *fakeVaultStore) UpsertVault(_ context.Context, v types.VaultMetadata) error {
+	f.vaults = append(f.vaults, v)
+	return nil
 }
 
 func (f *fakeVaultStore) UpsertAsset(_ context.Context, a types.AssetMetadata) error {
@@ -56,6 +62,22 @@ func (f *fakeResolver) TokenMetadata(context.Context, types.Identity) (chain.Tok
 	return f.meta, nil
 }
 
+type fakeVaultMeta struct {
+	asset  string
+	offset uint8
+	err    error
+	calls  int
+}
+
+func (f *fakeVaultMeta) VaultMetadata(context.Context, types.Identity) (types.Identity, uint8, error) {
+	f.calls++
+	if f.err != nil {
+		return types.Identity{}, 0, f.err
+	}
+	id, _ := types.IdentityFromEVMHex(f.asset)
+	return id, f.offset, nil
+}
+
 func mustID(t *testing.T, hex string) types.Identity {
 	t.Helper()
 	id, err := types.IdentityFromEVMHex(hex)
@@ -76,13 +98,19 @@ func mustBigInt(t *testing.T, s string) *big.Int {
 
 func newVaultHandler(t *testing.T, store VaultStore, resolver AssetResolver) *VaultHandler {
 	t.Helper()
+	return newVaultHandlerWithMeta(t, store, resolver, &fakeVaultMeta{asset: assetHex, offset: 3})
+}
+
+func newVaultHandlerWithMeta(t *testing.T, store VaultStore, resolver AssetResolver, meta VaultMetadataReader) *VaultHandler {
+	t.Helper()
 	return &VaultHandler{
-		vault:    mustID(t, vaultHex),
-		encode:   func(id types.Identity) string { return id.EVMHex() },
-		resolver: resolver,
-		store:    store,
-		chainID:  testChainID,
-		assets:   make(map[types.Identity]types.AssetMetadata),
+		vault:     mustID(t, vaultHex),
+		encode:    func(id types.Identity) string { return id.EVMHex() },
+		resolver:  resolver,
+		vaultMeta: meta,
+		store:     store,
+		chainID:   testChainID,
+		assets:    make(map[types.Identity]types.AssetMetadata),
 	}
 }
 
@@ -265,5 +293,71 @@ func TestVaultHandlerFiltersToItsOwnEvents(t *testing.T) {
 	}
 	if len(filters[0].Names) != 2 {
 		t.Fatalf("want Deposited and Withdrawn, got %v", filters[0].Names)
+	}
+}
+
+// The share offset is read from the contract, never assumed. Serving a guessed offset would
+// misstate every share amount by a factor of ten to the guess — the same class of error the
+// hardcoded token decimals were.
+func TestVaultHandlerRecordsShareOffsetFromChain(t *testing.T) {
+	store := &fakeVaultStore{}
+	meta := &fakeVaultMeta{asset: assetHex, offset: 3}
+	h := newVaultHandlerWithMeta(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 6}}, meta)
+
+	if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1500000", "1500000000")); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if len(store.vaults) != 1 {
+		t.Fatalf("vault metadata not recorded: %v", store.vaults)
+	}
+	if store.vaults[0].ShareOffset != 3 {
+		t.Errorf("share offset = %d, want 3", store.vaults[0].ShareOffset)
+	}
+	if store.vaults[0].AssetAddress != assetHex {
+		t.Errorf("vault asset = %s", store.vaults[0].AssetAddress)
+	}
+}
+
+func TestVaultHandlerResolvesVaultMetadataOnce(t *testing.T) {
+	store := &fakeVaultStore{}
+	meta := &fakeVaultMeta{asset: assetHex, offset: 3}
+	h := newVaultHandlerWithMeta(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}}, meta)
+
+	for range 3 {
+		if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1", "1000")); err != nil {
+			t.Fatalf("handle: %v", err)
+		}
+	}
+	if meta.calls != 1 {
+		t.Fatalf("read vault metadata %d times, want 1", meta.calls)
+	}
+}
+
+// If the contract and the event disagree about the asset, one of them is being read wrong and
+// storing either is a guess.
+func TestVaultHandlerRejectsAssetMismatch(t *testing.T) {
+	store := &fakeVaultStore{}
+	meta := &fakeVaultMeta{asset: "0x0000000000000000000000000000000000000009", offset: 3}
+	h := newVaultHandlerWithMeta(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}}, meta)
+
+	if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1", "1000")); err == nil {
+		t.Fatal("expected an error when the vault reports a different asset than it emitted")
+	}
+	if len(store.deposits) != 0 {
+		t.Fatal("a row was written despite disagreeing metadata")
+	}
+}
+
+func TestVaultHandlerFailsWhenVaultUnreadable(t *testing.T) {
+	store := &fakeVaultStore{}
+	meta := &fakeVaultMeta{err: errors.New("execution reverted")}
+	h := newVaultHandlerWithMeta(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}}, meta)
+
+	if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1", "1000")); err == nil {
+		t.Fatal("expected an error when the share offset cannot be read")
+	}
+	if len(store.deposits) != 0 {
+		t.Fatal("a share amount was stored without a known scale")
 	}
 }
