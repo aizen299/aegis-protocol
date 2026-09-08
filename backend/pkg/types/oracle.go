@@ -38,11 +38,15 @@ type OracleRound struct {
 
 // OracleSubmission is one node's reported value in a round.
 type OracleSubmission struct {
-	ChainID     int64     `json:"chainId"`
-	RoundID     Raw       `json:"roundId"`
-	Node        string    `json:"node"`
-	Value       Raw       `json:"value"`
-	Decimals    uint8     `json:"decimals"`
+	ChainID  int64  `json:"chainId"`
+	RoundID  Raw    `json:"roundId"`
+	Node     string `json:"node"`
+	Value    Raw    `json:"value"`
+	Decimals uint8  `json:"decimals"`
+	Nonce    Raw    `json:"nonce"`
+	// NonceKnown separates "no nonce recorded" from "the nonce was zero", which is a real value a
+	// node's first submission carries.
+	NonceKnown  bool      `json:"nonceKnown"`
 	IsOutlier   bool      `json:"isOutlier"`
 	TxHash      string    `json:"txHash"`
 	LogIndex    uint      `json:"logIndex"`

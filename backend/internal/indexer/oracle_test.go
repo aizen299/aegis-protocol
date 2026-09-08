@@ -261,6 +261,7 @@ func TestSubmissionRecordsRawValueAndSignature(t *testing.T) {
 		"roundId":         big.NewInt(3),
 		"node":            mustID(t, nodeHex),
 		"value":           mustBigInt(t, "3000000000000000000000"),
+		"nonce":           big.NewInt(4),
 		"submissionCount": big.NewInt(1),
 		"signature":       signature,
 	})
@@ -277,6 +278,28 @@ func TestSubmissionRecordsRawValueAndSignature(t *testing.T) {
 	}
 	if string(sub.Signature) != string(signature) {
 		t.Error("signature was not preserved; the aggregator verifies it off-chain")
+	}
+	if sub.Nonce.String() != "4" {
+		t.Errorf("nonce = %s, want 4 — without it the signature cannot be verified off-chain",
+			sub.Nonce)
+	}
+}
+
+// The signature is unverifiable without the nonce, so an event missing it must fail rather than
+// storing a signature nothing can check.
+func TestSubmissionRejectsMissingNonce(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newRoundsHandler(t, store)
+
+	ev := oracleEvent(t, roundsHex, eventSubmission, map[string]any{
+		"roundId":         big.NewInt(3),
+		"node":            mustID(t, nodeHex),
+		"value":           big.NewInt(1),
+		"submissionCount": big.NewInt(1),
+		"signature":       []byte{0x01},
+	})
+	if err := h.Handle(context.Background(), ev); err == nil {
+		t.Fatal("expected an error rather than an unverifiable signature")
 	}
 }
 

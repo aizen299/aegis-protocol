@@ -232,6 +232,10 @@ func (h *OracleRoundsHandler) handleSubmission(ctx context.Context, ev chain.Eve
 	if err != nil {
 		return err
 	}
+	nonce, err := rawField(ev, "nonce")
+	if err != nil {
+		return err
+	}
 	signature, err := bytesField(ev, "signature")
 	if err != nil {
 		return err
@@ -242,6 +246,7 @@ func (h *OracleRoundsHandler) handleSubmission(ctx context.Context, ev chain.Eve
 		RoundID:     roundID,
 		Node:        h.encode(node),
 		Value:       value,
+		Nonce:       nonce,
 		Signature:   signature,
 		TxHash:      txHashHex(ev.TxHash),
 		LogIndex:    ev.LogIndex,

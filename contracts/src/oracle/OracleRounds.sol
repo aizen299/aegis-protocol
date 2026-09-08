@@ -172,7 +172,7 @@ contract OracleRounds is
         _roundValues[roundId].push(value);
 
         uint256 count = _roundValues[roundId].length;
-        emit SubmissionReceived(roundId, msg.sender, value, count, signature);
+        emit SubmissionReceived(roundId, msg.sender, value, nonce, count, signature);
 
         if (round.state == RoundState.OPEN && _hasQuorum(count, round.eligibleCount)) {
             round.state = RoundState.QUORUM_MET;

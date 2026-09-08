@@ -117,3 +117,37 @@ func padUint256(n *big.Int) []byte {
 func padAddress(addr [20]byte) []byte {
 	return common.LeftPadBytes(addr[:], 32)
 }
+
+// VerifySubmission checks that signature was produced by node over this exact submission.
+//
+// The contract already verified it on the way in, so this is not a second gate on the same
+// question — it is an independent check by a party that did not choose the transaction. A
+// signature the chain accepted but this rejects means the service and the contract disagree about
+// what was signed, which is worth an alert regardless of which one is wrong.
+func VerifySubmission(chainID int64, verifyingContract pbtypes.Identity, sub OracleSubmission, signature []byte) (bool, error) {
+	if len(signature) != 65 {
+		return false, fmt.Errorf("signature is %d bytes, want 65", len(signature))
+	}
+
+	digest, err := SubmissionDigest(chainID, verifyingContract, sub)
+	if err != nil {
+		return false, err
+	}
+
+	// crypto.SigToPub wants v as 0/1; the stored signature carries the 27/28 the contract expects.
+	normalized := make([]byte, 65)
+	copy(normalized, signature)
+	if normalized[64] >= 27 {
+		normalized[64] -= 27
+	}
+	if normalized[64] > 1 {
+		return false, fmt.Errorf("signature recovery id is %d, want 0 or 1", normalized[64])
+	}
+
+	recovered, err := crypto.SigToPub(digest[:], normalized)
+	if err != nil {
+		return false, fmt.Errorf("recover signer: %w", err)
+	}
+
+	return pbtypes.IdentityFromEVM(crypto.PubkeyToAddress(*recovered)) == sub.Node, nil
+}

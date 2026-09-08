@@ -50,7 +50,8 @@ const qGetRound = `
 `
 
 const qListSubmissions = `
-	SELECT s.chain_id, s.round_id, s.node_address, s.value, f.decimals, s.is_outlier,
+	SELECT s.chain_id, s.round_id, s.node_address, s.value, f.decimals,
+	       COALESCE(s.nonce, 0), s.nonce IS NOT NULL, s.is_outlier,
 	       s.tx_hash, s.log_index, s.block_number, s.submitted_at
 	FROM oracle_submissions s
 	JOIN oracle_rounds r ON r.chain_id = s.chain_id AND r.round_id = s.round_id
@@ -151,7 +152,8 @@ func (s *Store) ListOracleSubmissions(ctx context.Context, chainID int64, roundI
 			decimals int16
 		)
 		if err := rows.Scan(&sub.ChainID, &sub.RoundID, &sub.Node, &sub.Value, &decimals,
-			&sub.IsOutlier, &sub.TxHash, &sub.LogIndex, &sub.BlockNumber, &sub.SubmittedAt); err != nil {
+			&sub.Nonce, &sub.NonceKnown, &sub.IsOutlier, &sub.TxHash, &sub.LogIndex,
+			&sub.BlockNumber, &sub.SubmittedAt); err != nil {
 			return nil, fmt.Errorf("scan submission: %w", err)
 		}
 		sub.Decimals = uint8(decimals)

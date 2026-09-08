@@ -1107,6 +1107,12 @@
         "internalType": "uint256"
       },
       {
+        "name": "nonce",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
         "name": "submissionCount",
         "type": "uint256",
         "indexed": false,

@@ -59,8 +59,8 @@ const qFailRound = `
 
 const qInsertSubmission = `
 	INSERT INTO oracle_submissions
-		(chain_id, round_id, node_address, value, signature, tx_hash, log_index, block_number, submitted_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		(chain_id, round_id, node_address, value, nonce, signature, tx_hash, log_index, block_number, submitted_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
 `
 
@@ -126,6 +126,7 @@ type Submission struct {
 	RoundID     types.Raw
 	Node        string
 	Value       types.Raw
+	Nonce       types.Raw
 	Signature   []byte
 	TxHash      string
 	LogIndex    uint
@@ -208,7 +209,7 @@ func (s *Store) FailOracleRound(ctx context.Context, chainID int64, roundID type
 
 func (s *Store) InsertOracleSubmission(ctx context.Context, sub Submission) error {
 	_, err := s.pool.Exec(ctx, qInsertSubmission, sub.ChainID, sub.RoundID, sub.Node, sub.Value,
-		sub.Signature, sub.TxHash, int32(sub.LogIndex), int64(sub.BlockNumber), sub.SubmittedAt)
+		sub.Nonce, sub.Signature, sub.TxHash, int32(sub.LogIndex), int64(sub.BlockNumber), sub.SubmittedAt)
 	if err != nil {
 		return fmt.Errorf("insert submission %s#%d: %w", sub.TxHash, sub.LogIndex, err)
 	}

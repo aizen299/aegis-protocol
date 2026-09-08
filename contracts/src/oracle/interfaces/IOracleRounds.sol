@@ -35,8 +35,16 @@ interface IOracleRounds {
         uint256 eligibleCount,
         uint256 nodeSetVersion
     );
+    /// @dev The nonce is emitted because without it the signature cannot be verified off-chain, and
+    ///      an unverifiable signature in the log is decorative. The aggregation service checks these
+    ///      independently of the contract, which is the point of storing them at all.
     event SubmissionReceived(
-        uint256 indexed roundId, address indexed node, uint256 value, uint256 submissionCount, bytes signature
+        uint256 indexed roundId,
+        address indexed node,
+        uint256 value,
+        uint256 nonce,
+        uint256 submissionCount,
+        bytes signature
     );
     event RoundQuorumMet(uint256 indexed roundId, uint256 submissionCount, uint256 eligibleCount);
     event RoundSettled(
