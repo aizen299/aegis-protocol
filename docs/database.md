@@ -32,10 +32,13 @@ config.HealthCheckPeriod = 30 * time.Second
   on ingest bakes one token's decimals into every row and misrepresents by twelve orders of
   magnitude any asset that does not match — a six-decimal USDC amount written as though it were
   eighteen-decimal. Callers scale once, at the presentation edge, using `assets.decimals`.
-- Protocol-scaled values are the exception and stay `NUMERIC(38, 18)`. An oracle's aggregated value
-  is scaled to 18 decimals by `OracleModule` itself (`docs/oracle.md`), so the scale is contractual
-  rather than a property of any token. Do not copy the vault's raw-units pattern there, or the
-  reverse.
+- **Oracle values are raw too.** An earlier revision of this document made them an exception,
+  stored as `NUMERIC(38, 18)` on the grounds that the contract fixes the scale at 18 so it is
+  contractual rather than a property of any token. That reasoning holds for *where the scale comes
+  from* and does not justify a narrower column: `NUMERIC(38, 18)` cannot represent every `uint256` a
+  node may legitimately submit, and an indexer that cannot store a valid on-chain value stalls. The
+  scale still differs in origin — it lives on `oracle_feeds.decimals` rather than on an asset — but
+  the storage rule is the same everywhere: raw base units, scale recorded alongside.
 
 ## Multi-Chain Readiness
 

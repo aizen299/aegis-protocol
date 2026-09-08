@@ -8,6 +8,7 @@ coordination layer — contracts settle, the backend interprets.
 | Version | Component | State |
 |---|---|---|
 | v0.1 | `cmd/indexer`, `cmd/api`, vault read models | Implemented |
+| v0.2 | Oracle indexing (feeds, rounds, submissions, node registry, slashing) | Implemented |
 | v0.2 | Oracle aggregation service | Not started |
 | v0.3 | Governance state cache | Not started |
 | v0.4 | zk proof orchestration | Not started |
@@ -21,7 +22,7 @@ go test ./internal/indexer/... -run TestStepStopsAtConfirmationDepth -v
 migrate -path migrations/ -database $DB_DSN up
 ```
 
-Regenerate the vault ABI after any change to the contract's external surface:
+Regenerate the contract ABIs after any change to an external surface:
 
 ```bash
 make backend-abi

@@ -35,7 +35,10 @@ type Config struct {
 	}
 
 	Contracts struct {
-		VaultEngine string `env:"CONTRACT_VAULT_ENGINE"`
+		VaultEngine   string `env:"CONTRACT_VAULT_ENGINE"`
+		OracleRounds  string `env:"CONTRACT_ORACLE_ROUNDS"`
+		OracleStaking string `env:"CONTRACT_ORACLE_STAKING"`
+		OracleStake   string `env:"CONTRACT_ORACLE_STAKE_TOKEN"`
 	}
 
 	API struct {
@@ -70,5 +73,16 @@ func (c *Config) ValidateIndexer() error {
 	if c.Contracts.VaultEngine == "" {
 		return fmt.Errorf("CONTRACT_VAULT_ENGINE is required for the indexer")
 	}
+	// The oracle contracts are optional: an operator running only v0.1 has none deployed. But the
+	// staking registry records stake amounts, which are meaningless without the token that gives
+	// them a scale, so those two are required together or not at all.
+	if (c.Contracts.OracleStaking == "") != (c.Contracts.OracleStake == "") {
+		return fmt.Errorf("CONTRACT_ORACLE_STAKING and CONTRACT_ORACLE_STAKE_TOKEN must be set together")
+	}
 	return nil
+}
+
+// OracleEnabled reports whether oracle contracts were configured for indexing.
+func (c *Config) OracleEnabled() bool {
+	return c.Contracts.OracleRounds != "" || c.Contracts.OracleStaking != ""
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/indexer"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
+	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
@@ -44,25 +45,55 @@ func main() {
 		log.Fatal().Err(err).Str("value", cfg.Contracts.VaultEngine).Msg("invalid vault address")
 	}
 
+	registrations := []evm.Registration{{Address: vaultAddress, ABI: vaultengine.ABI()}}
+
+	oracleRounds, err := optionalAddress(cfg.Contracts.OracleRounds)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_ORACLE_ROUNDS")
+	}
+	oracleStaking, err := optionalAddress(cfg.Contracts.OracleStaking)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_ORACLE_STAKING")
+	}
+	stakeToken, err := optionalAddress(cfg.Contracts.OracleStake)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_ORACLE_STAKE_TOKEN")
+	}
+
+	if oracleRounds != nil {
+		registrations = append(registrations, evm.Registration{Address: *oracleRounds, ABI: oracle.RoundsABI()})
+	}
+	if oracleStaking != nil {
+		registrations = append(registrations, evm.Registration{Address: *oracleStaking, ABI: oracle.StakingABI()})
+	}
+
 	client, err := evm.New(ctx, evm.Options{
 		RPCURL:            cfg.Chain.RPCURL,
 		ChainID:           cfg.Chain.ChainID,
 		ConfirmationDepth: cfg.Chain.ConfirmBlocks,
-		Contracts: []evm.Registration{
-			{Address: vaultAddress, ABI: vaultengine.ABI()},
-		},
+		Contracts:         registrations,
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("chain client unavailable")
 	}
 	defer client.Close()
 
+	handlers := []indexer.Handler{indexer.NewVaultHandler(store, client, vaultAddress)}
+	if oracleRounds != nil {
+		handlers = append(handlers, indexer.NewOracleRoundsHandler(store, client, *oracleRounds))
+	}
+	if oracleStaking != nil {
+		handlers = append(handlers, indexer.NewOracleStakingHandler(store, client, *oracleStaking, *stakeToken))
+	}
+
+	log.Info().Bool("oracle", cfg.OracleEnabled()).Int("handlers", len(handlers)).Msg("handlers wired")
+
 	idx := indexer.New(client, store, log, indexer.Options{
 		ServiceName:  serviceName,
 		StartBlock:   cfg.Chain.StartBlock,
 		BatchSize:    cfg.Chain.BatchSize,
 		PollInterval: cfg.Chain.PollInterval,
-	}, indexer.NewVaultHandler(store, client, vaultAddress))
+	}, handlers...)
 
 	if err := idx.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("indexer stopped with error")
@@ -70,4 +101,16 @@ func main() {
 	}
 
 	log.Info().Uint64("cursor", idx.Cursor()).Msg("indexer stopped")
+}
+
+// optionalAddress parses a contract address that may legitimately be unset.
+func optionalAddress(value string) (*types.Identity, error) {
+	if value == "" {
+		return nil, nil
+	}
+	id, err := types.IdentityFromEVMHex(value)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }

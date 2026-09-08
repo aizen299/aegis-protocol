@@ -121,6 +121,10 @@ backend-lint:
 backend-abi: ## Re-export contract ABIs consumed by the indexer
 	cd contracts && forge inspect VaultEngine abi --json \
 		> ../backend/pkg/contracts/vaultengine/VaultEngine.abi.json
+	cd contracts && forge inspect OracleRounds abi --json \
+		> ../backend/pkg/contracts/oracle/OracleRounds.abi.json
+	cd contracts && forge inspect OracleStaking abi --json \
+		> ../backend/pkg/contracts/oracle/OracleStaking.abi.json
 
 .PHONY: migrate-up
 migrate-up:

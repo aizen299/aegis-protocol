@@ -59,8 +59,15 @@ carry no value at risk.
 deployed contract and the backend does not read it. The field was removed rather than guessed. See
 `pkg/types/vault.go`.
 
-**Trigger:** v0.2. The oracle needs per-feed on-chain metadata resolved the same way `assets` is,
-so the table and the resolution path get built once for both.
+**Trigger fired at v0.2, partially satisfied.** The metadata pattern is now established twice more:
+`oracle_feeds` records a feed's scale, and `oracle_nodes` carries a foreign key to `assets` so a
+stake amount cannot exist without its token's decimals. The `vaults` table itself is still
+outstanding — it needs a contract-specific reader for `virtualSharesOffset()`, which is not a
+chain-generic concept and so cannot sit on `chain.Client` the way `TokenMetadata` does.
+
+**Now blocked on:** a narrow `VaultMetadataReader` interface in `internal/indexer`, implemented in
+`internal/chain/evm`. Do it alongside the oracle API endpoints, when there is a second consumer to
+justify the interface.
 
 ### Indexer lag metric and its CloudWatch alarm
 
