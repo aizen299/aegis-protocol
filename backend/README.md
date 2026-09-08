@@ -124,6 +124,15 @@ What it covers beyond the happy path:
 | `TestReindexingIsIdempotent` | the conflict target not catching a replayed batch |
 | `TestUnconfirmedBlocksAreNotIndexed` | the reorg window not being respected |
 | `TestTVLReflectsIndexedFlows` | withdrawals not netting against deposits |
+| `TestOracleRoundSettlesWithGoSignedSubmissions` | the Go and Solidity EIP-712 encodings disagreeing |
+| `TestOracleRoundDeactivationDoesNotShrinkQuorumOnChain` | the eligibility snapshot not holding on a real chain |
+| `TestOracleReaderRejectsStaleValueOnChain` | a stale price being served |
+
+The oracle signature test is the one that could not be written any other way. Every contract unit
+test signs with Foundry's `vm.sign` against a Foundry-deployed address. This one signs with
+`internal/chain/evm.SignSubmission` — the code path a node binary will use — against a
+script-deployed contract, and lets the contract verify it. A mismatch in the domain separator,
+typehash, field order, or the `v` offset surfaces only here.
 
 The tests skip rather than fail when Anvil or Postgres are unreachable, so CI asserts that they
 actually ran — a silently skipped smoke test is worse than none.

@@ -67,7 +67,11 @@ jobs:
             echo "::error::End-to-end tests skipped — anvil, postgres, or redis was unreachable."
             exit 1
           fi
-          grep -q -- "--- PASS: TestDepositFlowPreservesRawSixDecimalAmount" /tmp/e2e.log || {
-            echo "::error::The decimals regression test did not run."
-            exit 1
-          }
+          for required in \
+            TestDepositFlowPreservesRawSixDecimalAmount \
+            TestOracleRoundSettlesWithGoSignedSubmissions; do
+            grep -q -- "--- PASS: $required" /tmp/e2e.log || {
+              echo "::error::$required did not run."
+              exit 1
+            }
+          done
