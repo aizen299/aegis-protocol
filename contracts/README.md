@@ -55,6 +55,7 @@ Three detector families were suppressed inline after review:
 |---|---|---|
 | `incorrect-equality` | `deposit`, `withdraw` zero-guards | `shares == 0` / `assets == 0` are dust-rounding guards, not balance comparisons. The detector targets equality against balances or timestamps. |
 | `unused-state` | `__gap` | A reserved storage gap is unreferenced by definition. |
+| `timestamp` | `OracleStaking.completeUnstake` | The comparison guards a 7-day unbonding deadline. Sequencer timestamp drift is seconds-scale, so it cannot move a deadline measured in days; a block count would be the unstable unit on Arbitrum. See `docs/v0.2-oracle-plan.md` §2.1. |
 
 The `reentrancy-balance` findings previously raised on `withdraw` were resolved structurally, not
 suppressed: liquidity sourcing moved into `_ensureLiquidity`, which reads the balance again after
