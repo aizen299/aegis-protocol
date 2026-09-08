@@ -24,6 +24,14 @@ func ParseRaw(s string) (Raw, error) {
 	if s == "" {
 		return Raw{}, nil
 	}
+	// big.Int accepts a leading sign, but Raw represents a uint256. Rejected on the character
+	// rather than the parsed sign, because "-0" is equally malformed input even though it happens
+	// to normalise to zero. A signed value reaching an amount column would violate a CHECK
+	// constraint and surface as a server error rather than a rejected request.
+	if s[0] == '-' || s[0] == '+' {
+		return Raw{}, fmt.Errorf("raw: %q carries a sign; on-chain integers are unsigned", s)
+	}
+
 	n, ok := new(big.Int).SetString(s, 10)
 	if !ok {
 		return Raw{}, fmt.Errorf("raw: %q is not a base-10 integer", s)

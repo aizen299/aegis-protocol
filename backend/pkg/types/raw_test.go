@@ -80,3 +80,18 @@ func TestRawSub(t *testing.T) {
 		t.Fatalf("got %s, want 750", got)
 	}
 }
+
+// big.Int parses a leading minus happily. Raw is a uint256, so a negative must be rejected at the
+// edge rather than reaching a column whose CHECK constraint turns a bad request into a 500.
+func TestRawRejectsNegative(t *testing.T) {
+	for _, in := range []string{"-1", "-0", "+1", "-115792089237316195423570985008687907853269984665640564039457584007913129639935"} {
+		if _, err := ParseRaw(in); err == nil {
+			t.Errorf("ParseRaw(%q) should fail: on-chain integers are unsigned", in)
+		}
+	}
+
+	// Rejecting the sign must not reject a legitimate zero.
+	if _, err := ParseRaw("0"); err != nil {
+		t.Errorf("ParseRaw(\"0\") should succeed: %v", err)
+	}
+}

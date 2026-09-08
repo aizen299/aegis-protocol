@@ -81,7 +81,27 @@ GET /ready                                       db + cache reachability
 GET /v1/vault/{vaultAddress}/tvl
 GET /v1/vault/positions/{address}
 GET /v1/vault/positions/{address}/deposits?limit=&offset=
+
+GET /v1/oracle/feeds?limit=&offset=
+GET /v1/oracle/feeds/{feedId}
+GET /v1/oracle/feeds/{feedId}/rounds?limit=&offset=
+GET /v1/oracle/rounds/{roundId}
+GET /v1/oracle/rounds/{roundId}/submissions?limit=&offset=
+GET /v1/oracle/nodes?limit=&offset=
+GET /v1/oracle/nodes/{address}
 ```
+
+Every response carrying a value carries its scale beside it — a feed's declared decimals for round
+and submission values, the stake asset's for node balances. Values are raw strings, never JSON
+numbers: a uint256 does not survive a float64.
+
+Rounds expose the eligibility snapshot the contract froze at open (`eligibleCount`,
+`nodeSetVersion`) rather than the live node set, so a settled round can be audited against the set
+that actually applied to it.
+
+Rounds and submissions are deliberately uncached. They are the audit trail an operator reaches for
+when a settlement looks wrong, and a stale answer there is worse than a slow one. Feeds and the
+node registry are cached — they change rarely and are read constantly.
 
 Addresses are validated through the chain client's own decoder, not a hex regex — the canonical
 encoding differs per chain.

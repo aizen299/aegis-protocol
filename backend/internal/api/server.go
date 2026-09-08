@@ -28,6 +28,7 @@ type Deps struct {
 	Store   *db.Store
 	Cache   *cache.Client
 	Vault   *vault.Service
+	Oracle  OracleService
 	Chain   chain.Client
 	ChainID int64
 }
@@ -35,6 +36,7 @@ type Deps struct {
 func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 	h := &handlers{
 		vault:       deps.Vault,
+		oracle:      deps.Oracle,
 		store:       deps.Store,
 		cache:       deps.Cache,
 		chainClient: deps.Chain,
@@ -43,6 +45,21 @@ func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 		log:         log,
 	}
 
+	return &Server{
+		log: log,
+		cfg: cfg,
+		http: &http.Server{
+			Addr:         cfg.API.Addr,
+			Handler:      routes(cfg, h, log),
+			ReadTimeout:  cfg.API.ReadTimeout,
+			WriteTimeout: cfg.API.WriteTimeout,
+		},
+	}
+}
+
+// routes builds the router. Separate from NewServer so handler tests can drive the real routing
+// and middleware without binding a port or constructing a database.
+func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -57,18 +74,17 @@ func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 		r.Get("/vault/{vaultAddress}/tvl", h.getVaultTVL)
 		r.Get("/vault/positions/{address}", h.getVaultPosition)
 		r.Get("/vault/positions/{address}/deposits", h.listVaultDeposits)
+
+		r.Get("/oracle/feeds", h.listOracleFeeds)
+		r.Get("/oracle/feeds/{feedId}", h.getOracleFeed)
+		r.Get("/oracle/feeds/{feedId}/rounds", h.listOracleRounds)
+		r.Get("/oracle/rounds/{roundId}", h.getOracleRound)
+		r.Get("/oracle/rounds/{roundId}/submissions", h.listOracleSubmissions)
+		r.Get("/oracle/nodes", h.listOracleNodes)
+		r.Get("/oracle/nodes/{address}", h.getOracleNode)
 	})
 
-	return &Server{
-		log: log,
-		cfg: cfg,
-		http: &http.Server{
-			Addr:         cfg.API.Addr,
-			Handler:      r,
-			ReadTimeout:  cfg.API.ReadTimeout,
-			WriteTimeout: cfg.API.WriteTimeout,
-		},
-	}
+	return r
 }
 
 // Handler returns the routed handler, so the API can be exercised in-process without binding a

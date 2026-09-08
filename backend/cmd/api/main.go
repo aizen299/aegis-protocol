@@ -12,6 +12,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/chain/evm"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
+	"github.com/aizen299/aegis-protocol/backend/internal/oracle"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 )
@@ -56,6 +57,7 @@ func main() {
 		Store:   store,
 		Cache:   redis,
 		Vault:   vault.NewService(store, redis, log, cfg.Chain.ChainID),
+		Oracle:  oracle.NewService(store, redis, log, cfg.Chain.ChainID),
 		Chain:   client,
 		ChainID: cfg.Chain.ChainID,
 	})

@@ -4,16 +4,22 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/aizen299/aegis-protocol/backend/internal/api"
 	"github.com/aizen299/aegis-protocol/backend/internal/chain/evm"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/indexer"
+	oraclesvc "github.com/aizen299/aegis-protocol/backend/internal/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
@@ -273,4 +279,107 @@ func assertNodeCount(t *testing.T, s *oracleStack, want int) {
 	if got != int64(want) {
 		t.Fatalf("indexed %d nodes, want %d", got, want)
 	}
+}
+
+// The handler tests drive stubs. This drives the real service over real indexed rows, which is the
+// only place a query, its joins, and the JSON shape are checked together.
+func TestOracleAPIServesIndexedRows(t *testing.T) {
+	requireDeps(t)
+	d := deployOracle(t)
+	nodes := registerNodes(t, d, 3)
+	s := setupOracleStack(t, d)
+
+	send(t, deployerKey, d.OracleRounds, "openRound(bytes32)", feedIDHex())
+	roundID := castCallUint(t, d.OracleRounds, "currentRoundId(bytes32)(uint256)", feedIDHex()).Int64()
+	for _, node := range nodes {
+		submitSigned(t, d, node, roundID, ether(3000))
+	}
+	send(t, deployerKey, d.OracleRounds, "settleRound(uint256)", fmt64(roundID))
+	s.indexToHead(t)
+
+	srv := s.apiHandler(t)
+
+	status, body := apiGet(t, srv, "/v1/oracle/feeds")
+	if status != http.StatusOK {
+		t.Fatalf("feeds: status %d, body %v", status, body)
+	}
+	feeds := body["items"].([]any)
+	if len(feeds) != 1 {
+		t.Fatalf("feeds = %v", feeds)
+	}
+	if got := feeds[0].(map[string]any)["decimals"]; got != float64(18) {
+		t.Errorf("feed decimals = %v, want 18 as registered on chain", got)
+	}
+
+	status, body = apiGet(t, srv, fmt.Sprintf("/v1/oracle/rounds/%d", roundID))
+	if status != http.StatusOK {
+		t.Fatalf("round: status %d, body %v", status, body)
+	}
+	if got := body["aggregatedValue"]; got != ether(3000).String() {
+		t.Errorf("aggregatedValue = %v, want the raw median as a string", got)
+	}
+	if got := body["eligibleCount"]; got != float64(3) {
+		t.Errorf("eligibleCount = %v, want the frozen snapshot", got)
+	}
+	if got := body["state"]; got != "settled" {
+		t.Errorf("state = %v", got)
+	}
+
+	status, body = apiGet(t, srv, fmt.Sprintf("/v1/oracle/rounds/%d/submissions", roundID))
+	if status != http.StatusOK {
+		t.Fatalf("submissions: status %d", status)
+	}
+	if got := body["count"]; got != float64(3) {
+		t.Errorf("submissions count = %v, want 3", got)
+	}
+
+	status, body = apiGet(t, srv, "/v1/oracle/nodes/"+nodes[0].address)
+	if status != http.StatusOK {
+		t.Fatalf("node: status %d, body %v", status, body)
+	}
+	if got := body["stakedAmount"]; got != minStake {
+		t.Errorf("stakedAmount = %v, want the raw stake", got)
+	}
+	if got := body["decimals"]; got != float64(18) {
+		t.Errorf("node decimals = %v, want the stake asset's scale", got)
+	}
+
+	if status, _ := apiGet(t, srv, "/v1/oracle/rounds/999999"); status != http.StatusNotFound {
+		t.Errorf("unknown round: status %d, want 404", status)
+	}
+}
+
+// apiHandler builds the real API over the same store the indexer just wrote to. The cache is nil:
+// these assertions are about the query and its joins, and a cache hit would hide both.
+func (s *oracleStack) apiHandler(t *testing.T) http.Handler {
+	t.Helper()
+
+	cfg := &config.Config{}
+	cfg.API.MaxPageSize = 100
+	cfg.API.WriteTimeout = 30 * time.Second
+	cfg.Chain.ChainID = chainID
+
+	log := zerolog.New(io.Discard)
+	srv := api.NewServer(cfg, log, api.Deps{
+		Store:   s.store,
+		Oracle:  oraclesvc.NewService(s.store, nil, log, chainID),
+		Chain:   s.client,
+		ChainID: chainID,
+	})
+	return srv.Handler()
+}
+
+func apiGet(t *testing.T, srv http.Handler, path string) (int, map[string]any) {
+	t.Helper()
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+
+	var body map[string]any
+	if rec.Body.Len() > 0 {
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode %s: %v\nbody: %s", path, err, rec.Body.String())
+		}
+	}
+	return rec.Code, body
 }

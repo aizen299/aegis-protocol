@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,16 +10,41 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
-	"github.com/aizen299/aegis-protocol/backend/internal/chain"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
+	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
+
+// OracleService is the oracle read surface the handlers depend on. An interface rather than the
+// concrete service so handler tests can exercise validation, error mapping, and serialisation
+// without a database behind them.
+// IdentityCodec is all the handlers need from a chain: the canonical encoding of an account
+// identity. Narrowed from chain.Client because requiring log-reading and head-tracking to validate
+// an address string is coupling the API does not use and a test would have to fake for nothing.
+type IdentityCodec interface {
+	EncodeIdentity(id types.Identity) string
+	DecodeIdentity(s string) (types.Identity, error)
+}
+
+// OracleService is the oracle read surface the handlers depend on. An interface rather than the
+// concrete service so handler tests can exercise validation, error mapping, and serialisation
+// without a database behind them.
+type OracleService interface {
+	Feeds(ctx context.Context, limit, offset int) ([]types.OracleFeed, error)
+	Feed(ctx context.Context, feedID string) (types.OracleFeed, error)
+	Rounds(ctx context.Context, feedID string, limit, offset int) ([]types.OracleRound, error)
+	Round(ctx context.Context, roundID types.Raw) (types.OracleRound, error)
+	Submissions(ctx context.Context, roundID types.Raw, limit, offset int) ([]types.OracleSubmission, error)
+	Nodes(ctx context.Context, limit, offset int) ([]types.OracleNode, error)
+	Node(ctx context.Context, address string) (types.OracleNode, error)
+}
 
 type handlers struct {
 	vault       *vault.Service
+	oracle      OracleService
 	store       *db.Store
 	cache       *cache.Client
-	chainClient chain.Client
+	chainClient IdentityCodec
 	chainID     int64
 	maxPageSize int
 	log         zerolog.Logger

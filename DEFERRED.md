@@ -61,14 +61,6 @@ which catches a crashed indexer but not a silently stalled one.
 
 **Trigger:** v1.0, with the rest of the observability work.
 
-### API handler tests
-
-`internal/api` has no unit tests. The handlers are exercised end to end in `internal/e2e`, which
-covers the paths that matter today; the gap will bite when there are enough endpoints that E2E
-stops being exhaustive.
-
-**Trigger:** v0.2, when the oracle endpoints land.
-
 ---
 
 ## Not deferred — decided
@@ -79,4 +71,5 @@ stops being exhaustive.
 | Token decimals | Never assumed. Resolved per asset, stored in `assets`, enforced by a foreign key. |
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
+| API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
 | Vault metadata table | Done in v0.2. `vaults` completes the pattern `assets` and `oracle_feeds` follow: a foreign key from every share-bearing row, so a share cannot be stored without its scale. |
