@@ -13,7 +13,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
 | v0.3 | DAO Governance | **Released** — tagged `v0.3.0` |
-| v0.4 | zk Privacy Layer | **In progress** — membership circuit and Poseidon done; commitment tree next |
+| v0.4 | zk Privacy Layer | **In progress** — circuit, Poseidon, and commitment tree done; verifier and gate next |
 | v1.0 | Production Release | Not started |
 
 No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
@@ -62,7 +62,13 @@ The contract's Poseidon is generated from circomlib rather than hand-written, an
 are proven to agree rather than assumed to. Node is needed only to regenerate that artifact; CI
 regenerates it and fails on any difference.
 
-Current: **265 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
+`CommitmentTree` holds the set on chain rather than accepting a root posted from off chain: a wrong
+mirror is a liveness bug because proofs stop verifying, while a wrong posted root forges membership.
+Its incremental insert is checked against a full rebuild from every leaf, and a path taken from the
+tree is walked exactly as the circuit walks it and must reach the same root. The depth constant
+lives in two languages no compiler can reconcile, so `make zk-depth-check` compares them.
+
+Current: **284 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
 [`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

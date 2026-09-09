@@ -9,7 +9,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 | v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
 | v0.2 | `src/oracle/` | Implemented — 150 tests, Slither clean |
 | v0.3 | `src/governance/` | Implemented — fuzzed, invariants enforced, layouts baselined at v0.3.0; 261 tests, Slither clean |
-| v0.4 | `src/zk/` | In progress — generated Poseidon, cross-checked against the circuit |
+| v0.4 | `src/zk/` | In progress — generated Poseidon and the commitment tree; 284 tests, Slither clean |
 
 ## Commands
 
@@ -56,6 +56,7 @@ Three detector families were suppressed inline after review:
 | `incorrect-equality` | `deposit`, `withdraw` zero-guards | `shares == 0` / `assets == 0` are dust-rounding guards, not balance comparisons. The detector targets equality against balances or timestamps. |
 | `unused-state` | `__gap` | A reserved storage gap is unreferenced by definition. |
 | `low-level-calls` | `Timelock.execute` | An arbitrary call is the mechanism governance exists to provide. A typed interface would restrict governance to functions fixed at deployment. Reachable only through a proposer, an elapsed delay, no cancellation, and an executor; state is set to executed before the call, and the call is `nonReentrant`. |
+| `calls-loop` | `CommitmentTree._hash` | Poseidon is its own generated contract, so hashing a Merkle path is necessarily a loop of external calls. The callee is fixed at initialization, pure, and holds no state to corrupt; the loop is bounded by `TREE_DEPTH`. The detector targets an untrusted call that can fail or reenter part-way through a loop. |
 | `reentrancy-events` | `Governor.queue` | `ProposalQueued` carries `executableAt`, which the call returns, so it cannot precede the call. The callee is the timelock address fixed at initialization and its `schedule` makes no external call. |
 | `timestamp` | `OracleRounds.submit`, `settleRound`, `getValue` | Round deadlines are timestamps by decision (`docs/v0.2-oracle-plan.md` §2.1). The residual is real but bounded: a sequencer can shift a submission across a 300s boundary by seconds, which could exclude one submission near quorum. Quorum is 2/3, so a single excluded submission rarely decides one, and a round that falls short fails closed — no price — rather than settling on a wrong one. |
 | `timestamp` | `OracleStaking.completeUnstake` | The comparison guards a 7-day unbonding deadline. Sequencer timestamp drift is seconds-scale, so it cannot move a deadline measured in days; a block count would be the unstable unit on Arbitrum. See `docs/v0.2-oracle-plan.md` §2.1. |

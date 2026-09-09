@@ -14,4 +14,5 @@ library Roles {
     bytes32 internal constant TIMELOCK_PROPOSER_ROLE = keccak256("TIMELOCK_PROPOSER_ROLE");
     bytes32 internal constant TIMELOCK_EXECUTOR_ROLE = keccak256("TIMELOCK_EXECUTOR_ROLE");
     bytes32 internal constant TIMELOCK_CANCELLER_ROLE = keccak256("TIMELOCK_CANCELLER_ROLE");
+    bytes32 internal constant COMMITMENT_WRITER_ROLE = keccak256("COMMITMENT_WRITER_ROLE");
 }

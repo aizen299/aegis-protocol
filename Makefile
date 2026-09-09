@@ -120,6 +120,24 @@ poseidon-check: ## Fail if the committed Poseidon artifact differs from a fresh 
 zk-circuits-test: ## Run the Noir circuit tests, negative cases included
 	cd zk/circuits/vault_membership && nargo test
 
+# The circuit and the contract must agree on tree depth. They cannot import a shared constant
+# across languages, and a mismatch is invisible until a proof fails to verify against any root.
+.PHONY: zk-depth-check
+zk-depth-check: ## Fail if the circuit and the contract disagree on the Merkle tree depth
+	@circuit=$$(grep -oE '^global TREE_DEPTH: u32 = [0-9]+' zk/circuits/vault_membership/src/main.nr | grep -oE '[0-9]+$$'); \
+	contract=$$(grep -oE 'uint32 public constant TREE_DEPTH = [0-9]+' contracts/src/zk/CommitmentTree.sol | grep -oE '[0-9]+$$'); \
+	if [ -z "$$circuit" ] || [ -z "$$contract" ]; then \
+		echo "zk-depth-check: could not read the depth from one of the two files — an unread value must not pass."; \
+		echo "  circuit: '$$circuit'  contract: '$$contract'"; \
+		exit 1; \
+	fi; \
+	if [ "$$circuit" != "$$contract" ]; then \
+		echo "TREE DEPTH MISMATCH: circuit says $$circuit, CommitmentTree says $$contract."; \
+		echo "A proof built at one depth can never match a root built at another."; \
+		exit 1; \
+	fi; \
+	echo "tree depth agrees: $$circuit"
+
 .PHONY: zk-toolchain-check
 zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned one
 	@pinned=$$(awk '/^nargo /{print $$2}' zk/circuits/toolchain.txt); \
