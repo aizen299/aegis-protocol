@@ -62,6 +62,7 @@ type Config struct {
 		OracleRounds  string `env:"CONTRACT_ORACLE_ROUNDS"`
 		OracleStaking string `env:"CONTRACT_ORACLE_STAKING"`
 		OracleStake   string `env:"CONTRACT_ORACLE_STAKE_TOKEN"`
+		Governor      string `env:"CONTRACT_GOVERNOR"`
 	}
 
 	API struct {
@@ -166,4 +167,11 @@ func (c *Config) ValidateIndexer() error {
 // OracleEnabled reports whether oracle contracts were configured for indexing.
 func (c *Config) OracleEnabled() bool {
 	return c.Contracts.OracleRounds != "" || c.Contracts.OracleStaking != ""
+}
+
+// GovernanceEnabled reports whether the governor was configured for indexing. The vote token is not
+// configured alongside it: the governor is authoritative about its own token, so the indexer reads
+// it rather than trusting an operator to keep two values in agreement.
+func (c *Config) GovernanceEnabled() bool {
+	return c.Contracts.Governor != ""
 }

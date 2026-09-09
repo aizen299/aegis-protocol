@@ -68,7 +68,9 @@ interface IGovernor {
     event VoteCast(
         uint256 indexed proposalId, address indexed voter, uint8 support, uint256 weight, string reason
     );
-    event ProposalQueued(uint256 indexed proposalId, uint256 executableAt);
+    /// @dev Carries the timelock operation so the indexer can correlate the two records without a
+    ///      contract read — the same rule that made ProposalCreated carry the whole action.
+    event ProposalQueued(uint256 indexed proposalId, uint256 indexed operationId, uint256 executableAt);
     event ProposalExecuted(uint256 indexed proposalId);
     event ProposalDispatched(uint256 indexed proposalId, uint256 indexed targetChainId);
     event ProposalCancelled(uint256 indexed proposalId);

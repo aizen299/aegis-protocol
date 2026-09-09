@@ -42,6 +42,7 @@ type OracleService interface {
 type handlers struct {
 	vault       *vault.Service
 	oracle      OracleService
+	governance  GovernanceService
 	store       *db.Store
 	cache       *cache.Client
 	chainClient IdentityCodec

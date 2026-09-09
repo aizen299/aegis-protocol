@@ -37,8 +37,7 @@ contract DeployGovernanceLocal is Script {
 
         timelockProxy = address(
             new ERC1967Proxy(
-                address(new Timelock()),
-                abi.encodeCall(Timelock.initialize, (deployer, TIMELOCK_DELAY))
+                address(new Timelock()), abi.encodeCall(Timelock.initialize, (deployer, TIMELOCK_DELAY))
             )
         );
 
@@ -94,8 +93,6 @@ contract DeployGovernanceLocal is Script {
         vm.serializeUint(key, "chainId", block.chainid);
         string memory out = vm.serializeUint(key, "deployedAtBlock", block.number);
 
-        vm.writeJson(
-            out, string.concat("./deployments/governance-", vm.toString(block.chainid), ".json")
-        );
+        vm.writeJson(out, string.concat("./deployments/governance-", vm.toString(block.chainid), ".json"));
     }
 }

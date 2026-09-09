@@ -192,7 +192,7 @@ contract Governor is
         // The event carries a value the call returns, so it cannot precede the call. The callee is
         // the timelock address fixed at initialization, and its schedule() makes no call of its own.
         // slither-disable-next-line reentrancy-events
-        emit ProposalQueued(proposalId, executableAt);
+        emit ProposalQueued(proposalId, operationId, executableAt);
     }
 
     /// @inheritdoc IGovernor

@@ -37,10 +37,12 @@ assuming a local target. Protocol roles are meant to sit on the timelock, not th
 governor can be replaced without migrating every role. The nine invariants in the plan are
 enforced by a fuzzing handler, not just written down — they caught a one-second window in which a
 proposal reported itself open for voting while every vote reverted. A proposal is created, voted,
-queued, and executed against a real chain end to end. Still to come: indexing, endpoints, and the
-role-migration procedure.
+queued, and executed against a real chain end to end. Proposals and votes are indexed into
+Postgres and served over `/v1/governance`, with every raw weight accompanied by the scale that
+makes it readable. Still to come: extending the end-to-end suite through the indexer and API, and
+the role-migration procedure.
 
-Current: **247 contract tests**, 11 backend packages, **23 end-to-end tests**, Slither clean.
+Current: **251 contract tests**, 12 backend packages, **23 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 

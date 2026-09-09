@@ -150,6 +150,95 @@ contract GovernorTest is GovernorFixture {
         assertGt(governor.proposalOf(proposalId).forVotes, 0);
     }
 
+    // --- the event surface ---
+    //
+    // These events are the backend's entire view of governance: the indexer reconstructs a
+    // proposal from them without a contract read. An unasserted event surface can be changed
+    // silently, and the break surfaces in the indexer rather than here.
+
+    function test_proposalCreatedCarriesTheWholeAction() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+
+        IGovernor.Action memory action = _localAction(42);
+        uint48 expectedStart = uint48(block.timestamp) + VOTING_DELAY;
+
+        vm.expectEmit(true, true, false, true, address(governor));
+        emit IGovernor.ProposalCreated(
+            1,
+            alice,
+            action.targetChainId,
+            action.target,
+            action.value,
+            action.payload,
+            expectedStart,
+            expectedStart + VOTING_PERIOD,
+            "Set value",
+            "because"
+        );
+
+        vm.prank(alice);
+        governor.propose(action, "Set value", "because");
+    }
+
+    function test_voteCastCarriesTheSnapshottedWeight() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        skip(VOTING_DELAY + 1);
+
+        vm.expectEmit(true, true, false, true, address(governor));
+        emit IGovernor.VoteCast(proposalId, bob, uint8(IGovernor.Support.FOR), SUPPLY / 10, "aye");
+
+        vm.prank(bob);
+        governor.castVote(proposalId, uint8(IGovernor.Support.FOR), "aye");
+    }
+
+    /// The operation id is in the event so the indexer can correlate a proposal with the timelock
+    /// record without reading the contract.
+    function test_proposalQueuedCarriesTheOperationAndTheDeadline() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+
+        uint256 expectedOperationId = timelock.operationCount() + 1;
+        uint256 expectedExecutableAt = block.timestamp + TIMELOCK_DELAY;
+
+        vm.expectEmit(true, true, false, true, address(governor));
+        emit IGovernor.ProposalQueued(proposalId, expectedOperationId, expectedExecutableAt);
+
+        governor.queue(proposalId);
+
+        assertEq(
+            governor.proposalOf(proposalId).operationId,
+            expectedOperationId,
+            "the event and storage disagree about the operation"
+        );
+    }
+
+    function test_executionAndCancellationEmit() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 executed = _propose(alice, 42);
+        _passProposal(executed, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(executed);
+        skip(TIMELOCK_DELAY + 1);
+
+        vm.expectEmit(true, false, false, true, address(governor));
+        emit IGovernor.ProposalExecuted(executed);
+        governor.execute(executed);
+
+        uint256 cancelled = _propose(alice, 7);
+
+        vm.expectEmit(true, false, false, true, address(governor));
+        emit IGovernor.ProposalCancelled(cancelled);
+        vm.prank(guardian);
+        governor.cancel(cancelled);
+    }
+
     // --- parameters ---
     //
     // These are the surface a captured admin would reach for, and setQuorumNumerator carries the

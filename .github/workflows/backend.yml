@@ -97,7 +97,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          for contract in VaultEngine OracleRounds OracleStaking; do
+          for contract in VaultEngine OracleRounds OracleStaking Governor; do
             forge inspect "$contract" abi --json > "$RUNNER_TEMP/$contract.abi.json"
           done
       - name: Fail if any committed ABI is stale
@@ -121,4 +121,5 @@ jobs:
           check VaultEngine   backend/pkg/contracts/vaultengine/VaultEngine.abi.json
           check OracleRounds  backend/pkg/contracts/oracle/OracleRounds.abi.json
           check OracleStaking backend/pkg/contracts/oracle/OracleStaking.abi.json
+          check Governor      backend/pkg/contracts/governance/Governor.abi.json
           exit "$stale"

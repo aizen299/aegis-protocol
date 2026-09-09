@@ -24,7 +24,7 @@
       "label": "_timelock",
       "offset": 0,
       "slot": "1",
-      "type": "t_contract(ITimelock)6798"
+      "type": "t_contract(ITimelock)6802"
     },
     {
       "label": "_proposalThreshold",
@@ -48,7 +48,7 @@
       "label": "_proposals",
       "offset": 0,
       "slot": "5",
-      "type": "t_mapping(t_uint256,t_struct(Proposal)6471_storage)"
+      "type": "t_mapping(t_uint256,t_struct(Proposal)6472_storage)"
     },
     {
       "label": "_hasVoted",
@@ -90,7 +90,7 @@
       "label": "bytes",
       "numberOfBytes": "32"
     },
-    "t_contract(ITimelock)6798": {
+    "t_contract(ITimelock)6802": {
       "encoding": "inplace",
       "label": "contract ITimelock",
       "numberOfBytes": "20"
@@ -100,7 +100,7 @@
       "label": "contract IVotes",
       "numberOfBytes": "20"
     },
-    "t_enum(ProposalState)6434": {
+    "t_enum(ProposalState)6435": {
       "encoding": "inplace",
       "label": "enum IGovernor.ProposalState",
       "numberOfBytes": "1"
@@ -119,19 +119,19 @@
       "numberOfBytes": "32",
       "value": "t_mapping(t_address,t_bool)"
     },
-    "t_mapping(t_uint256,t_struct(Proposal)6471_storage)": {
+    "t_mapping(t_uint256,t_struct(Proposal)6472_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct IGovernor.Proposal)",
       "numberOfBytes": "32",
-      "value": "t_struct(Proposal)6471_storage"
+      "value": "t_struct(Proposal)6472_storage"
     },
-    "t_struct(Action)6448_storage": {
+    "t_struct(Action)6449_storage": {
       "encoding": "inplace",
       "label": "struct IGovernor.Action",
       "members": [
         {
-          "astId": 6441,
+          "astId": 6442,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "targetChainId",
           "offset": 0,
@@ -139,7 +139,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6443,
+          "astId": 6444,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "target",
           "offset": 0,
@@ -147,7 +147,7 @@
           "type": "t_bytes32"
         },
         {
-          "astId": 6445,
+          "astId": 6446,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "value",
           "offset": 0,
@@ -155,7 +155,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6447,
+          "astId": 6448,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "payload",
           "offset": 0,
@@ -165,12 +165,12 @@
       ],
       "numberOfBytes": "128"
     },
-    "t_struct(Proposal)6471_storage": {
+    "t_struct(Proposal)6472_storage": {
       "encoding": "inplace",
       "label": "struct IGovernor.Proposal",
       "members": [
         {
-          "astId": 6450,
+          "astId": 6451,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "proposer",
           "offset": 0,
@@ -178,7 +178,7 @@
           "type": "t_address"
         },
         {
-          "astId": 6452,
+          "astId": 6453,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "voteStart",
           "offset": 20,
@@ -186,7 +186,7 @@
           "type": "t_uint48"
         },
         {
-          "astId": 6454,
+          "astId": 6455,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "voteEnd",
           "offset": 26,
@@ -194,7 +194,7 @@
           "type": "t_uint48"
         },
         {
-          "astId": 6456,
+          "astId": 6457,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "executableAt",
           "offset": 0,
@@ -202,15 +202,15 @@
           "type": "t_uint48"
         },
         {
-          "astId": 6459,
+          "astId": 6460,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "state",
           "offset": 6,
           "slot": "1",
-          "type": "t_enum(ProposalState)6434"
+          "type": "t_enum(ProposalState)6435"
         },
         {
-          "astId": 6461,
+          "astId": 6462,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "operationId",
           "offset": 0,
@@ -218,7 +218,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6463,
+          "astId": 6464,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "forVotes",
           "offset": 0,
@@ -226,7 +226,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6465,
+          "astId": 6466,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "againstVotes",
           "offset": 0,
@@ -234,7 +234,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6467,
+          "astId": 6468,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "abstainVotes",
           "offset": 0,
@@ -242,12 +242,12 @@
           "type": "t_uint256"
         },
         {
-          "astId": 6470,
+          "astId": 6471,
           "contract": "src/governance/Governor.sol:Governor",
           "label": "action",
           "offset": 0,
           "slot": "6",
-          "type": "t_struct(Action)6448_storage"
+          "type": "t_struct(Action)6449_storage"
         }
       ],
       "numberOfBytes": "320"

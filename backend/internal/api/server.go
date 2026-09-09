@@ -25,18 +25,20 @@ type Server struct {
 }
 
 type Deps struct {
-	Store   *db.Store
-	Cache   *cache.Client
-	Vault   *vault.Service
-	Oracle  OracleService
-	Chain   chain.Client
-	ChainID int64
+	Store      *db.Store
+	Cache      *cache.Client
+	Vault      *vault.Service
+	Oracle     OracleService
+	Governance GovernanceService
+	Chain      chain.Client
+	ChainID    int64
 }
 
 func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 	h := &handlers{
 		vault:       deps.Vault,
 		oracle:      deps.Oracle,
+		governance:  deps.Governance,
 		store:       deps.Store,
 		cache:       deps.Cache,
 		chainClient: deps.Chain,
@@ -82,6 +84,12 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 		r.Get("/oracle/rounds/{roundId}/submissions", h.listOracleSubmissions)
 		r.Get("/oracle/nodes", h.listOracleNodes)
 		r.Get("/oracle/nodes/{address}", h.getOracleNode)
+
+		r.Get("/governance/governor", h.getGovernor)
+		r.Get("/governance/proposals", h.listProposals)
+		r.Get("/governance/proposals/{proposalId}", h.getProposal)
+		r.Get("/governance/proposals/{proposalId}/votes", h.listProposalVotes)
+		r.Get("/governance/voters/{address}/votes", h.listVoterVotes)
 	})
 
 	return r

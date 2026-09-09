@@ -94,6 +94,10 @@ contracts-layout: ## Dump the current storage layout
 
 # Every upgradeable contract with a released baseline. A contract absent from this list is not
 # checked, so adding one here is part of releasing it.
+#
+# Types are compared with AST node ids stripped from struct, contract, and enum references: those
+# ids shift when unrelated files enter the compilation unit. Array lengths are deliberately NOT
+# stripped — a gap that changes size is a real layout change.
 LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock
 
 .PHONY: contracts-layout-check
@@ -102,8 +106,8 @@ contracts-layout-check: ## Fail if any storage layout diverges from its released
 		baseline=$$(ls contracts/deployments/layouts/$$contract.*.json 2>/dev/null | sort | tail -1); \
 		if [ -z "$$baseline" ]; then echo "$$contract: no baseline recorded yet, skipping"; continue; fi; \
 		(cd contracts && forge inspect $$contract storage-layout --json \
-			| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]') > /tmp/layout-current.json; \
-		jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' "$$baseline" > /tmp/layout-baseline.json; \
+			| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]') > /tmp/layout-current.json; \
+		jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]' "$$baseline" > /tmp/layout-baseline.json; \
 		if [ "$$(jq 'length' /tmp/layout-current.json)" = "0" ] || [ "$$(jq 'length' /tmp/layout-baseline.json)" = "0" ]; then \
 			echo "$$contract: empty storage layout — an unreadable layout must not read as a match. Run 'forge clean'."; \
 			exit 1; \
@@ -175,6 +179,8 @@ backend-abi: ## Re-export contract ABIs consumed by the indexer
 		> ../backend/pkg/contracts/oracle/OracleRounds.abi.json
 	cd contracts && forge inspect OracleStaking abi --json \
 		> ../backend/pkg/contracts/oracle/OracleStaking.abi.json
+	cd contracts && forge inspect Governor abi --json \
+		> ../backend/pkg/contracts/governance/Governor.abi.json
 
 .PHONY: migrate-up
 migrate-up:

@@ -13,6 +13,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/indexer"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
+	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/governance"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
@@ -72,6 +73,14 @@ func main() {
 		registrations = append(registrations, evm.Registration{Address: *oracleStaking, ABI: oracle.StakingABI()})
 	}
 
+	governorAddress, err := optionalAddress(cfg.Contracts.Governor)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_GOVERNOR")
+	}
+	if governorAddress != nil {
+		registrations = append(registrations, evm.Registration{Address: *governorAddress, ABI: governance.GovernorABI()})
+	}
+
 	client, err := evm.New(ctx, evm.Options{
 		RPCURL:            cfg.Chain.RPCURL,
 		ChainID:           cfg.Chain.ChainID,
@@ -92,8 +101,16 @@ func main() {
 	if oracleStaking != nil {
 		handlers = append(handlers, indexer.NewOracleStakingHandler(store, client, *oracleStaking, *stakeToken))
 	}
+	if governorAddress != nil {
+		handlers = append(handlers,
+			indexer.NewGovernanceHandler(store, client, evm.NewGovernanceReader(client), *governorAddress))
+	}
 
-	log.Info().Bool("oracle", cfg.OracleEnabled()).Int("handlers", len(handlers)).Msg("handlers wired")
+	log.Info().
+		Bool("oracle", cfg.OracleEnabled()).
+		Bool("governance", cfg.GovernanceEnabled()).
+		Int("handlers", len(handlers)).
+		Msg("handlers wired")
 
 	idx := indexer.New(client, store, log, indexer.Options{
 		ServiceName:  serviceName,
