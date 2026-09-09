@@ -44,3 +44,23 @@ func (s *Store) SaveCursor(ctx context.Context, service string, chainID int64, b
 	}
 	return nil
 }
+
+// RewindCursorForTest moves a cursor backwards, which SaveCursor deliberately refuses to do.
+//
+// The monotonic guard on SaveCursor is a real safety property — a stale process must not rewind a
+// cursor another has advanced — but it also made every "replay the same range" test a silent
+// no-op: the rewind was rejected, the indexer resumed from where it already was, and the assertion
+// that no duplicate row appeared passed without a single log being reprocessed. Replay has to be
+// explicit to be exercised at all.
+func (s *Store) RewindCursorForTest(ctx context.Context, service string, chainID int64, block uint64) error {
+	const q = `UPDATE indexer_cursors SET last_block = $3 WHERE service_name = $1 AND chain_id = $2`
+
+	tag, err := s.pool.Exec(ctx, q, service, chainID, int64(block))
+	if err != nil {
+		return fmt.Errorf("rewind cursor %s/%d: %w", service, chainID, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("rewind cursor %s/%d: no cursor row to rewind", service, chainID)
+	}
+	return nil
+}

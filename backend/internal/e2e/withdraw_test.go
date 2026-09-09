@@ -53,10 +53,21 @@ func TestReindexingIsIdempotent(t *testing.T) {
 	}
 
 	// Rewind the cursor and replay the same range, exactly as a crashed process would.
-	if err := s.store.SaveCursor(ctx, "e2e", chainID, 0); err != nil {
+	//
+	// This used SaveCursor, which is monotonic by design and silently refused the rewind, so the
+	// replay never happened and this test asserted nothing for two releases. The cursor is now
+	// asserted on both sides so a rewind that does not take effect fails loudly.
+	head := s.indexer.Cursor()
+	if head == 0 {
+		t.Fatal("cursor never advanced, so there is nothing to replay")
+	}
+	if err := s.store.RewindCursorForTest(ctx, "e2e", chainID, 0); err != nil {
 		t.Fatalf("rewind cursor: %v", err)
 	}
 	s.replayFromGenesis(t)
+	if got := s.indexer.Cursor(); got < head {
+		t.Fatalf("cursor = %d after the replay, want it back at or past %d", got, head)
+	}
 
 	after, err := s.store.ListVaultDeposits(ctx, chainID, aliceAddr, 100, 0)
 	if err != nil {
