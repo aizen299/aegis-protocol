@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,7 +23,10 @@ const serviceName = "api"
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		panic(err)
+		// The logger does not exist yet, and a stack trace is noise for what is always a
+		// misconfiguration. Say what is wrong and exit.
+		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+		os.Exit(1)
 	}
 
 	log := observability.NewLogger(serviceName, cfg.LogSvc).

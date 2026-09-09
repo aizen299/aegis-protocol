@@ -68,7 +68,27 @@ func Load() (*Config, error) {
 	if err := env.Parse(&cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
+	if err := cfg.validateEnvironment(); err != nil {
+		return nil, err
+	}
 	return &cfg, nil
+}
+
+// validateEnvironment rejects an unusable APP_ENV at load rather than at first use.
+//
+// `required` only checks that the variable is present, so APP_ENV="" satisfies it and parses to the
+// empty string. That would defer the failure to secret resolution — a service that starts, connects
+// to a database, and only then discovers it cannot say which environment it is in. It should not
+// start at all.
+func (c *Config) validateEnvironment() error {
+	switch c.Environment {
+	case "local", "staging", "production":
+		return nil
+	case "":
+		return fmt.Errorf("APP_ENV is empty; it must be one of local, staging, production")
+	default:
+		return fmt.Errorf("APP_ENV is %q; it must be one of local, staging, production", c.Environment)
+	}
 }
 
 // ValidateAggregator checks the fields the oracle aggregation service needs. The key itself is
