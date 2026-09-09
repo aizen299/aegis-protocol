@@ -44,6 +44,7 @@ interface IGovernor {
         uint48 voteEnd;
         uint48 executableAt;
         ProposalState state;
+        uint256 operationId;
         uint256 forVotes;
         uint256 againstVotes;
         uint256 abstainVotes;
@@ -76,7 +77,6 @@ interface IGovernor {
     event VotingPeriodUpdated(uint256 previousValue, uint256 newValue);
     event ProposalThresholdUpdated(uint256 previousValue, uint256 newValue);
     event QuorumNumeratorUpdated(uint256 previousValue, uint256 newValue);
-    event TimelockDelayUpdated(uint256 previousValue, uint256 newValue);
 
     error ZeroAddress();
     error EmptyTitle();
@@ -89,14 +89,10 @@ interface IGovernor {
     error NoVotingPower(address voter);
     error InvalidSupport(uint8 support);
     error VotingNotFinished(uint256 proposalId, uint256 voteEnd);
-    error TimelockNotElapsed(uint256 executableAt, uint256 nowTimestamp);
     error NotProposerOrGuardian(address caller);
     error ProposalNotCancellable(uint256 proposalId, ProposalState state);
-    error TargetNotLocalAddress(bytes32 target);
-    error CrossChainDispatchUnavailable(uint256 targetChainId);
     error InvalidQuorumNumerator(uint256 numerator);
     error ZeroValue();
-    error ExecutionReverted(uint256 proposalId);
 
     function propose(
         Action calldata action,

@@ -14,9 +14,13 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {Roles} from "../shared/access/Roles.sol";
 import {IGovernor} from "./interfaces/IGovernor.sol";
+import {ITimelock} from "./interfaces/ITimelock.sol";
 
 /// @title Governor (v0.3)
-/// @notice Proposal creation, voting on snapshotted weight, and timelocked execution.
+/// @notice Proposal creation, voting on snapshotted weight, and queueing into the timelock.
+/// @dev This contract decides; the Timelock waits and calls. Protocol roles are held by the
+///      Timelock, so replacing a governor is a role change on one contract rather than a
+///      migration of every role in the protocol.
 /// @dev Storage layout is append-only. Run `make contracts-layout-check` before any upgrade.
 contract Governor is
     Initializable,
@@ -31,7 +35,7 @@ contract Governor is
     IVotes private _token;
     uint48 private _votingDelay;
     uint48 private _votingPeriod;
-    uint48 private _timelockDelay;
+    ITimelock private _timelock;
     uint256 private _proposalThreshold;
     uint256 private _quorumNumerator;
     uint256 private _proposalCount;
@@ -49,14 +53,16 @@ contract Governor is
     function initialize(
         address admin,
         address token_,
+        address timelock_,
         uint48 votingDelay_,
         uint48 votingPeriod_,
-        uint48 timelockDelay_,
         uint256 proposalThreshold_,
         uint256 quorumNumerator_
     ) external initializer {
-        if (admin == address(0) || token_ == address(0)) revert ZeroAddress();
-        if (votingPeriod_ == 0 || timelockDelay_ == 0) revert ZeroValue();
+        if (admin == address(0) || token_ == address(0) || timelock_ == address(0)) {
+            revert ZeroAddress();
+        }
+        if (votingPeriod_ == 0) revert ZeroValue();
         if (quorumNumerator_ == 0 || quorumNumerator_ > _QUORUM_DENOMINATOR) {
             revert InvalidQuorumNumerator(quorumNumerator_);
         }
@@ -66,9 +72,9 @@ contract Governor is
         __ReentrancyGuard_init();
 
         _token = IVotes(token_);
+        _timelock = ITimelock(payable(timelock_));
         _votingDelay = votingDelay_;
         _votingPeriod = votingPeriod_;
-        _timelockDelay = timelockDelay_;
         _proposalThreshold = proposalThreshold_;
         _quorumNumerator = quorumNumerator_;
 
@@ -162,7 +168,8 @@ contract Governor is
 
     /// @inheritdoc IGovernor
     /// @dev Queueing writes the outcome to storage. Until then state() derives it, so a proposal
-    ///      that nobody queues does not sit in storage claiming to have succeeded.
+    ///      that nobody queues does not sit in storage claiming to have succeeded. The delay is
+    ///      the timelock's, read back rather than recomputed, so there is one clock not two.
     function queue(
         uint256 proposalId
     ) external {
@@ -171,18 +178,27 @@ contract Governor is
         ProposalState current = _liveState(proposalId, proposal);
         if (current != ProposalState.SUCCEEDED) revert ProposalNotSucceeded(proposalId, current);
 
-        uint48 executableAt = uint48(block.timestamp) + _timelockDelay;
-        proposal.executableAt = executableAt;
         proposal.state = ProposalState.QUEUED;
 
+        (uint256 operationId, uint48 executableAt) = _timelock.schedule(
+            proposal.action.targetChainId,
+            proposal.action.target,
+            proposal.action.value,
+            proposal.action.payload
+        );
+        proposal.operationId = operationId;
+        proposal.executableAt = executableAt;
+
+        // The event carries a value the call returns, so it cannot precede the call. The callee is
+        // the timelock address fixed at initialization, and its schedule() makes no call of its own.
+        // slither-disable-next-line reentrancy-events
         emit ProposalQueued(proposalId, executableAt);
     }
 
     /// @inheritdoc IGovernor
-    /// @dev Branches on the destination chain. The local branch is the direct call it would have
-    ///      been anyway; a non-local destination has nowhere to go in Phase 1 and reverts. The
-    ///      branch exists so that "local" is not baked into the type — see docs/project-spec.md §7.
-    ///      No dispatcher is built here, deliberately.
+    /// @dev The call itself belongs to the timelock, which owns the delay, holds the value, and
+    ///      branches on the destination chain. Anything that reverts there reverts here, so a
+    ///      proposal is never recorded as executed when its action did not run.
     function execute(
         uint256 proposalId
     ) external nonReentrant {
@@ -191,27 +207,11 @@ contract Governor is
         if (proposal.state != ProposalState.QUEUED) {
             revert ProposalNotQueued(proposalId, proposal.state);
         }
-        // slither-disable-next-line timestamp
-        if (block.timestamp < proposal.executableAt) {
-            revert TimelockNotElapsed(proposal.executableAt, block.timestamp);
-        }
-
-        if (proposal.action.targetChainId != block.chainid) {
-            revert CrossChainDispatchUnavailable(proposal.action.targetChainId);
-        }
 
         // Marked executed before the call: a proposal that reenters must not find itself queued.
         proposal.state = ProposalState.EXECUTED;
 
-        address target = _localAddress(proposal.action.target);
-
-        // An arbitrary call is the mechanism, not an oversight: a governor exists to perform the
-        // call a vote chose. A typed interface would restrict governance to a set of functions
-        // fixed at deployment, which is the opposite of what it is for. The call is reachable only
-        // through quorum, a majority, a timelock that has elapsed, and no cancellation.
-        // slither-disable-next-line low-level-calls
-        (bool ok,) = target.call{value: proposal.action.value}(proposal.action.payload);
-        if (!ok) revert ExecutionReverted(proposalId);
+        _timelock.execute(proposal.operationId);
 
         emit ProposalExecuted(proposalId);
     }
@@ -235,6 +235,12 @@ contract Governor is
 
         proposal.state = ProposalState.CANCELLED;
         emit ProposalCancelled(proposalId);
+
+        // A cancelled proposal that left a live operation behind would still be executable by
+        // anything else holding the executor role. The queue has to be cleared too.
+        if (current == ProposalState.QUEUED) {
+            _timelock.cancel(proposal.operationId);
+        }
     }
 
     // --- views ---
@@ -283,8 +289,8 @@ contract Governor is
         return _votingPeriod;
     }
 
-    function timelockDelay() external view returns (uint256) {
-        return _timelockDelay;
+    function timelock() external view returns (address) {
+        return address(_timelock);
     }
 
     function proposalThreshold() external view returns (uint256) {
@@ -317,14 +323,6 @@ contract Governor is
         if (value == 0) revert ZeroValue();
         emit VotingPeriodUpdated(_votingPeriod, value);
         _votingPeriod = value;
-    }
-
-    function setTimelockDelay(
-        uint48 value
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (value == 0) revert ZeroValue();
-        emit TimelockDelayUpdated(_timelockDelay, value);
-        _timelockDelay = value;
     }
 
     function setProposalThreshold(
@@ -381,15 +379,6 @@ contract Governor is
         return ProposalState.SUCCEEDED;
     }
 
-    /// @dev Narrows a 32-byte target to a local address, rejecting anything that does not fit. The
-    ///      same check types.Identity.EVMAddress performs in the backend.
-    function _localAddress(
-        bytes32 target
-    ) private pure returns (address) {
-        if (uint256(target) >> 160 != 0) revert TargetNotLocalAddress(target);
-        return address(uint160(uint256(target)));
-    }
-
     function _requireProposal(
         uint256 proposalId
     ) private view returns (Proposal storage) {
@@ -401,7 +390,4 @@ contract Governor is
     function _authorizeUpgrade(
         address
     ) internal override onlyRole(Roles.UPGRADER_ROLE) {}
-
-    /// @dev Proposals may move value, so the contract must be able to hold it.
-    receive() external payable {}
 }

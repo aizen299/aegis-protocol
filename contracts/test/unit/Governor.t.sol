@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
+import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {GovernedTarget, GovernorFixture} from "../utils/GovernorFixture.sol";
 
 contract GovernorTest is GovernorFixture {
@@ -24,7 +25,7 @@ contract GovernorTest is GovernorFixture {
         skip(TIMELOCK_DELAY + 1);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IGovernor.CrossChainDispatchUnavailable.selector, block.chainid + 1)
+            abi.encodeWithSelector(ITimelock.CrossChainDispatchUnavailable.selector, block.chainid + 1)
         );
         governor.execute(proposalId);
 
@@ -47,7 +48,7 @@ contract GovernorTest is GovernorFixture {
         governor.queue(proposalId);
         skip(TIMELOCK_DELAY + 1);
 
-        vm.expectRevert(abi.encodeWithSelector(IGovernor.TargetNotLocalAddress.selector, action.target));
+        vm.expectRevert(abi.encodeWithSelector(ITimelock.TargetNotLocalAddress.selector, action.target));
         governor.execute(proposalId);
     }
 
@@ -116,7 +117,108 @@ contract GovernorTest is GovernorFixture {
         governor.queue(proposalId);
         skip(TIMELOCK_DELAY + 1);
 
-        vm.expectRevert(abi.encodeWithSelector(IGovernor.ExecutionReverted.selector, proposalId));
+        uint256 operationId = governor.proposalOf(proposalId).operationId;
+        vm.expectRevert(abi.encodeWithSelector(ITimelock.ExecutionReverted.selector, operationId));
+        governor.execute(proposalId);
+    }
+
+    // --- the seam between the governor and the timelock ---
+
+    /// A cancelled proposal that left a live operation behind would still be executable by
+    /// anything holding the executor role. "Cancelled can never reach executed" spans both
+    /// contracts, so cancelling has to clear the queue as well as the proposal.
+    function test_cancellingAQueuedProposalClearsTheTimelockQueue() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+
+        uint256 operationId = governor.proposalOf(proposalId).operationId;
+
+        vm.prank(guardian);
+        governor.cancel(proposalId);
+
+        assertEq(
+            uint8(timelock.operationOf(operationId).state),
+            uint8(ITimelock.OperationState.CANCELLED),
+            "the queue outlived the proposal"
+        );
+
+        skip(TIMELOCK_DELAY + 1);
+        vm.prank(address(governor));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITimelock.OperationNotScheduled.selector, operationId, ITimelock.OperationState.CANCELLED
+            )
+        );
+        timelock.execute(operationId);
+    }
+
+    /// The governor is the timelock's only client. If anything else could execute a scheduled
+    /// operation, the action would run while the proposal sat in the indexer still marked queued.
+    function test_nobodyButTheGovernorCanDriveTheTimelock() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+
+        uint256 operationId = governor.proposalOf(proposalId).operationId;
+        skip(TIMELOCK_DELAY + 1);
+
+        vm.prank(carol);
+        vm.expectRevert();
+        timelock.execute(operationId);
+
+        assertEq(target.value(), 0, "the timelock ran an action nobody was authorised to trigger");
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.QUEUED));
+    }
+
+    /// Value belongs to the timelock, not the governor: replacing a governor must not mean moving
+    /// a treasury.
+    function test_valueBearingProposalSpendsFromTheTimelock() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+        vm.deal(address(timelock), 5 ether);
+
+        IGovernor.Action memory action = _localAction(0);
+        action.value = 1 ether;
+        action.payload = "";
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(action, "Pay", "");
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+        skip(TIMELOCK_DELAY + 1);
+        governor.execute(proposalId);
+
+        assertEq(target.received(), 1 ether);
+        assertEq(address(timelock).balance, 4 ether);
+        assertEq(address(governor).balance, 0, "the governor held value");
+    }
+
+    /// The delay a proposal was queued under is the delay it waits out, whoever changes the
+    /// parameter afterwards.
+    function test_aQueuedProposalIsUnaffectedByADelayChange() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+
+        uint48 executableAt = governor.proposalOf(proposalId).executableAt;
+
+        vm.prank(admin);
+        timelock.setDelay(1);
+
+        skip(2);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITimelock.DelayNotElapsed.selector, executableAt, block.timestamp)
+        );
         governor.execute(proposalId);
     }
 

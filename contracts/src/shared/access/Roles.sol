@@ -11,4 +11,7 @@ library Roles {
     bytes32 internal constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
     bytes32 internal constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
     bytes32 internal constant GOVERNANCE_GUARDIAN_ROLE = keccak256("GOVERNANCE_GUARDIAN_ROLE");
+    bytes32 internal constant TIMELOCK_PROPOSER_ROLE = keccak256("TIMELOCK_PROPOSER_ROLE");
+    bytes32 internal constant TIMELOCK_EXECUTOR_ROLE = keccak256("TIMELOCK_EXECUTOR_ROLE");
+    bytes32 internal constant TIMELOCK_CANCELLER_ROLE = keccak256("TIMELOCK_CANCELLER_ROLE");
 }

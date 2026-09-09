@@ -6,7 +6,9 @@ import {Test} from "forge-std/Test.sol";
 
 import {AegisToken} from "../../src/governance/AegisToken.sol";
 import {Governor} from "../../src/governance/Governor.sol";
+import {Timelock} from "../../src/governance/Timelock.sol";
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
+import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {Roles} from "../../src/shared/access/Roles.sol";
 
 /// @dev A contract a proposal can act on, so execution is observable rather than inferred.
@@ -49,30 +51,44 @@ abstract contract GovernorFixture is Test {
 
     AegisToken internal token;
     Governor internal governor;
+    Timelock internal timelock;
     GovernedTarget internal target;
 
     function setUp() public virtual {
         token = new AegisToken(treasury, SUPPLY);
         target = new GovernedTarget();
 
-        Governor implementation = new Governor();
+        timelock = Timelock(
+            payable(address(
+                    new ERC1967Proxy(
+                        address(new Timelock()), abi.encodeCall(Timelock.initialize, (admin, TIMELOCK_DELAY))
+                    )
+                ))
+        );
+
         bytes memory initData = abi.encodeCall(
             Governor.initialize,
             (
                 admin,
                 address(token),
+                address(timelock),
                 VOTING_DELAY,
                 VOTING_PERIOD,
-                TIMELOCK_DELAY,
                 PROPOSAL_THRESHOLD,
                 QUORUM_NUMERATOR
             )
         );
-        governor = Governor(payable(address(new ERC1967Proxy(address(implementation), initData))));
+        governor = Governor(address(new ERC1967Proxy(address(new Governor()), initData)));
 
         vm.startPrank(admin);
         governor.grantRole(Roles.GOVERNANCE_GUARDIAN_ROLE, guardian);
         governor.grantRole(Roles.UPGRADER_ROLE, upgrader);
+        timelock.grantRole(Roles.UPGRADER_ROLE, upgrader);
+        // The governor is the timelock's only client: nothing else may schedule, execute, or
+        // cancel, or a proposal's state machine and the queue could disagree.
+        timelock.grantRole(Roles.TIMELOCK_PROPOSER_ROLE, address(governor));
+        timelock.grantRole(Roles.TIMELOCK_EXECUTOR_ROLE, address(governor));
+        timelock.grantRole(Roles.TIMELOCK_CANCELLER_ROLE, address(governor));
         vm.stopPrank();
 
         // Start well past zero so snapshots can look backwards.
