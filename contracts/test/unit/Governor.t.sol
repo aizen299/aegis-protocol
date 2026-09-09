@@ -124,6 +124,32 @@ contract GovernorTest is GovernorFixture {
         governor.execute(proposalId);
     }
 
+    /// Regression: at exactly `voteStart` the proposal reported ACTIVE while every vote reverted,
+    /// because `getPastVotes` refuses a timepoint that is not yet in the past. A one-second window
+    /// that advertised voting and refused it. Found by the invariant suite, not by unit tests —
+    /// the fixture had always skipped `VOTING_DELAY + 1`, stepping over the boundary.
+    function test_theProposalIsPendingAtExactlyTheSnapshot() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        skip(VOTING_DELAY);
+
+        assertEq(
+            uint48(block.timestamp),
+            governor.proposalOf(proposalId).voteStart,
+            "the test did not land on the boundary"
+        );
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.PENDING));
+
+        skip(1);
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.ACTIVE));
+
+        vm.prank(bob);
+        governor.castVote(proposalId, uint8(IGovernor.Support.FOR), "");
+        assertGt(governor.proposalOf(proposalId).forVotes, 0);
+    }
+
     // --- parameters ---
     //
     // These are the surface a captured admin would reach for, and setQuorumNumerator carries the

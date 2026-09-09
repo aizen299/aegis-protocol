@@ -94,7 +94,7 @@ contracts-layout: ## Dump the current storage layout
 
 # Every upgradeable contract with a released baseline. A contract absent from this list is not
 # checked, so adding one here is part of releasing it.
-LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds
+LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock
 
 .PHONY: contracts-layout-check
 contracts-layout-check: ## Fail if any storage layout diverges from its released baseline (run before any UUPS upgrade)

@@ -12,7 +12,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
-| v0.3 | DAO Governance | **In progress** — token, governor, and timelock done; fuzz and indexing next |
+| v0.3 | DAO Governance | **In progress** — contracts done and fuzzed; indexing and endpoints next |
 | v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
 | v1.0 | Production Release | Not started |
 
@@ -34,10 +34,12 @@ and an oracle node that fetches from independent sources.
 `Governor` (proposals, snapshotted voting, guardian cancellation), and `Timelock`, which holds the
 queue, owns the delay, and performs the call — branching on the destination chain rather than
 assuming a local target. Protocol roles are meant to sit on the timelock, not the governor, so a
-governor can be replaced without migrating every role. Still to come: fuzz and invariants,
-indexing, endpoints, and the role-migration procedure.
+governor can be replaced without migrating every role. The nine invariants in the plan are
+enforced by a fuzzing handler, not just written down — they caught a one-second window in which a
+proposal reported itself open for voting while every vote reverted. Still to come: indexing,
+endpoints, an end-to-end run against a real chain, and the role-migration procedure.
 
-Current: **224 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
+Current: **247 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 

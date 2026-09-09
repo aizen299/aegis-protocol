@@ -357,8 +357,11 @@ contract Governor is
             return stored;
         }
 
+        // Voting opens the second *after* the snapshot, not on it. `getPastVotes` refuses a
+        // timepoint that is not yet in the past, so reporting ACTIVE at exactly voteStart would
+        // advertise a window in which every vote reverts. Found by the invariant suite.
         // slither-disable-next-line timestamp
-        if (block.timestamp < proposal.voteStart) return ProposalState.PENDING;
+        if (block.timestamp <= proposal.voteStart) return ProposalState.PENDING;
         // slither-disable-next-line timestamp
         if (block.timestamp <= proposal.voteEnd) return ProposalState.ACTIVE;
 
