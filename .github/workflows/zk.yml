@@ -20,20 +20,33 @@ jobs:
     runs-on: ubuntu-latest
     # The circuit is the security boundary: an unconstrained signal is a forgery, not a bug in a
     # service that can be patched. Its tests run on their own, before anything else.
+    #
+    # Overrides the workflow's `zk` default so every path below is written from the repo root. The
+    # Makefile lives there, and relying on a step-level override to climb back out is a guess about
+    # Actions' path resolution that this job does not need to make.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
+      # Downloads the pinned release directly rather than going through noirup. noirup with no
+      # arguments installs "latest stable", which is the opposite of a pin, and piping its script
+      # to bash runs that install before noirup is on disk to be re-invoked with a version.
+      # --fail matters: without it curl exits 0 on a 404 page and tar fails with a confusing error
+      # about the archive rather than the missing tag.
       - name: Install the pinned Noir toolchain
         run: |
-          NARGO_VERSION=$(awk '/^nargo /{print $2}' circuits/toolchain.txt)
-          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/noirup | bash
+          set -euo pipefail
+          NARGO_VERSION=$(awk '/^nargo /{print $2}' zk/circuits/toolchain.txt)
+          mkdir -p "$HOME/.nargo/bin"
+          curl -fsSL "https://github.com/noir-lang/noir/releases/download/v${NARGO_VERSION}/noir-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.nargo/bin"
           echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
-          "$HOME/.nargo/bin/noirup" --version "$NARGO_VERSION"
+          "$HOME/.nargo/bin/nargo" --version
       - name: Fail if the toolchain drifts from the pin
-        working-directory: .
         run: make zk-toolchain-check
       - name: Circuit tests
-        working-directory: zk/circuits/vault_membership
-        run: nargo test
+        run: make zk-circuits-test
 
   test:
     runs-on: ubuntu-latest
