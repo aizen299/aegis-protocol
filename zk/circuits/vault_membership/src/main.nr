@@ -12,7 +12,14 @@
 //!   * The nullifier binds the chain and the gate contract, so a proof spent on one deployment
 //!     cannot be replayed against another. Same class as the chainId in the v0.2 EIP-712 payload.
 
-use poseidon::poseidon2::Poseidon2;
+// circomlib-compatible Poseidon, not Poseidon2, and the reason is on-chain agreement rather than
+// preference. Poseidon2 is cheaper in circuit, but no audited Solidity implementation of
+// Barretenberg's Poseidon2 exists — using it would mean hand-porting round constants into the
+// contract that builds the tree, and a single wrong constant yields a tree no proof can ever
+// verify against. This variant matches circomlib's canonical vectors exactly, so the contract can
+// use a generated implementation and the two halves are cross-checked rather than assumed.
+// See docs/v0.4-zk-plan.md §2.8.
+use poseidon::poseidon::bn254::{hash_1, hash_2};
 
 global TREE_DEPTH: u32 = 20;
 
@@ -42,14 +49,14 @@ fn main(
 
 /// The value inserted into the tree at deposit. The depositor keeps `secret`.
 pub fn commitment_of(secret: Field) -> Field {
-    Poseidon2::hash([secret], 1)
+    hash_1([secret])
 }
 
 /// Domain-separated and action-specific. Reusing a secret for a different action, on a different
 /// chain, or against a different gate yields a different nullifier, and reusing it for the same
 /// one yields the same nullifier — which is what lets the gate reject a replay.
 pub fn nullifier_of(secret: Field, action_id: Field, chain_id: Field, gate: Field) -> Field {
-    Poseidon2::hash([secret, action_id, chain_id, gate], 4)
+    hash_2([hash_2([secret, action_id]), hash_2([chain_id, gate])])
 }
 
 /// Walks a Merkle path from `leaf` to a root.
@@ -74,7 +81,7 @@ pub fn compute_root(
         let left = current + index * (sibling - current);
         let right = sibling + index * (current - sibling);
 
-        current = Poseidon2::hash([left, right], 2);
+        current = hash_2([left, right]);
     }
 
     current
@@ -110,6 +117,56 @@ mod tests {
 
         let root = compute_root(leaf, elements, indices);
         (root, elements, indices)
+    }
+
+    // --- the hash family, pinned ---
+
+    /// Every other test in this file passes under any hash function: they test structure, not the
+    /// primitive. Nothing else here would notice a switch back to Poseidon2, and the failure would
+    /// surface only when a proof met the contract and no root ever matched.
+    ///
+    /// These are circomlib's canonical vectors. The contract's generated Poseidon is checked
+    /// against the same values, which is what makes the two halves agree by test rather than by
+    /// assumption. See docs/v0.4-zk-plan.md §2.8.
+    #[test]
+    fn the_hash_family_is_circomlib_compatible() {
+        assert(
+            super::hash_1([1]) == 0x29176100eaa962bdc1fe6c654d6a3c130e96a4d1168b33848b897dc502820133,
+            "hash_1 is not circomlib Poseidon",
+        );
+        assert(
+            super::hash_2([1, 2]) == 0x115cc0f5e7d690413df64c6b9662e9cf2a3617f2743245519e19607a4417189a,
+            "hash_2 is not circomlib Poseidon",
+        );
+    }
+
+    /// And the circuit's own primitives use that family, not merely import it.
+    #[test]
+    fn the_commitment_uses_the_pinned_hash() {
+        assert(
+            commitment_of(1) == 0x29176100eaa962bdc1fe6c654d6a3c130e96a4d1168b33848b897dc502820133,
+            "the commitment does not use circomlib Poseidon",
+        );
+    }
+
+    /// Pins the path's *structure* — depth and hashing order — against an independently built
+    /// chain. It deliberately does not pin the family: it derives its expectation from the same
+    /// hash the circuit uses, so a swapped primitive keeps this test green. The family is pinned
+    /// by the vectors above, and the two together are what make the contract's Poseidon checkable.
+    #[test]
+    fn the_path_uses_the_pinned_hash() {
+        let elements: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+        let indices: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+
+        let mut expected: Field = 1;
+        for _ in 0..TREE_DEPTH {
+            expected = super::hash_2([expected, 0]);
+        }
+
+        assert(
+            compute_root(1, elements, indices) == expected,
+            "the path does not use circomlib Poseidon",
+        );
     }
 
     // --- positive control ---
