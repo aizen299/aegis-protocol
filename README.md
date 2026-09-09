@@ -12,7 +12,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
-| v0.3 | DAO Governance | **In progress** — contracts, indexing, and endpoints done; role migration next |
+| v0.3 | DAO Governance | **Complete** — ready to tag v0.3.0 |
 | v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
 | v1.0 | Production Release | Not started |
 
@@ -40,9 +40,12 @@ proposal reported itself open for voting while every vote reverted. A proposal i
 queued, and executed against a real chain end to end. Proposals and votes are indexed into
 Postgres and served over `/v1/governance`, with every raw weight accompanied by the scale that
 makes it readable, and the whole path is exercised end to end against a real chain, a real
-database, and the real API. Still to come: the role-migration procedure.
+database, and the real API. The role-migration procedure is written up in
+[`docs/role-migration.md`](docs/role-migration.md) and executed by tests at both layers — v0.3
+builds that capability and proves it, but grants governance nothing; performing the migration is a
+v1.0 step.
 
-Current: **251 contract tests**, 12 backend packages, **29 end-to-end tests**, Slither clean.
+Current: **261 contract tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 

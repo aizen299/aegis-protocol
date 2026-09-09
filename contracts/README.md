@@ -8,7 +8,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 |---|---|---|
 | v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
 | v0.2 | `src/oracle/` | Implemented — 150 tests, Slither clean |
-| v0.3 | `src/governance/` | Contracts complete — fuzzed, invariants enforced, layouts baselined at v0.3.0; 251 tests total, Slither clean |
+| v0.3 | `src/governance/` | Implemented — fuzzed, invariants enforced, layouts baselined at v0.3.0; 261 tests, Slither clean |
 | v0.4 | `src/zk/` | Not started |
 
 ## Commands
