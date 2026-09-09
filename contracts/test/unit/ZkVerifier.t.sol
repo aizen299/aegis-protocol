@@ -69,11 +69,11 @@ contract ZkVerifierTest is Test {
         assertFalse(ok && result.length == 32 && abi.decode(result, (bool)), "a short input list verified");
     }
 
-    /// The fixture's chain id and gate are the values the witness was built with. If these drift
-    /// from what the gate checks, proofs verify here and fail in production.
+    /// The fixture's chain id is the one the witness was built with. The gate address is asserted
+    /// in ZkVaultGate.t.sol, where the gate that must match it is actually deployed.
     function test_theFixtureCarriesTheExpectedDomain() public pure {
         assertEq(uint256(ProofFixture.CHAIN_ID), 31337, "fixture chain id changed");
         assertEq(uint256(ProofFixture.ACTION_ID), 7, "fixture action id changed");
-        assertEq(uint256(ProofFixture.GATE), 0xab, "fixture gate changed");
+        assertTrue(uint256(ProofFixture.GATE) != 0, "fixture carries no gate");
     }
 }
