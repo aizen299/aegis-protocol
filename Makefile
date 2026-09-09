@@ -84,6 +84,38 @@ contracts-lint:
 contracts-fmt:
 	cd contracts && forge fmt
 
+# Poseidon is generated from circomlib, never hand-written. Node is required only here: the output
+# is committed Solidity, so `forge build` and `forge test` never need it.
+POSEIDON_OUT = contracts/src/zk/poseidon
+
+.PHONY: poseidon-gen
+poseidon-gen: ## Regenerate the Poseidon contract artifact from the pinned circomlibjs (needs Node)
+	cd tools/poseidon && npm ci --no-audit --no-fund && node generate.js
+
+.PHONY: poseidon-check
+poseidon-check: ## Fail if the committed Poseidon artifact differs from a fresh generation (needs Node)
+	@set -e; \
+	tmp=$$(mktemp -d); \
+	( cd tools/poseidon && npm ci --silent --no-audit --no-fund >/dev/null && node generate.js "$$tmp" >/dev/null ); \
+	fresh="$$tmp/PoseidonBytecode.sol"; \
+	if [ ! -s "$$fresh" ]; then \
+		echo "poseidon: generation produced an empty artifact — an unreadable output must not read as a match."; \
+		rm -rf "$$tmp"; exit 1; \
+	fi; \
+	committed=$$(shasum -a 256 < "$(POSEIDON_OUT)/PoseidonBytecode.sol" | cut -d" " -f1); \
+	generated=$$(shasum -a 256 < "$$fresh" | cut -d" " -f1); \
+	if [ "$$committed" = "$$generated" ]; then \
+		echo "Poseidon artifact matches a fresh generation (sha256 $$committed)"; \
+		rm -rf "$$tmp"; \
+	else \
+		echo "GENERATED POSEIDON HAS DRIFTED."; \
+		echo "  committed: $$committed"; \
+		echo "  generated: $$generated"; \
+		echo "  differing lines: $$(diff "$(POSEIDON_OUT)/PoseidonBytecode.sol" "$$fresh" | grep -c "^[<>]")"; \
+		echo "The bytecode lines are ~20KB each, so the content is not printed. Run 'make poseidon-gen' and commit the result."; \
+		rm -rf "$$tmp"; exit 1; \
+	fi
+
 .PHONY: zk-circuits-test
 zk-circuits-test: ## Run the Noir circuit tests, negative cases included
 	cd zk/circuits/vault_membership && nargo test
@@ -168,6 +200,11 @@ deploy-local: ## Deploy the v0.1 vault and a six-decimal test token to local anv
 .PHONY: deploy-oracle-local
 deploy-oracle-local: ## Deploy the v0.2 oracle contracts to local anvil
 	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployOracleLocal.s.sol:DeployOracleLocal \
+		--rpc-url $(ANVIL_RPC) --broadcast
+
+.PHONY: deploy-governance-local
+deploy-governance-local: ## Deploy the v0.3 governance contracts to local anvil
+	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployGovernanceLocal.s.sol:DeployGovernanceLocal \
 		--rpc-url $(ANVIL_RPC) --broadcast
 
 .PHONY: deploy-vault

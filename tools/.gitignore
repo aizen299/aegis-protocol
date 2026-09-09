@@ -1,0 +1,3 @@
+# npm install output. package-lock.json is committed: the generated Poseidon must be reproducible
+# from an exact dependency tree, not from whatever npm resolves today.
+node_modules/

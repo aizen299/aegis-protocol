@@ -3,9 +3,9 @@ name: Contracts CI
 on:
   push:
     branches: [main]
-    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+    paths: ["contracts/**", "tools/poseidon/**", "Makefile", ".github/workflows/contracts.yml"]
   pull_request:
-    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+    paths: ["contracts/**", "tools/poseidon/**", "Makefile", ".github/workflows/contracts.yml"]
 
 concurrency:
   group: contracts-${{ github.ref }}
@@ -16,6 +16,24 @@ defaults:
     working-directory: contracts
 
 jobs:
+  # Poseidon is generated from circomlib and committed as Solidity. This is the only job that needs
+  # Node: `forge build` and `forge test` read the committed artifact and never invoke a generator.
+  # Kept separate for that reason — the same split the ABI-drift job uses.
+  poseidon-drift:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tools/poseidon/package-lock.json
+      - name: Fail if the committed Poseidon differs from a fresh generation
+        run: make poseidon-check
+
   test:
     runs-on: ubuntu-latest
     env:

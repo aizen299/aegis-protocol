@@ -1,0 +1,12 @@
+{
+  "name": "aegis-poseidon-gen",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generates the Solidity Poseidon artifact from circomlib. Not part of the contracts build.",
+  "scripts": {
+    "generate": "node generate.js"
+  },
+  "dependencies": {
+    "circomlibjs": "0.1.7"
+  }
+}

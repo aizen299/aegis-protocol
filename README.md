@@ -12,22 +12,9 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
-| v0.3 | DAO Governance | **Complete** — ready to tag v0.3.0 |
-| v0.4 | zk Privacy Layer | **In progress** — membership circuit done; commitment tree next |
+| v0.3 | DAO Governance | **Released** — tagged `v0.3.0` |
+| v0.4 | zk Privacy Layer | **In progress** — membership circuit and Poseidon done; commitment tree next |
 | v1.0 | Production Release | Not started |
-
-
-**v0.4 — zk Privacy Layer.** The membership circuit in Noir, proving ownership of a commitment in
-the vault's tree without revealing which one. The plan
-([`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md)) records three corrections to the circuit sketch in
-`docs/zk.md`: the nullifier is domain-separated and action-specific rather than a constant, which
-otherwise allows exactly one private action per user forever; the commitment is bound into the
-Merkle path rather than proved beside it; and the nullifier binds the chain and gate so a proof
-cannot be replayed against another deployment. The circuit uses circomlib-compatible Poseidon
-rather than Noir's default Poseidon2, because no audited Solidity implementation of the latter
-exists and the tree is built on chain — the alternative was hand-porting round constants into the
-contract. Privacy is bounded by the anonymity set — an unresolved limitation the API surfaces as a
-leaf count rather than implying away.
 
 No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
 for v1.0 staging.
@@ -58,18 +45,37 @@ database, and the real API. The role-migration procedure is written up in
 builds that capability and proves it, but grants governance nothing; performing the migration is a
 v1.0 step.
 
-Current: **261 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
-[`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
-decisions behind it.
+**v0.4 — zk Privacy Layer.** The membership circuit in Noir, proving ownership of a commitment in
+the vault's tree without revealing which one. The plan
+([`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md)) records three corrections to the circuit sketch in
+`docs/zk.md`: the nullifier is domain-separated and action-specific rather than a constant, which
+otherwise allows exactly one private action per user forever; the commitment is bound into the
+Merkle path rather than proved beside it; and the nullifier binds the chain and gate so a proof
+cannot be replayed against another deployment. The circuit uses circomlib-compatible Poseidon
+rather than Noir's default Poseidon2, because no audited Solidity implementation of the latter
+exists and the tree is built on chain — the alternative was hand-porting round constants into the
+contract. Privacy is bounded by the anonymity set — an unresolved limitation the API surfaces as a
+leaf count rather than implying away.
+
+The contract's Poseidon is generated from circomlib rather than hand-written, and
+`contracts/test/unit/Poseidon.t.sol` asserts the same vectors the circuit does, so the two halves
+are proven to agree rather than assumed to. Node is needed only to regenerate that artifact; CI
+regenerates it and fails on any difference.
+
+Current: **265 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
+[`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
+v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
+it took and where it deviated from the locked specs.
 
 ## Layout
 
 ```
 contracts/   Solidity + Foundry      settlement layer
 backend/     Go                      indexing, aggregation, APIs
-zk/          Rust + circuits         proof generation
+zk/          Rust + Noir circuits    proof generation
 frontend/    Next.js                 dashboards
 infra/       Terraform               AWS
+tools/       Node                    generators for committed artifacts
 ```
 
 Each directory is versioned, built, and tested in isolation — CI triggers per path. The only
@@ -82,6 +88,7 @@ cp .env.example .env
 make dev                    # postgres, redis, anvil, migrations, indexer, api
 make deploy-local           # v0.1 vault + a six-decimal test token
 make deploy-oracle-local    # v0.2 oracle contracts
+make deploy-governance-local # v0.3 token, governor, timelock
 ```
 
 Each deploy writes an artifact under `contracts/deployments/` — `<chainId>.json` for the vault,
@@ -99,11 +106,13 @@ rather than defaulting to a well-known test key.
 The API listens on **8090** — 8080 is deliberately avoided as it is commonly taken by Jenkins.
 
 ```bash
-make test        # every layer, in isolation
-make e2e         # real chain, real database, real indexer and API
+make test               # every layer, in isolation
+make e2e                # real chain, real database, real indexer and API
+make zk-circuits-test   # Noir circuits, negative cases included
+make poseidon-check     # generated Poseidon still matches its source
 make lint
-make security    # slither
-make help        # all targets
+make security           # slither
+make help               # all targets
 ```
 
 `make test` verifies each component against a mock of its neighbour. `make e2e` is the only thing
@@ -117,6 +126,12 @@ Six decimals is deliberate. Eighteen is the value every layer would get right by
 ## Prerequisites
 
 Foundry, Go 1.24+, Rust 1.82+, Node 22+, Docker, and (for `make security`) Slither.
+
+The Noir toolchain is pinned in [`zk/circuits/toolchain.txt`](zk/circuits/toolchain.txt) and needed
+only to work on circuits — install it with `noirup --version $(awk '/^nargo /{print $2}'
+zk/circuits/toolchain.txt)` and verify with `make zk-toolchain-check`. Node is needed for the
+frontend and to regenerate the Poseidon artifact; neither the contracts build nor its tests require
+it.
 
 ## Architecture in one paragraph
 
@@ -192,6 +207,11 @@ external functions, `SafeERC20` only, no spot-price-based decisions, replay-resi
 no unbounded loops over user input. Slither runs in CI and fails on MEDIUM; the current suppression
 set is justified in [`contracts/README.md`](contracts/README.md).
 
+Cryptographic primitives and verifier code are **generated, never hand-written** — the Poseidon the
+commitment tree uses comes from circomlib, and CI regenerates it and fails on any difference. A
+single wrong round constant produces a tree no proof can ever verify against, and the failure would
+appear only at integration.
+
 Two protocol-level constraints worth stating here:
 
 - **Slashing is capped on-chain.** `SLASHER_ROLE` is a backend hot key, so the contract bounds each
@@ -211,8 +231,9 @@ comparing nothing to nothing would otherwise pass for a contract whose layout wa
 
 ## Keeping this file honest
 
-`make docs-check` verifies the claims above — the test counts, that every version described as
-released has a matching tag, and that every path linked here exists. It runs in CI on every push,
+`make docs-check` verifies the claims above — the contract, circuit, and end-to-end test counts,
+that every version described as released has a matching tag, and that every path linked here
+exists. It runs in CI on every push,
 without a path filter: the README goes stale on changes that never touch it, so a check gated on
 the README changing would miss exactly the cases that cause drift.
 
