@@ -3,9 +3,9 @@ name: zk CI
 on:
   push:
     branches: [main]
-    paths: ["zk/**", "contracts/src/zk/**", "Makefile", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "Makefile", ".github/workflows/zk.yml"]
   pull_request:
-    paths: ["zk/**", "contracts/src/zk/**", "Makefile", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "Makefile", ".github/workflows/zk.yml"]
 
 concurrency:
   group: zk-${{ github.ref }}
@@ -57,6 +57,10 @@ jobs:
       # Cross-language invariant: the contract's depth is not visible to the circuit's compiler.
       - name: Fail if the circuit and the contract disagree on tree depth
         run: make zk-depth-check
+      # The verifier is a function of the circuit and the toolchain. A circuit change that does not
+      # regenerate it leaves a verifier no proof can satisfy.
+      - name: Fail if the committed verifier differs from a fresh generation
+        run: make zk-verifier-check
 
   test:
     runs-on: ubuntu-latest

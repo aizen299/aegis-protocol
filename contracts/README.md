@@ -9,7 +9,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 | v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
 | v0.2 | `src/oracle/` | Implemented — 150 tests, Slither clean |
 | v0.3 | `src/governance/` | Implemented — fuzzed, invariants enforced, layouts baselined at v0.3.0; 261 tests, Slither clean |
-| v0.4 | `src/zk/` | In progress — generated Poseidon and the commitment tree; 284 tests, Slither clean |
+| v0.4 | `src/zk/` | In progress — Poseidon, commitment tree, and a verified proof; 290 tests, Slither clean |
 
 ## Commands
 

@@ -138,6 +138,39 @@ zk-depth-check: ## Fail if the circuit and the contract disagree on the Merkle t
 	fi; \
 	echo "tree depth agrees: $$circuit"
 
+# The verifier is generated from the circuit and the pinned toolchain, never hand-written. Node is
+# not involved; nargo and bb are, so these are separate from the Poseidon targets.
+.PHONY: zk-verifier-gen
+zk-verifier-gen: ## Regenerate the Solidity verifier from the circuit (needs nargo and bb)
+	./tools/gen-verifier.sh
+
+.PHONY: zk-verifier-check
+zk-verifier-check: ## Fail if the committed verifier differs from a fresh generation
+	@set -e; \
+	tmp=$$(mktemp -d); \
+	./tools/gen-verifier.sh "$$tmp" >/dev/null; \
+	if [ ! -s "$$tmp/HonkVerifier.sol" ]; then \
+		echo "verifier: generation produced nothing — an unreadable output must not read as a match."; \
+		rm -rf "$$tmp"; exit 1; \
+	fi; \
+	committed=$$(shasum -a 256 < contracts/generated/HonkVerifier.sol | cut -d" " -f1); \
+	generated=$$(shasum -a 256 < "$$tmp/HonkVerifier.sol" | cut -d" " -f1); \
+	rm -rf "$$tmp"; \
+	if [ "$$committed" = "$$generated" ]; then \
+		echo "verifier matches a fresh generation (sha256 $$committed)"; \
+	else \
+		echo "GENERATED VERIFIER HAS DRIFTED."; \
+		echo "  committed: $$committed"; \
+		echo "  generated: $$generated"; \
+		echo "The circuit or the toolchain changed. Run 'make zk-verifier-gen', regenerate the"; \
+		echo "proof fixture with 'make zk-proof-fixture', and commit both."; \
+		exit 1; \
+	fi
+
+.PHONY: zk-proof-fixture
+zk-proof-fixture: ## Regenerate the committed proof the contract suite verifies (needs nargo, bb, Node)
+	./tools/gen-proof-fixture.sh
+
 .PHONY: zk-toolchain-check
 zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned one
 	@pinned=$$(awk '/^nargo /{print $$2}' zk/circuits/toolchain.txt); \

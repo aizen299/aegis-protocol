@@ -38,7 +38,7 @@ depth = 128
 # Generated output is not source and must not be reformatted: forge fmt rewrites it, the fresh
 # generation does not match, and `forge fmt --check` and `make poseidon-check` then fail each
 # other's output forever.
-ignore = ["src/zk/poseidon/PoseidonBytecode.sol"]
+ignore = ["src/zk/poseidon/PoseidonBytecode.sol", "generated/HonkVerifier.sol", "test/utils/ProofFixture.sol"]
 line_length = 110
 tab_width = 4
 bracket_spacing = false
