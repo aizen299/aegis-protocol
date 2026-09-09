@@ -10,4 +10,5 @@ library Roles {
     bytes32 internal constant ORACLE_MANAGER_ROLE = keccak256("ORACLE_MANAGER_ROLE");
     bytes32 internal constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
     bytes32 internal constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+    bytes32 internal constant GOVERNANCE_GUARDIAN_ROLE = keccak256("GOVERNANCE_GUARDIAN_ROLE");
 }

@@ -12,7 +12,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
-| v0.3 | DAO Governance | Next |
+| v0.3 | DAO Governance | **In progress** — token and governor done; timelock next |
 | v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
 | v1.0 | Production Release | Not started |
 
@@ -30,7 +30,12 @@ fail-closed reader). Indexing for every event either emits, seven read endpoints
 service that verifies signatures and medianizes independently, an executor that submits penalties,
 and an oracle node that fetches from independent sources.
 
-Current: **150 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
+**v0.3 — DAO Governance.** `AegisToken` (fixed supply, timestamp-keyed vote checkpoints) and
+`Governor` (proposals, snapshotted voting, timelock, an executor that branches on destination
+chain). Still to come: the standalone timelock, indexing, endpoints, and the role-migration
+procedure.
+
+Current: **192 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 
