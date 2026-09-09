@@ -76,9 +76,12 @@ costs roughly 2.2M gas.
 `ZkVaultGate` is where replay is actually rejected: the circuit has no memory, and only guarantees
 that the same secret and domain always yield the same nullifier so the gate's map sees the repeat.
 The chain and the gate's own address are read on chain rather than taken from the caller, which is
-what makes the domain separation enforced rather than advisory.
+what makes the domain separation enforced rather than advisory. End to end, a proof is generated
+against the gate address deployment produced — not a fixture — executed on a real chain, and its
+replay refused; a proof made for one gate is refused by another even when both trees hold the same
+root.
 
-Current: **321 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
+Current: **321 contract tests**, **19 circuit tests**, 12 backend packages, **32 end-to-end tests**, Slither clean.
 [`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

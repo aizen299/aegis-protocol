@@ -273,6 +273,11 @@ deploy-governance-local: ## Deploy the v0.3 governance contracts to local anvil
 	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployGovernanceLocal.s.sol:DeployGovernanceLocal \
 		--rpc-url $(ANVIL_RPC) --broadcast
 
+.PHONY: deploy-zk-local
+deploy-zk-local: ## Deploy the v0.4 zk contracts to local anvil
+	cd contracts && PRIVATE_KEY=$(ANVIL_DEPLOYER_KEY) forge script script/DeployZkLocal.s.sol:DeployZkLocal \
+		--rpc-url $(ANVIL_RPC) --broadcast
+
 .PHONY: deploy-vault
 deploy-vault: ## Deploy VaultEngine against an existing asset (needs PRIVATE_KEY, VAULT_ASSET, VAULT_ADMIN)
 	@test -n "$(PRIVATE_KEY)" || (echo "set PRIVATE_KEY; this target is not local-only and has no default" && exit 1)

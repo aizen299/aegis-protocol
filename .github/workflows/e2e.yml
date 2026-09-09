@@ -3,9 +3,9 @@ name: End-to-End
 on:
   push:
     branches: [main]
-    paths: ["backend/**", "contracts/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+    paths: ["backend/**", "contracts/**", "zk/**", "tools/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
   pull_request:
-    paths: ["backend/**", "contracts/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+    paths: ["backend/**", "contracts/**", "zk/**", "tools/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -51,6 +51,23 @@ jobs:
             psql "$DB_DSN" -v ON_ERROR_STOP=1 -f "$migration"
           done
 
+      # The zk end-to-end proves against the gate address that deployment produced, so it needs
+      # the real proving toolchain. Without it those tests skip, and the assertion below turns a
+      # skip into a failure.
+      - name: Install the pinned Noir toolchain
+        run: |
+          set -euo pipefail
+          NARGO_VERSION=$(awk '/^nargo /{print $2}' zk/circuits/toolchain.txt)
+          mkdir -p "$HOME/.nargo/bin"
+          curl -fsSL "https://github.com/noir-lang/noir/releases/download/v${NARGO_VERSION}/noir-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.nargo/bin"
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+          curl -fsSL https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          PATH="$HOME/.nargo/bin:$PATH" "$HOME/.bb/bbup"
+          echo "$HOME/.bb" >> "$GITHUB_PATH"
+      - name: Install the witness generator's dependencies
+        run: cd tools/poseidon && npm ci --no-audit --no-fund
+
       - name: Start anvil
         run: |
           anvil --port 8545 --chain-id 31337 --silent &
@@ -82,7 +99,9 @@ jobs:
             TestGovernanceAPIServesIndexedRows \
             TestGovernanceReindexingIsIdempotent \
             TestReindexingIsIdempotent \
-            TestRoleMigrationOnALocalDeployment; do
+            TestRoleMigrationOnALocalDeployment \
+            TestZkPrivateActionExecutesAndCannotBeReplayed \
+            TestZkProofFromAnotherGateIsRejected; do
             grep -q -- "--- PASS: $required" /tmp/e2e.log || {
               echo "::error::$required did not run."
               exit 1

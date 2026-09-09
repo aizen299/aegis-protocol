@@ -11,7 +11,7 @@ const FIELD_SIZE =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
 const DEPTH = 20;
-const SECRET = 424242n;
+const SECRET = BigInt(process.env.SECRET || "424242");
 const ACTION = BigInt(process.env.ACTION_ID || "7");
 const CHAIN = BigInt(process.env.CHAIN_ID || "31337");
 const GATE = BigInt(process.env.GATE || "0xab");
