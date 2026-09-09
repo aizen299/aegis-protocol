@@ -88,23 +88,46 @@ contracts-slither: ## Mandatory before any contract is considered complete
 contracts-layout: ## Dump the current storage layout
 	cd contracts && forge inspect VaultEngine storage-layout
 
+# Every upgradeable contract with a released baseline. A contract absent from this list is not
+# checked, so adding one here is part of releasing it.
+LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds
+
 .PHONY: contracts-layout-check
-contracts-layout-check: ## Fail if storage layout diverges from the released baseline (run before any UUPS upgrade)
-	@cd contracts && forge inspect VaultEngine storage-layout --json \
-		| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' > /tmp/layout-current.json
-	@jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' \
-		contracts/deployments/layouts/VaultEngine.$(LAYOUT_BASELINE).json > /tmp/layout-baseline.json
-	@diff -u /tmp/layout-baseline.json /tmp/layout-current.json \
-		&& echo "storage layout matches $(LAYOUT_BASELINE)" \
-		|| (echo "STORAGE LAYOUT DIVERGED from $(LAYOUT_BASELINE). Append-only: never remove or reorder a variable." && exit 1)
+contracts-layout-check: ## Fail if any storage layout diverges from its released baseline (run before any UUPS upgrade)
+	@set -e; for contract in $(LAYOUT_CONTRACTS); do \
+		baseline=$$(ls contracts/deployments/layouts/$$contract.*.json 2>/dev/null | sort | tail -1); \
+		if [ -z "$$baseline" ]; then echo "$$contract: no baseline recorded yet, skipping"; continue; fi; \
+		(cd contracts && forge inspect $$contract storage-layout --json \
+			| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]') > /tmp/layout-current.json; \
+		jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("[0-9]+$$"; ""))}]' "$$baseline" > /tmp/layout-baseline.json; \
+		if [ "$$(jq 'length' /tmp/layout-current.json)" = "0" ] || [ "$$(jq 'length' /tmp/layout-baseline.json)" = "0" ]; then \
+			echo "$$contract: empty storage layout — an unreadable layout must not read as a match. Run 'forge clean'."; \
+			exit 1; \
+		fi; \
+		if diff -u /tmp/layout-baseline.json /tmp/layout-current.json > /tmp/layout-diff.txt; then \
+			echo "$$contract matches $$(basename $$baseline)"; \
+		else \
+			cat /tmp/layout-diff.txt; \
+			echo "STORAGE LAYOUT DIVERGED: $$contract vs $$(basename $$baseline). Append-only: never remove or reorder a variable."; \
+			exit 1; \
+		fi; \
+	done
 
 .PHONY: contracts-layout-record
-contracts-layout-record: ## Record the current layout as a new release baseline (RELEASE=v0.2.0)
+contracts-layout-record: ## Record current layouts as a release baseline (RELEASE=v0.2.0)
 	@test -n "$(RELEASE)" || (echo "set RELEASE, e.g. make contracts-layout-record RELEASE=v0.2.0" && exit 1)
-	cd contracts && forge inspect VaultEngine storage-layout --json \
-		| jq -S '{contract: "VaultEngine", release: "$(RELEASE)", storage: [.storage[] | {label, slot, offset, type}], types: .types}' \
-		> deployments/layouts/VaultEngine.$(RELEASE).json
-	@echo "recorded contracts/deployments/layouts/VaultEngine.$(RELEASE).json"
+	@set -e; for contract in $(LAYOUT_CONTRACTS); do \
+		(cd contracts && forge inspect $$contract storage-layout --json \
+			| jq -S --arg c "$$contract" --arg r "$(RELEASE)" \
+			  '{contract: $$c, release: $$r, storage: [.storage[] | {label, slot, offset, type}], types: .types}') \
+			> /tmp/layout-record.json; \
+		if [ "$$(jq '.storage | length' /tmp/layout-record.json)" = "0" ]; then \
+			echo "$$contract: forge returned an empty layout. Run 'forge clean' and retry."; \
+			exit 1; \
+		fi; \
+		cp /tmp/layout-record.json contracts/deployments/layouts/$$contract.$(RELEASE).json; \
+		echo "recorded contracts/deployments/layouts/$$contract.$(RELEASE).json"; \
+	done
 
 .PHONY: deploy-local
 deploy-local: ## Deploy the v0.1 vault and a six-decimal test token to local anvil

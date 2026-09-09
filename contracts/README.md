@@ -7,7 +7,7 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 | Version | Module | State |
 |---|---|---|
 | v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
-| v0.2 | `src/oracle/` | Not started |
+| v0.2 | `src/oracle/` | Implemented — 150 tests, Slither clean |
 | v0.3 | `src/governance/` | Not started |
 | v0.4 | `src/zk/` | Not started |
 
@@ -76,9 +76,14 @@ Storage layout is append-only, and the released baseline is committed at
 `deployments/layouts/VaultEngine.<release>.json`.
 
 ```bash
-make contracts-layout-check                          # fails if the layout diverged
-make contracts-layout-record RELEASE=v0.2.0          # after a deliberate append
+make contracts-layout-check                    # fails if any layout diverged from its baseline
+make contracts-layout-record RELEASE=v0.3.0    # after a deliberate append
 ```
+
+Every upgradeable contract is listed in the Makefile's `LAYOUT_CONTRACTS`; one absent from that
+list is not checked, so adding it there is part of releasing it. An empty layout is treated as a
+failure rather than a match — `forge inspect` returns nothing on a stale cache, and comparing
+nothing to nothing would otherwise report success for a contract whose layout was never read.
 
 The check runs in CI on every contracts change, so a reordered or removed variable fails the build
 rather than surfacing at deploy time. Consume `__gap` when appending.

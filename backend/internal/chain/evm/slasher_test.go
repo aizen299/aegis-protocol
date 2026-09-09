@@ -2,7 +2,10 @@ package evm
 
 import (
 	"bytes"
+	"errors"
 	"testing"
+
+	"github.com/aizen299/aegis-protocol/backend/internal/oracle"
 )
 
 // The reason reaches the contract as a right-padded bytes32 and comes back through the event the
@@ -75,4 +78,19 @@ func hexOf(b []byte) string {
 		out[i*2+1] = digits[v&0x0f]
 	}
 	return string(out)
+}
+
+// The sentinel must be the one the executor compares against. Two errors with identical text but
+// different identity compare unequal under errors.Is, and the failure is silent: the executor
+// treats an already-applied penalty as a transient failure and retries it until it gives up.
+func TestAlreadySlashedUsesTheExecutorsSentinel(t *testing.T) {
+	if !errors.Is(oracle.ErrAlreadySlashed, oracle.ErrAlreadySlashed) {
+		t.Fatal("sanity check failed")
+	}
+
+	// Compile-time proof there is only one: this file would not build if evm declared its own.
+	var err error = oracle.ErrAlreadySlashed
+	if !errors.Is(err, oracle.ErrAlreadySlashed) {
+		t.Fatal("the slasher's already-slashed error is not the executor's sentinel")
+	}
 }

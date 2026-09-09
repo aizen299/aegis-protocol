@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/aizen299/aegis-protocol/backend/internal/oracle"
 	pbtypes "github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
@@ -41,10 +42,6 @@ func init() {
 	sig := crypto.Keccak256([]byte("AlreadySlashedForRound(address,uint256)"))
 	alreadySlashedSelector = sig[:4]
 }
-
-// ErrAlreadySlashed mirrors the contract's per-round guard. Surfaced as a distinct error so the
-// caller can close the decision instead of retrying something that will never succeed.
-var ErrAlreadySlashed = errors.New("node already slashed for this round")
 
 // Slasher submits penalties with the SLASHER_ROLE key.
 //
@@ -105,7 +102,10 @@ func (s *Slasher) Slash(ctx context.Context, node string, roundID, amount pbtype
 
 	if _, err := s.client.rpc.CallContract(ctx, call, nil); err != nil {
 		if isAlreadySlashed(err) {
-			return "", ErrAlreadySlashed
+			// The sentinel belongs to the package that defines the Slasher interface. Declaring a
+			// second one here with the same text would compare unequal under errors.Is — which is
+			// exactly the bug the end-to-end retry test caught.
+			return "", oracle.ErrAlreadySlashed
 		}
 		return "", fmt.Errorf("slash would revert: %w", err)
 	}

@@ -11,7 +11,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | Version | Module | State |
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
-| v0.2 | Oracle Network | **In progress** — contracts, indexing, and APIs done; aggregation service next |
+| v0.2 | Oracle Network | **Complete** — ready to tag `v0.2.0` |
 | v0.3 | DAO Governance | Not started |
 | v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
 | v1.0 | Production Release | Not started |
@@ -24,12 +24,13 @@ for v1.0 staging.
 **v0.1 — Vault Engine.** UUPS vault with internal share accounting, one optional yield strategy, and
 manager-configurable risk controls. Event indexer, REST API, Next.js dashboard.
 
-**v0.2 — Oracle Network.** `OracleStaking` (registration, stake, unbonding, capped slashing) and
-`OracleRounds` (round lifecycle, EIP-712 submissions, on-chain medianization, a fail-closed reader).
-Indexing for every event either emits, seven read endpoints, and the SLASHER_ROLE key-sourcing
-policy. Still to come: the aggregation service, the node binary, and the `v0.2.0` tag.
+**v0.2 — Oracle Network.** `OracleStaking` (registration, stake, unbonding, capped slashing with a
+per-round guard) and `OracleRounds` (round lifecycle, EIP-712 submissions, on-chain medianization, a
+fail-closed reader). Indexing for every event either emits, seven read endpoints, an aggregation
+service that verifies signatures and medianizes independently, an executor that submits penalties,
+and an oracle node that fetches from independent sources.
 
-Current: **144 contract tests**, 7 backend packages, **17 end-to-end tests**, Slither clean.
+Current: **150 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 
@@ -176,7 +177,9 @@ Two protocol-level constraints worth stating here:
 
 Contracts are UUPS with append-only storage. The released layout is committed at
 `contracts/deployments/layouts/`, and `make contracts-layout-check` runs in CI, so a reordered or
-removed variable fails the build rather than corrupting storage on a live deployment.
+removed variable fails the build rather than corrupting storage on a live deployment. An empty
+layout counts as a failure, not a match: `forge inspect` returns nothing on a stale cache, and
+comparing nothing to nothing would otherwise pass for a contract whose layout was never read.
 
 ## Known gaps
 
