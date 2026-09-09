@@ -43,6 +43,13 @@ jobs:
             | tar -xz -C "$HOME/.nargo/bin"
           echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
           "$HOME/.nargo/bin/nargo" --version
+
+          # bb is not optional: it generates the verifier, and it is not independent of nargo.
+          # bbup reads the installed nargo and resolves the compatible bb from Aztec's map.
+          curl -fsSL https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          PATH="$HOME/.nargo/bin:$PATH" "$HOME/.bb/bbup"
+          echo "$HOME/.bb" >> "$GITHUB_PATH"
+          "$HOME/.bb/bb" --version
       - name: Fail if the toolchain drifts from the pin
         run: make zk-toolchain-check
       - name: Circuit tests

@@ -1,10 +1,16 @@
-# Pinned Noir toolchain. docs/v0.4-zk-plan.md §2.1: the generated Solidity verifier is a function of
-# these versions, so they are pinned as strictly as solc_version and changed deliberately.
+# Pinned Noir toolchain. docs/v0.4-zk-plan.md §2.1 and §2.9: the generated Solidity verifier is a
+# function of these versions, so they are pinned as strictly as solc_version and changed
+# deliberately.
 #
 # Verified by `make zk-toolchain-check`. Install with:
-#   noirup --version <nargo>
-nargo 1.0.0-beta.26
+#   noirup --version <nargo>   &&   bbup     (bbup reads the nargo version and picks the bb below)
+nargo 1.0.0-beta.22
 
-# The poseidon library moved out of the Noir stdlib. v0.3.0 is the first tag that compiles against
-# beta.26; v0.2.x and earlier do not. Pinned in vault_membership/Nargo.toml.
+# Barretenberg generates the verifier and the proofs. It is NOT independent of nargo: Aztec
+# publishes a compatibility map, and a nargo with no entry in it has no usable bb at all. beta.22 is
+# the newest nargo that map covers — see §2.9 for why the pin moved down from beta.26.
+bb 5.0.0-nightly.20260522
+
+# The poseidon library moved out of the Noir stdlib. v0.3.0 compiles against beta.22 and beta.26
+# alike; v0.2.x and earlier do not. Pinned in vault_membership/Nargo.toml.
 poseidon v0.3.0

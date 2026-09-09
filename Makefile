@@ -152,6 +152,18 @@ zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned on
 		exit 1; \
 	fi; \
 	echo "nargo $$installed matches the pin"; \
+	bb_pinned=$$(awk '/^bb /{print $$2}' zk/circuits/toolchain.txt); \
+	if ! command -v bb >/dev/null 2>&1; then \
+		echo "bb is not on PATH. The verifier cannot be generated without it: run bbup."; \
+		exit 1; \
+	fi; \
+	bb_installed=$$(bb --version | head -1 | tr -d '\r'); \
+	if [ "$$bb_installed" != "$$bb_pinned" ]; then \
+		echo "bb $$bb_installed is installed, but the pin is $$bb_pinned."; \
+		echo "bb and nargo are not independent — see zk/circuits/toolchain.txt. Run: bbup"; \
+		exit 1; \
+	fi; \
+	echo "bb $$bb_installed matches the pin"; \
 	dep=$$(awk '/^poseidon /{print $$2}' zk/circuits/toolchain.txt); \
 	grep -q "tag = \"$$dep\"" zk/circuits/vault_membership/Nargo.toml || { \
 		echo "vault_membership/Nargo.toml does not pin poseidon $$dep"; exit 1; }; \
