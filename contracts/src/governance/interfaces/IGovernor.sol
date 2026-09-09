@@ -88,7 +88,6 @@ interface IGovernor {
     error AlreadyVoted(uint256 proposalId, address voter);
     error NoVotingPower(address voter);
     error InvalidSupport(uint8 support);
-    error VotingNotFinished(uint256 proposalId, uint256 voteEnd);
     error NotProposerOrGuardian(address caller);
     error ProposalNotCancellable(uint256 proposalId, ProposalState state);
     error InvalidQuorumNumerator(uint256 numerator);

@@ -90,14 +90,35 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       # Exporting and comparing are separate steps on purpose: folding them together with `||` made
       # a failed export report as "ABI is stale", which is the wrong diagnosis.
-      - name: Export the ABI from contracts/
+      #
+      # Every ABI `make backend-abi` writes is checked here. Checking only one let the others go
+      # stale silently, which is the whole failure this job exists to catch.
+      - name: Export the ABIs from contracts/
         working-directory: contracts
-        run: forge inspect VaultEngine abi --json > "$RUNNER_TEMP/current.abi.json"
-      - name: Fail if the committed ABI is stale
         run: |
-          if ! diff -u \
-              <(jq -S . backend/pkg/contracts/vaultengine/VaultEngine.abi.json) \
-              <(jq -S . "$RUNNER_TEMP/current.abi.json"); then
-            echo "::error::Committed ABI does not match contracts/. Run 'make backend-abi' and commit the result."
-            exit 1
-          fi
+          set -euo pipefail
+          for contract in VaultEngine OracleRounds OracleStaking; do
+            forge inspect "$contract" abi --json > "$RUNNER_TEMP/$contract.abi.json"
+          done
+      - name: Fail if any committed ABI is stale
+        run: |
+          set -uo pipefail
+          stale=0
+          check() {
+            current="$RUNNER_TEMP/$1.abi.json"
+            # An empty export compared against an empty baseline would report a match. The
+            # storage-layout check learned this the same way.
+            if [ ! -s "$current" ] || [ "$(jq 'length' "$current")" = "0" ]; then
+              echo "::error::Export for $1 was empty — the ABI could not be read from contracts/."
+              stale=1
+              return
+            fi
+            if ! diff -u <(jq -S . "$2") <(jq -S . "$current"); then
+              echo "::error::$1: committed ABI does not match contracts/. Run 'make backend-abi' and commit the result."
+              stale=1
+            fi
+          }
+          check VaultEngine   backend/pkg/contracts/vaultengine/VaultEngine.abi.json
+          check OracleRounds  backend/pkg/contracts/oracle/OracleRounds.abi.json
+          check OracleStaking backend/pkg/contracts/oracle/OracleStaking.abi.json
+          exit "$stale"

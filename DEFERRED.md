@@ -51,6 +51,25 @@ carry no value at risk.
 
 ---
 
+## Accepted for v0.3
+
+### The timelock's admin can route around the governor
+
+`Timelock` grants `TIMELOCK_PROPOSER_ROLE`, `TIMELOCK_EXECUTOR_ROLE`, and
+`TIMELOCK_CANCELLER_ROLE` to the `Governor` alone, and `test_nobodyButTheGovernorCanDriveTheTimelock`
+holds that. Nothing structural stops `DEFAULT_ADMIN_ROLE` from granting the executor role to another
+account, which could then run a scheduled operation directly — the action would take effect while
+the proposal sat in the indexer still marked `queued`.
+
+This is the same trust already placed in that key, and it is the mechanism that lets a bricked
+governor be replaced without migrating every protocol role, which is the reason the contracts were
+split at all. Removing it would mean giving up the recovery path.
+
+**Revisit when** the §2.4 role migration runs and `DEFAULT_ADMIN_ROLE` moves to the timelock itself,
+at which point routing around the governor requires a passed proposal and the divergence closes.
+
+---
+
 ## Deferred to a named version
 
 ### Indexer lag metric and its CloudWatch alarm

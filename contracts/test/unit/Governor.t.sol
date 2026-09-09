@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
 import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {GovernedTarget, GovernorFixture} from "../utils/GovernorFixture.sol";
@@ -120,6 +122,106 @@ contract GovernorTest is GovernorFixture {
         uint256 operationId = governor.proposalOf(proposalId).operationId;
         vm.expectRevert(abi.encodeWithSelector(ITimelock.ExecutionReverted.selector, operationId));
         governor.execute(proposalId);
+    }
+
+    // --- parameters ---
+    //
+    // These are the surface a captured admin would reach for, and setQuorumNumerator carries the
+    // only validation in the group. An unexercised guard is how v0.2 nearly shipped without its
+    // per-round slash check.
+
+    function test_parameterSettersRequireTheAdminRole() public {
+        vm.startPrank(carol);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, carol, bytes32(0)
+            )
+        );
+        governor.setVotingDelay(1 days);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, carol, bytes32(0)
+            )
+        );
+        governor.setVotingPeriod(1 days);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, carol, bytes32(0)
+            )
+        );
+        governor.setProposalThreshold(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, carol, bytes32(0)
+            )
+        );
+        governor.setQuorumNumerator(10);
+
+        vm.stopPrank();
+    }
+
+    function test_adminCanSetEachParameter() public {
+        vm.startPrank(admin);
+        governor.setVotingDelay(2 days);
+        governor.setVotingPeriod(3 days);
+        governor.setProposalThreshold(1 ether);
+        governor.setQuorumNumerator(10);
+        vm.stopPrank();
+
+        assertEq(governor.votingDelay(), 2 days);
+        assertEq(governor.votingPeriod(), 3 days);
+        assertEq(governor.proposalThreshold(), 1 ether);
+        assertEq(governor.quorumNumerator(), 10);
+    }
+
+    function test_aZeroVotingPeriodIsRejected() public {
+        vm.prank(admin);
+        vm.expectRevert(IGovernor.ZeroValue.selector);
+        governor.setVotingPeriod(0);
+    }
+
+    /// A quorum of zero passes anything and a quorum above the denominator can never be met. Both
+    /// are unreachable states for a governance system, so neither is settable.
+    function test_anOutOfRangeQuorumIsRejected() public {
+        vm.startPrank(admin);
+
+        vm.expectRevert(abi.encodeWithSelector(IGovernor.InvalidQuorumNumerator.selector, 0));
+        governor.setQuorumNumerator(0);
+
+        vm.expectRevert(abi.encodeWithSelector(IGovernor.InvalidQuorumNumerator.selector, 101));
+        governor.setQuorumNumerator(101);
+
+        vm.stopPrank();
+    }
+
+    /// Parameters must not move a vote that is already running: a proposal carries the window it
+    /// was created with, and its quorum is measured against the snapshot.
+    function test_aParameterChangeDoesNotMoveARunningVote() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+
+        uint256 proposalId = _propose(alice, 42);
+        uint48 voteEnd = governor.proposalOf(proposalId).voteEnd;
+
+        vm.startPrank(admin);
+        governor.setVotingPeriod(1);
+        governor.setVotingDelay(1);
+        vm.stopPrank();
+
+        assertEq(governor.proposalOf(proposalId).voteEnd, voteEnd, "a running vote was shortened");
+
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.SUCCEEDED));
+    }
+
+    function test_theGovernorReportsItsWiring() public view {
+        assertEq(governor.token(), address(token));
+        assertEq(governor.timelock(), address(timelock));
+        assertEq(governor.proposalCount(), 0);
     }
 
     // --- the seam between the governor and the timelock ---

@@ -37,7 +37,7 @@ assuming a local target. Protocol roles are meant to sit on the timelock, not th
 governor can be replaced without migrating every role. Still to come: fuzz and invariants,
 indexing, endpoints, and the role-migration procedure.
 
-Current: **218 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
+Current: **224 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 
