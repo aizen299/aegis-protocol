@@ -85,3 +85,52 @@ func TestValidateAggregatorRequiresKeyReference(t *testing.T) {
 		t.Fatalf("validate: %v", err)
 	}
 }
+
+// A node configured with fewer sources than its own floor can never submit. Failing at startup
+// beats discovering it when a round is already open.
+func TestValidateNodeRejectsFewerSourcesThanTheFloor(t *testing.T) {
+	cfg := &Config{}
+	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
+	cfg.Contracts.OracleRounds = "0x1"
+	cfg.Contracts.OracleStaking = "0x2"
+	cfg.Node.FeedName = "ETH/USD"
+	cfg.Node.Sources = []string{"https://a", "https://b"}
+	cfg.Node.SourcePaths = []string{"price", "price"}
+	cfg.Node.MinSources = 3
+
+	if err := cfg.ValidateNode(); err == nil {
+		t.Fatal("a node with two sources and a floor of three validated")
+	}
+}
+
+// Sources and their JSON paths are positional, so a length mismatch is a misconfiguration that
+// would otherwise read the wrong path from the wrong endpoint.
+func TestValidateNodeRejectsMismatchedSourcePaths(t *testing.T) {
+	cfg := &Config{}
+	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
+	cfg.Contracts.OracleRounds = "0x1"
+	cfg.Contracts.OracleStaking = "0x2"
+	cfg.Node.FeedName = "ETH/USD"
+	cfg.Node.Sources = []string{"https://a", "https://b", "https://c"}
+	cfg.Node.SourcePaths = []string{"price"}
+	cfg.Node.MinSources = 3
+
+	if err := cfg.ValidateNode(); err == nil {
+		t.Fatal("mismatched sources and paths validated")
+	}
+}
+
+func TestValidateNodeAcceptsACompleteConfiguration(t *testing.T) {
+	cfg := &Config{}
+	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
+	cfg.Contracts.OracleRounds = "0x1"
+	cfg.Contracts.OracleStaking = "0x2"
+	cfg.Node.FeedName = "ETH/USD"
+	cfg.Node.Sources = []string{"https://a", "https://b", "https://c"}
+	cfg.Node.SourcePaths = []string{"price", "price", "data.amount"}
+	cfg.Node.MinSources = 3
+
+	if err := cfg.ValidateNode(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}

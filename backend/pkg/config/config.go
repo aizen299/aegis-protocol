@@ -21,6 +21,17 @@ type Config struct {
 		// Interpreted by the environment's provider: a variable name locally, an SSM parameter
 		// path in staging and production.
 		SlasherKeyRef string `env:"SLASHER_KEY_REF"`
+		NodeKeyRef    string `env:"NODE_KEY_REF"`
+	}
+
+	Node struct {
+		FeedID       string        `env:"NODE_FEED_ID"`
+		FeedName     string        `env:"NODE_FEED_NAME"`
+		Sources      []string      `env:"NODE_SOURCES" envSeparator:","`
+		SourcePaths  []string      `env:"NODE_SOURCE_PATHS" envSeparator:","`
+		MinSources   int           `env:"NODE_MIN_SOURCES" envDefault:"3"`
+		MaxRetries   int           `env:"NODE_MAX_RETRIES" envDefault:"5"`
+		SubmitBefore time.Duration `env:"NODE_SUBMIT_BEFORE" envDefault:"15s"`
 	}
 
 	DB struct {
@@ -99,6 +110,32 @@ func (c *Config) ValidateAggregator() error {
 	}
 	if c.Contracts.OracleStaking == "" {
 		return fmt.Errorf("CONTRACT_ORACLE_STAKING is required for the aggregator")
+	}
+	return nil
+}
+
+// ValidateNode checks the fields the oracle node needs.
+//
+// The source floor is enforced at startup rather than at the first round: a node configured with
+// fewer sources than its own minimum can never submit, and discovering that when a round is open is
+// discovering it too late.
+func (c *Config) ValidateNode() error {
+	if c.Secrets.NodeKeyRef == "" {
+		return fmt.Errorf("NODE_KEY_REF is required: it names the environment variable locally, or the SSM parameter path otherwise")
+	}
+	if c.Contracts.OracleRounds == "" || c.Contracts.OracleStaking == "" {
+		return fmt.Errorf("CONTRACT_ORACLE_ROUNDS and CONTRACT_ORACLE_STAKING are required for the node")
+	}
+	if c.Node.FeedName == "" {
+		return fmt.Errorf("NODE_FEED_NAME is required, for example ETH/USD")
+	}
+	if len(c.Node.Sources) != len(c.Node.SourcePaths) {
+		return fmt.Errorf("NODE_SOURCES has %d entries but NODE_SOURCE_PATHS has %d; they are positional",
+			len(c.Node.Sources), len(c.Node.SourcePaths))
+	}
+	if len(c.Node.Sources) < c.Node.MinSources {
+		return fmt.Errorf("%d sources configured but NODE_MIN_SOURCES is %d; this node could never submit",
+			len(c.Node.Sources), c.Node.MinSources)
 	}
 	return nil
 }

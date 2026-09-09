@@ -10,7 +10,7 @@ coordination layer — contracts settle, the backend interprets.
 | v0.1 | `cmd/indexer`, `cmd/api`, vault read models | Implemented |
 | v0.2 | Oracle indexing (feeds, rounds, submissions, node registry, slashing) | Implemented |
 | v0.2 | Oracle aggregation service (`cmd/aggregator`) | Implemented |
-| v0.2 | Oracle node binary | Not started |
+| v0.2 | Oracle node binary (`cmd/oraclenode`) | Implemented |
 | v0.3 | Governance state cache | Not started |
 | v0.4 | zk proof orchestration | Not started |
 
@@ -130,6 +130,29 @@ between the two is an operational alert rather than a resting state.
 Retrying is safe because the contract permits one penalty per node per round. The executor cannot
 know whether a transaction it lost track of landed, so the guard has to be on chain — a retry
 reverts instead of taking the stake twice.
+
+## The oracle node
+
+`cmd/oraclenode` fetches a price from several independent sources, takes the median across them,
+signs it, and submits it to the open round.
+
+**Two medians, protecting different things.** The contract's median over node submissions protects
+the feed from a bad node. This one, over sources, protects the node from a bad source — a single
+compromised endpoint cannot move what this node reports, and reporting something nobody else does
+is what gets a node slashed.
+
+**Prices never touch a float.** `3000.42` has no exact binary representation, and the error would
+compound through medianization into a value that disagrees with what every other node computed from
+the same input. Parsing is exact decimal-to-integer at the feed's scale, with excess precision
+truncated toward zero.
+
+**Silence beats a guess.** Below `NODE_MIN_SOURCES` answering, the node skips the round. A missed
+round costs 0.5% of stake; a submission derived from one source costs 1% and misleads every
+consumer of the feed. That floor is checked against the configured source count at startup, so a
+node that could never submit refuses to start.
+
+It holds its own key under the same policy as the slasher key — a node key can stake, unstake, and
+produce submissions attributed to that node, so it is not a lesser secret.
 
 ## Secrets
 

@@ -34,6 +34,10 @@ clean: ## Tear down the local stack and delete volumes
 aggregator: ## Run the oracle aggregation service (holds the SLASHER_ROLE key)
 	$(COMPOSE) --profile oracle up --build -d aggregator
 
+.PHONY: oraclenode
+oraclenode: ## Run one oracle node (holds its own signing key)
+	$(COMPOSE) --profile oracle up --build -d oraclenode
+
 .PHONY: logs
 logs: ## Follow service logs
 	$(COMPOSE) logs -f indexer api

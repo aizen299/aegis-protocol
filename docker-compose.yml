@@ -108,6 +108,33 @@ services:
       redis: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
 
+  # One node. A realistic local network runs several with different keys; this is the shape.
+  # Profiled off by default for the same reason as the aggregator: it holds a key.
+  oraclenode:
+    build:
+      context: ./backend
+      dockerfile: docker/oraclenode.Dockerfile
+    profiles: ["oracle"]
+    environment:
+      SERVICE_NAME: oraclenode
+      APP_ENV: ${APP_ENV:?set APP_ENV to local, staging, or production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
+      REDIS_ADDR: redis:6379
+      CHAIN_RPC_URL: ${CHAIN_RPC_URL:-http://anvil:8545}
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      CONTRACT_ORACLE_ROUNDS: ${CONTRACT_ORACLE_ROUNDS:?the node needs the oracle contracts}
+      CONTRACT_ORACLE_STAKING: ${CONTRACT_ORACLE_STAKING:?the node needs the oracle contracts}
+      NODE_KEY_REF: ${NODE_KEY_REF:-NODE_PRIVATE_KEY}
+      NODE_PRIVATE_KEY: ${NODE_PRIVATE_KEY:-}
+      NODE_FEED_NAME: ${NODE_FEED_NAME:-ETH/USD}
+      NODE_SOURCES: ${NODE_SOURCES:-}
+      NODE_SOURCE_PATHS: ${NODE_SOURCE_PATHS:-}
+      NODE_MIN_SOURCES: ${NODE_MIN_SOURCES:-3}
+      AWS_REGION: ${AWS_REGION:-}
+    depends_on:
+      anvil: {condition: service_started}
+
   zk-service:
     build:
       context: ./zk
