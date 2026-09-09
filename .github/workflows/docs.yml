@@ -1,0 +1,26 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Deliberately not path-filtered. The README goes stale on things that do not touch it — a new
+  # test file, a tag — so a check that only runs when the README changes would never fire on the
+  # cases that actually cause drift.
+  claims:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, so released-version claims can be verified
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
+      - run: ./scripts/docs-check.sh

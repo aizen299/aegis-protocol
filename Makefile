@@ -53,7 +53,11 @@ e2e: ## End-to-end smoke test: real chain, real database, real indexer and API
 build: contracts-build backend-build zk-build frontend-build ## Build every layer
 
 .PHONY: lint
-lint: contracts-lint backend-lint zk-lint frontend-lint ## Lint every layer
+lint: contracts-lint backend-lint zk-lint frontend-lint docs-check ## Lint every layer
+
+.PHONY: docs-check
+docs-check: ## Verify the README's claims against the repository
+	./scripts/docs-check.sh
 
 .PHONY: security
 security: contracts-slither ## Run static analysis

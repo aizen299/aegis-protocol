@@ -11,8 +11,8 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | Version | Module | State |
 |---|---|---|
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
-| v0.2 | Oracle Network | **Complete** — ready to tag `v0.2.0` |
-| v0.3 | DAO Governance | Not started |
+| v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
+| v0.3 | DAO Governance | Next |
 | v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
 | v1.0 | Production Release | Not started |
 
@@ -180,6 +180,13 @@ Contracts are UUPS with append-only storage. The released layout is committed at
 removed variable fails the build rather than corrupting storage on a live deployment. An empty
 layout counts as a failure, not a match: `forge inspect` returns nothing on a stale cache, and
 comparing nothing to nothing would otherwise pass for a contract whose layout was never read.
+
+## Keeping this file honest
+
+`make docs-check` verifies the claims above — the test counts, that every version described as
+released has a matching tag, and that every path linked here exists. It runs in CI on every push,
+without a path filter: the README goes stale on changes that never touch it, so a check gated on
+the README changing would miss exactly the cases that cause drift.
 
 ## Known gaps
 
