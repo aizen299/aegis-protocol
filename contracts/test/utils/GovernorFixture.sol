@@ -15,6 +15,7 @@ import {Roles} from "../../src/shared/access/Roles.sol";
 contract GovernedTarget {
     uint256 public value;
     uint256 public received;
+    address public lastCaller;
 
     error Refused();
 
@@ -22,6 +23,7 @@ contract GovernedTarget {
         uint256 newValue
     ) external {
         value = newValue;
+        lastCaller = msg.sender;
     }
 
     function refuse() external pure {

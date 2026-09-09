@@ -36,10 +36,11 @@ queue, owns the delay, and performs the call — branching on the destination ch
 assuming a local target. Protocol roles are meant to sit on the timelock, not the governor, so a
 governor can be replaced without migrating every role. The nine invariants in the plan are
 enforced by a fuzzing handler, not just written down — they caught a one-second window in which a
-proposal reported itself open for voting while every vote reverted. Still to come: indexing,
-endpoints, an end-to-end run against a real chain, and the role-migration procedure.
+proposal reported itself open for voting while every vote reverted. A proposal is created, voted,
+queued, and executed against a real chain end to end. Still to come: indexing, endpoints, and the
+role-migration procedure.
 
-Current: **247 contract tests**, 11 backend packages, **20 end-to-end tests**, Slither clean.
+Current: **247 contract tests**, 11 backend packages, **23 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 

@@ -13,6 +13,10 @@
 /contracts/broadcast/
 /contracts/deployments/*
 !/contracts/deployments/.gitkeep
+# Storage-layout baselines are release artifacts, not build output: the layout check reads them and
+# silently skips a contract that has none. contracts/.gitignore says the same; both say it so
+# neither can drift into disagreeing.
+!/contracts/deployments/layouts
 /zk/target/
 /frontend/.next/
 /frontend/out/
