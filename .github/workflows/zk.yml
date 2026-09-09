@@ -3,9 +3,9 @@ name: zk CI
 on:
   push:
     branches: [main]
-    paths: ["zk/**", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "Makefile", ".github/workflows/zk.yml"]
   pull_request:
-    paths: ["zk/**", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "Makefile", ".github/workflows/zk.yml"]
 
 concurrency:
   group: zk-${{ github.ref }}
@@ -16,6 +16,25 @@ defaults:
     working-directory: zk
 
 jobs:
+  circuits:
+    runs-on: ubuntu-latest
+    # The circuit is the security boundary: an unconstrained signal is a forgery, not a bug in a
+    # service that can be patched. Its tests run on their own, before anything else.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned Noir toolchain
+        run: |
+          NARGO_VERSION=$(awk '/^nargo /{print $2}' circuits/toolchain.txt)
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/noirup | bash
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.nargo/bin/noirup" --version "$NARGO_VERSION"
+      - name: Fail if the toolchain drifts from the pin
+        working-directory: .
+        run: make zk-toolchain-check
+      - name: Circuit tests
+        working-directory: zk/circuits/vault_membership
+        run: nargo test
+
   test:
     runs-on: ubuntu-latest
     steps:

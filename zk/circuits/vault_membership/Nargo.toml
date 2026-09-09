@@ -1,0 +1,11 @@
+[package]
+name = "vault_membership"
+type = "bin"
+authors = ["Aegis Protocol"]
+# nargo rejects a prerelease in compiler_version, so the toolchain pin lives in
+# zk/circuits/toolchain.txt and is enforced by `make zk-toolchain-check`. It is pinned for the
+# reason docs/v0.4-zk-plan.md §2.1 gives: Noir moves fast and the generated verifier is a function
+# of these versions. Treated like solc_version.
+
+[dependencies]
+poseidon = { tag = "v0.3.0", git = "https://github.com/noir-lang/poseidon" }

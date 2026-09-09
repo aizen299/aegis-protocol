@@ -1,1 +1,10 @@
 target/
+
+# Noir build output. Compiled circuits and generated verifiers are build artifacts, not sources:
+# they are regenerated from the pinned toolchain, and a committed copy drifts silently.
+circuits/*/target/
+
+# nargo's witness input template. Its entire purpose is to hold a secret, and the proof service
+# supplies inputs over the API instead — so a copy in the repo is a place for one to be committed
+# by accident and nothing else.
+circuits/*/Prover.toml

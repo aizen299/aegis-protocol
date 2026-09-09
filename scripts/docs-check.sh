@@ -35,6 +35,18 @@ else
   fail "README claims $claimed_contract_tests contract tests, found $actual_contract_tests"
 fi
 
+# Counts the #[test] attribute, not zero-argument functions: a helper that happens to take no
+# arguments would otherwise inflate the count silently.
+actual_circuit_tests=$(grep -rhoE '^\s*#\[test' zk/circuits/*/src/*.nr 2>/dev/null | wc -l | tr -d ' ')
+claimed_circuit_tests=$(claimed "circuit tests")
+if [ "$claimed_circuit_tests" = "missing" ]; then
+  pass "circuit tests: not claimed"
+elif [ "$claimed_circuit_tests" = "$actual_circuit_tests" ]; then
+  pass "circuit tests: $actual_circuit_tests"
+else
+  fail "README claims $claimed_circuit_tests circuit tests, found $actual_circuit_tests"
+fi
+
 actual_e2e=$(grep -rhoE '^func Test[A-Za-z0-9_]*\(' backend/internal/e2e/ | wc -l | tr -d ' ')
 claimed_e2e=$(claimed "end-to-end tests")
 if [ "$claimed_e2e" = "$actual_e2e" ]; then

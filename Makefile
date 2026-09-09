@@ -84,6 +84,29 @@ contracts-lint:
 contracts-fmt:
 	cd contracts && forge fmt
 
+.PHONY: zk-circuits-test
+zk-circuits-test: ## Run the Noir circuit tests, negative cases included
+	cd zk/circuits/vault_membership && nargo test
+
+.PHONY: zk-toolchain-check
+zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned one
+	@pinned=$$(awk '/^nargo /{print $$2}' zk/circuits/toolchain.txt); \
+	if ! command -v nargo >/dev/null 2>&1; then \
+		echo "nargo is not on PATH. Install the pinned version: noirup --version $$pinned"; \
+		exit 1; \
+	fi; \
+	installed=$$(nargo --version | awk -F'= ' '/nargo version/{print $$2}'); \
+	if [ "$$installed" != "$$pinned" ]; then \
+		echo "nargo $$installed is installed, but zk/circuits/toolchain.txt pins $$pinned."; \
+		echo "The generated verifier is a function of this version. Run: noirup --version $$pinned"; \
+		exit 1; \
+	fi; \
+	echo "nargo $$installed matches the pin"; \
+	dep=$$(awk '/^poseidon /{print $$2}' zk/circuits/toolchain.txt); \
+	grep -q "tag = \"$$dep\"" zk/circuits/vault_membership/Nargo.toml || { \
+		echo "vault_membership/Nargo.toml does not pin poseidon $$dep"; exit 1; }; \
+	echo "poseidon $$dep matches the pin"
+
 .PHONY: contracts-slither
 contracts-slither: ## Mandatory before any contract is considered complete
 	cd contracts && slither . --config-file slither.config.json

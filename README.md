@@ -13,8 +13,18 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
 | v0.3 | DAO Governance | **Complete** — ready to tag v0.3.0 |
-| v0.4 | zk Privacy Layer | Scaffolded service, no circuits |
+| v0.4 | zk Privacy Layer | **In progress** — membership circuit done; commitment tree next |
 | v1.0 | Production Release | Not started |
+
+
+**v0.4 — zk Privacy Layer.** The membership circuit in Noir, proving ownership of a commitment in
+the vault's tree without revealing which one. The plan
+([`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md)) records three corrections to the circuit sketch in
+`docs/zk.md`: the nullifier is domain-separated and action-specific rather than a constant, which
+otherwise allows exactly one private action per user forever; the commitment is bound into the
+Merkle path rather than proved beside it; and the nullifier binds the chain and gate so a proof
+cannot be replayed against another deployment. Privacy is bounded by the anonymity set — an
+unresolved limitation the API surfaces as a leaf count rather than implying away.
 
 No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
 for v1.0 staging.
@@ -45,7 +55,7 @@ database, and the real API. The role-migration procedure is written up in
 builds that capability and proves it, but grants governance nothing; performing the migration is a
 v1.0 step.
 
-Current: **261 contract tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
+Current: **261 contract tests**, **16 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
 [`docs/v0.2-oracle-plan.md`](docs/v0.2-oracle-plan.md) tracks the remaining v0.2 work and the design
 decisions behind it.
 

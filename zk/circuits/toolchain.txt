@@ -1,0 +1,10 @@
+# Pinned Noir toolchain. docs/v0.4-zk-plan.md §2.1: the generated Solidity verifier is a function of
+# these versions, so they are pinned as strictly as solc_version and changed deliberately.
+#
+# Verified by `make zk-toolchain-check`. Install with:
+#   noirup --version <nargo>
+nargo 1.0.0-beta.26
+
+# The poseidon library moved out of the Noir stdlib. v0.3.0 is the first tag that compiles against
+# beta.26; v0.2.x and earlier do not. Pinned in vault_membership/Nargo.toml.
+poseidon v0.3.0
