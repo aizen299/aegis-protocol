@@ -216,7 +216,7 @@ contracts-layout: ## Dump the current storage layout
 # Types are compared with AST node ids stripped from struct, contract, and enum references: those
 # ids shift when unrelated files enter the compilation unit. Array lengths are deliberately NOT
 # stripped — a gap that changes size is a real layout change.
-LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock
+LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock CommitmentTree ZkVaultGate
 
 .PHONY: contracts-layout-check
 contracts-layout-check: ## Fail if any storage layout diverges from its released baseline (run before any UUPS upgrade)
@@ -247,8 +247,11 @@ contracts-layout-record: ## Record current layouts as a release baseline (RELEAS
 			| jq -S --arg c "$$contract" --arg r "$(RELEASE)" \
 			  '{contract: $$c, release: $$r, storage: [.storage[] | {label, slot, offset, type}], types: .types}') \
 			> /tmp/layout-record.json; \
-		if [ "$$(jq '.storage | length' /tmp/layout-record.json)" = "0" ]; then \
-			echo "$$contract: forge returned an empty layout. Run 'forge clean' and retry."; \
+		entries=$$(jq -e '.storage | length' /tmp/layout-record.json 2>/dev/null || echo ""); \
+		if [ -z "$$entries" ] || [ "$$entries" = "0" ]; then \
+			echo "$$contract: forge returned no readable layout (got '$$entries')."; \
+			echo "This happens for a newly added contract on a stale cache. Run 'forge clean' and retry."; \
+			rm -f contracts/deployments/layouts/$$contract.$(RELEASE).json; \
 			exit 1; \
 		fi; \
 		cp /tmp/layout-record.json contracts/deployments/layouts/$$contract.$(RELEASE).json; \

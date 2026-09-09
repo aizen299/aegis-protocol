@@ -24,21 +24,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     function setUp() public override {
         super.setUp();
 
-        HonkVerifier verifier = new HonkVerifier();
-
-        // Plain CREATE on purpose. A CREATE2 address depends on the initcode, so every edit to the
-        // gate would move it and invalidate the committed proof. A CREATE address depends only on
-        // the deployer and its nonce, so it is stable unless this setUp's deployment sequence
-        // changes — and the guard below says so when it does.
-        ZkVaultGate implementation = new ZkVaultGate();
-        gate = ZkVaultGate(
-            address(
-                new ERC1967Proxy(
-                    address(implementation),
-                    abi.encodeCall(ZkVaultGate.initialize, (admin, address(verifier), address(tree)))
-                )
-            )
-        );
+        gate = _deployGateAtAFixedAddress(_deployVerifier(), admin, address(tree));
 
         // The proof binds the gate's address and the chain. If either drifts, no proof in this
         // suite can verify, and the failure would otherwise look like a broken verifier.

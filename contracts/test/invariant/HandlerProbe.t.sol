@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+import {HonkVerifier} from "../../generated/HonkVerifier.sol";
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
+import {Roles} from "../../src/shared/access/Roles.sol";
+import {ZkVaultGate} from "../../src/zk/ZkVaultGate.sol";
+import {CommitmentTreeFixture} from "../utils/CommitmentTreeFixture.sol";
 import {GovernorFixture} from "../utils/GovernorFixture.sol";
 import {OracleRoundsFixture} from "../utils/OracleRoundsFixture.sol";
+import {ProofFixture} from "../utils/ProofFixture.sol";
 import {GovernanceHandler} from "./GovernanceHandler.sol";
 import {OracleRoundsHandler} from "./OracleRoundsHandler.sol";
+import {ZkHandler} from "./ZkHandler.sol";
 
 /// @dev Not an invariant suite: drives the handler deterministically so a starved fuzz run can be
 ///      diagnosed instead of guessed at.
@@ -130,5 +138,89 @@ contract GovernanceProbeTest is GovernorFixture {
         assertEq(handler.ghostExecutedCount(), 0, "a remote proposal executed");
         assertEq(target.value(), 0, "a remote action landed locally");
         assertFalse(handler.ghostRemoteCallLandedLocally());
+    }
+}
+
+/// @dev Same purpose for the zk suite. Every §6 invariant here is trivially true if the handler
+///      never executes a proof, and each action guards itself with an early return, so a starved
+///      run would look identical to a passing one.
+contract ZkProbeTest is CommitmentTreeFixture {
+    address internal manager = makeAddr("manager");
+
+    ZkVaultGate internal gate;
+    ZkHandler internal handler;
+
+    function setUp() public override {
+        super.setUp();
+
+        gate = _deployGateAtAFixedAddress(_deployVerifier(), admin, address(tree));
+
+        vm.prank(admin);
+        gate.grantRole(Roles.ZK_GATE_MANAGER_ROLE, manager);
+        vm.prank(manager);
+        gate.registerAction(ProofFixture.ACTION_ID, "vault-membership");
+
+        handler = new ZkHandler(
+            tree,
+            gate,
+            writer,
+            manager,
+            ProofFixture.PROOF,
+            ProofFixture.ROOT,
+            ProofFixture.NULLIFIER_HASH,
+            ProofFixture.ACTION_ID
+        );
+
+        vm.prank(admin);
+        tree.grantRole(Roles.COMMITMENT_WRITER_ROLE, address(handler));
+
+        // The commitment the fixture's proof was built for. Without it the tree never holds the
+        // root the proof binds, every execution is refused as an unknown root, and the replay
+        // invariants below pass while proving nothing.
+        _insert(_commitmentOf(424242));
+    }
+
+    function test_handlerCanInsertAndRefuseADuplicate() public {
+        handler.insert(1);
+        assertEq(handler.ghostInsertCount(), 1, "insert was blocked");
+
+        handler.insertDuplicate(0);
+        assertEq(handler.ghostRefusedCount(), 1, "the duplicate was not refused");
+        assertEq(handler.insertedCount(), 1, "a duplicate was recorded as inserted");
+    }
+
+    /// The one that matters: without a valid proof reaching execution, every replay invariant is
+    /// proving something about a code path the fuzzer never enters.
+    function test_handlerCanExecuteTheValidProofExactlyOnce() public {
+        handler.executeValidProof();
+        assertEq(handler.ghostExecuteCount(), 1, "the valid proof never executed");
+        assertTrue(gate.isSpent(ProofFixture.NULLIFIER_HASH));
+
+        handler.executeValidProof();
+        assertEq(handler.ghostExecuteCount(), 1, "the proof executed twice");
+        assertFalse(handler.ghostDoubleSpend(), "a double spend was recorded as success");
+    }
+
+    function test_handlerCanReachTheRejectionPaths() public {
+        uint256 refusedBefore = handler.ghostRefusedCount();
+
+        handler.executeAgainstAnInventedRoot(7);
+        handler.executeAgainstAnUnregisteredAction(9);
+
+        assertEq(handler.ghostRefusedCount(), refusedBefore + 2, "a rejection path was not reached");
+        assertFalse(handler.ghostUnknownRootAccepted());
+        assertFalse(handler.ghostUnregisteredActionAccepted());
+    }
+
+    function test_handlerCanChurnTheRegistry() public {
+        handler.executeValidProof();
+        assertTrue(gate.isSpent(ProofFixture.NULLIFIER_HASH));
+
+        handler.churnActionRegistry(0);
+        assertFalse(gate.isActionRegistered(ProofFixture.ACTION_ID), "deregister was blocked");
+
+        handler.churnActionRegistry(0);
+        assertTrue(gate.isActionRegistered(ProofFixture.ACTION_ID), "register was blocked");
+        assertFalse(handler.ghostSpentBecameUnspent(), "churn un-spent a nullifier");
     }
 }

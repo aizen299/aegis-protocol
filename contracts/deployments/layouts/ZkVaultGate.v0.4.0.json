@@ -1,0 +1,83 @@
+{
+  "contract": "ZkVaultGate",
+  "release": "v0.4.0",
+  "storage": [
+    {
+      "label": "_verifier",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IZkVerifier)2472"
+    },
+    {
+      "label": "_tree",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_contract(ICommitmentTree)2383"
+    },
+    {
+      "label": "_spent",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_mapping(t_bytes32,t_bool))"
+    },
+    {
+      "label": "_actions",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "__gap",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_array(t_uint256)40_storage"
+    }
+  ],
+  "types": {
+    "t_array(t_uint256)40_storage": {
+      "base": "t_uint256",
+      "encoding": "inplace",
+      "label": "uint256[40]",
+      "numberOfBytes": "1280"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(ICommitmentTree)2383": {
+      "encoding": "inplace",
+      "label": "contract ICommitmentTree",
+      "numberOfBytes": "20"
+    },
+    "t_contract(IZkVerifier)2472": {
+      "encoding": "inplace",
+      "label": "contract IZkVerifier",
+      "numberOfBytes": "20"
+    },
+    "t_mapping(t_bytes32,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_bytes32",
+      "label": "mapping(bytes32 => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_uint256,t_mapping(t_bytes32,t_bool))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(bytes32 => bool))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_bytes32,t_bool)"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}

@@ -78,7 +78,7 @@ that the same secret and domain always yield the same nullifier so the gate's ma
 The chain and the gate's own address are read on chain rather than taken from the caller, which is
 what makes the domain separation enforced rather than advisory.
 
-Current: **305 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
+Current: **321 contract tests**, **19 circuit tests**, 12 backend packages, **30 end-to-end tests**, Slither clean.
 [`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

@@ -1,0 +1,125 @@
+{
+  "contract": "Timelock",
+  "release": "v0.4.0",
+  "storage": [
+    {
+      "label": "_delay",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_uint48"
+    },
+    {
+      "label": "_operationCount",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_uint256"
+    },
+    {
+      "label": "_operations",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_struct(Operation)2345_storage)"
+    },
+    {
+      "label": "__gap",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_array(t_uint256)40_storage"
+    }
+  ],
+  "types": {
+    "t_array(t_uint256)40_storage": {
+      "base": "t_uint256",
+      "encoding": "inplace",
+      "label": "uint256[40]",
+      "numberOfBytes": "1280"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_bytes_storage": {
+      "encoding": "bytes",
+      "label": "bytes",
+      "numberOfBytes": "32"
+    },
+    "t_enum(OperationState)2330": {
+      "encoding": "inplace",
+      "label": "enum ITimelock.OperationState",
+      "numberOfBytes": "1"
+    },
+    "t_mapping(t_uint256,t_struct(Operation)2345_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct ITimelock.Operation)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Operation)2345_storage"
+    },
+    "t_struct(Operation)2345_storage": {
+      "encoding": "inplace",
+      "label": "struct ITimelock.Operation",
+      "members": [
+        {
+          "astId": 2333,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "targetChainId",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2335,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "target",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bytes32"
+        },
+        {
+          "astId": 2337,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "value",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2339,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "executableAt",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint48"
+        },
+        {
+          "astId": 2342,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "state",
+          "offset": 6,
+          "slot": "3",
+          "type": "t_enum(OperationState)2330"
+        },
+        {
+          "astId": 2344,
+          "contract": "src/governance/Timelock.sol:Timelock",
+          "label": "payload",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_bytes_storage"
+        }
+      ],
+      "numberOfBytes": "160"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    },
+    "t_uint48": {
+      "encoding": "inplace",
+      "label": "uint48",
+      "numberOfBytes": "6"
+    }
+  }
+}

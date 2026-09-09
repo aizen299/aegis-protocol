@@ -22,7 +22,7 @@ trap 'rm -rf "$work"; rm -f "$CIRCUIT/Prover.toml"' EXIT
 # GATE is the address the gate is deployed at; the proof binds it, so it is part of the fixture.
 # contracts/test/unit/ZkVaultGate.t.sol asserts the deployed address matches and names this target
 # if it does not.
-GATE="${GATE:-0x1d1499e622d69689cdf9004d05ec547d650ff211}" \
+GATE="${GATE:-0x9c8e4255dd2e9f956281dfc2247b447995cd4e87}" \
   node "$ROOT/tools/poseidon/witness.cjs" > "$CIRCUIT/Prover.toml"
 
 cd "$CIRCUIT"

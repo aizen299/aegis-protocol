@@ -20,7 +20,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CIRCUIT="$ROOT/zk/circuits/vault_membership"
 OUT_SOL="${1:-$ROOT/contracts/generated}"
 
-for bin in nargo bb forge jq; do
+# nargo and bb only. forge and jq were required while the verifier was committed as bytecode; that
+# approach was dropped, and leaving them here made the zk CI job — which has no Foundry — fail on a
+# tool the script does not use.
+for bin in nargo bb; do
   command -v "$bin" >/dev/null || { echo "gen-verifier: $bin is not on PATH" >&2; exit 1; }
 done
 
