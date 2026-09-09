@@ -8,3 +8,6 @@ var _ oracle.AggregatorStore = (*Store)(nil)
 
 // The read service likewise.
 var _ oracle.Reader = (*Store)(nil)
+
+// And the executor, which holds the key that moves value.
+var _ oracle.ExecutorStore = (*Store)(nil)

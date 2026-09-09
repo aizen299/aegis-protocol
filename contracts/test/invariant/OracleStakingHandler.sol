@@ -18,6 +18,7 @@ contract OracleStakingHandler is CommonBase, StdCheats, StdUtils {
     uint256 public ghostStaked;
     uint256 public ghostWithdrawn;
     uint256 public ghostSlashed;
+    uint256 public ghostRound;
 
     constructor(
         OracleStaking staking_,
@@ -124,8 +125,11 @@ contract OracleStakingHandler is CommonBase, StdCheats, StdUtils {
         if (cap == 0) return;
 
         amount = bound(amount, 1, cap);
+        // A fresh round per slash: the contract permits one penalty per node per round, and this
+        // handler is exercising the accounting rather than the guard.
+        ghostRound += 1;
         vm.prank(slasher);
-        uint256 slashed = staking.slash(node, amount, bytes32("FUZZ"));
+        uint256 slashed = staking.slash(node, ghostRound, amount, bytes32("FUZZ"));
         ghostSlashed += slashed;
     }
 

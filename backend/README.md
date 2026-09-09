@@ -9,7 +9,8 @@ coordination layer — contracts settle, the backend interprets.
 |---|---|---|
 | v0.1 | `cmd/indexer`, `cmd/api`, vault read models | Implemented |
 | v0.2 | Oracle indexing (feeds, rounds, submissions, node registry, slashing) | Implemented |
-| v0.2 | Oracle aggregation service | Not started |
+| v0.2 | Oracle aggregation service (`cmd/aggregator`) | Implemented |
+| v0.2 | Oracle node binary | Not started |
 | v0.3 | Governance state cache | Not started |
 | v0.4 | zk proof orchestration | Not started |
 
@@ -107,6 +108,28 @@ Addresses are validated through the chain client's own decoder, not a hex regex 
 encoding differs per chain.
 
 The API listens on **8090**, not 8080; 8080 is commonly occupied by Jenkins.
+
+## The aggregation service
+
+`cmd/aggregator` analyses settled rounds and submits the penalties it decides. It is the only
+process in the backend that signs a state-changing transaction.
+
+Deciding and executing are separate types with separate privileges. The `Aggregator` verifies
+signatures, medianizes independently, and records decisions — it holds no key and cannot move
+anything. The `Executor` holds the key and makes no judgements. A crash between them loses nothing,
+because the decision is durable in Postgres before the executor runs.
+
+An independent median that disagrees with the settled value is an **alert, never a correction**. The
+chain is authoritative; a backend that overrode a settled price would be claiming the authority
+staking and slashing exist to deny it. Both numbers are kept so the disagreement can be diagnosed.
+
+`submitted_at` and `executed_at` are distinct. The executor sets the first; the indexer sets the
+second when it sees `NodeSlashed`. A sent transaction is not a landed one, and a decision stuck
+between the two is an operational alert rather than a resting state.
+
+Retrying is safe because the contract permits one penalty per node per round. The executor cannot
+know whether a transaction it lost track of landed, so the guard has to be on chain — a retry
+reverts instead of taking the stake twice.
 
 ## Secrets
 

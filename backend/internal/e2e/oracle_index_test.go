@@ -171,8 +171,8 @@ func TestOracleSlashIsIndexed(t *testing.T) {
 	s := setupOracleStack(t, d)
 
 	// 10% of stake: exactly the on-chain cap.
-	send(t, deployerKey, d.OracleStaking, "slash(address,uint256,bytes32)",
-		nodes[0].address, "1000000000000000000000", reasonHex("OUTLIER_SUBMISSION"))
+	send(t, deployerKey, d.OracleStaking, "slash(address,uint256,uint256,bytes32)",
+		nodes[0].address, "7", "1000000000000000000000", reasonHex("OUTLIER_SUBMISSION"))
 	s.indexToHead(t)
 
 	reason := queryString(t, s,
@@ -187,6 +187,41 @@ func TestOracleSlashIsIndexed(t *testing.T) {
 		chainID, nodes[0].address)
 	if stake != "9000000000000000000000" {
 		t.Errorf("stake = %s, want 9000e18 after a 10%% slash", stake)
+	}
+
+	round := queryString(t, s,
+		`SELECT round_id::text FROM oracle_slashings WHERE chain_id = $1 AND node_address = $2`,
+		chainID, nodes[0].address)
+	if round != "7" {
+		t.Errorf("round = %s, want 7 — a penalty must be traceable to what caused it", round)
+	}
+}
+
+// The executor cannot know whether a transaction it lost track of landed, so a retry must revert
+// rather than take the stake twice. Verified against a real chain, not just the unit test.
+func TestOracleDoubleSlashIsRejectedOnChain(t *testing.T) {
+	requireDeps(t)
+	d := deployOracle(t)
+	nodes := registerNodes(t, d, 3)
+	s := setupOracleStack(t, d)
+
+	send(t, deployerKey, d.OracleStaking, "slash(address,uint256,uint256,bytes32)",
+		nodes[0].address, "7", "1000000000000000000000", reasonHex("OUTLIER_SUBMISSION"))
+
+	out, err := castErr(t, "send", "--rpc-url", anvilRPC, "--private-key", deployerKey,
+		d.OracleStaking, "slash(address,uint256,uint256,bytes32)",
+		nodes[0].address, "7", "1000000000000000000000", reasonHex("OUTLIER_SUBMISSION"))
+	if err == nil {
+		t.Fatalf("a second slash for the same round succeeded: %s", out)
+	}
+
+	s.indexToHead(t)
+
+	stake := queryString(t, s,
+		`SELECT staked_amount::text FROM oracle_nodes WHERE chain_id = $1 AND address = $2`,
+		chainID, nodes[0].address)
+	if stake != "9000000000000000000000" {
+		t.Fatalf("stake = %s, want the single 10%% penalty applied once", stake)
 	}
 }
 

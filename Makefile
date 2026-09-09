@@ -30,6 +30,10 @@ down: ## Tear down the local stack, keeping volumes
 clean: ## Tear down the local stack and delete volumes
 	$(COMPOSE) down -v
 
+.PHONY: aggregator
+aggregator: ## Run the oracle aggregation service (holds the SLASHER_ROLE key)
+	$(COMPOSE) --profile oracle up --build -d aggregator
+
 .PHONY: logs
 logs: ## Follow service logs
 	$(COMPOSE) logs -f indexer api

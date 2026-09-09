@@ -10,7 +10,15 @@ interface IOracleStaking {
     event UnstakeRequested(address indexed node, uint256 amount, uint256 claimableAt);
     event UnstakeCancelled(address indexed node, uint256 amount);
     event NodeUnstaked(address indexed node, uint256 amount, uint256 remainingStake);
-    event NodeSlashed(address indexed node, uint256 amount, bytes32 indexed reason, uint256 remainingStake);
+    /// @dev Carries the round so a penalty can be traced to what caused it, and so the indexer can
+    ///      reconcile an executed slash against the decision that produced it.
+    event NodeSlashed(
+        address indexed node,
+        uint256 indexed roundId,
+        uint256 amount,
+        bytes32 indexed reason,
+        uint256 remainingStake
+    );
     event NodeDeactivated(address indexed node, bytes32 indexed reason);
     event NodeReactivated(address indexed node);
 
@@ -30,6 +38,8 @@ interface IOracleStaking {
     error UnbondingNotElapsed(uint256 claimableAt, uint256 nowTimestamp);
     error InsufficientStake(uint256 held, uint256 requested);
     error SlashExceedsCap(uint256 requested, uint256 cap);
+    error AlreadySlashedForRound(address node, uint256 roundId);
+    error InvalidRound(uint256 roundId);
     error NodeInactive(address node);
     error InvalidBps(uint256 bps);
     error UnbondingPeriodTooShort(uint256 provided, uint256 minimum);

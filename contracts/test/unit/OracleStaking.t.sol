@@ -31,7 +31,7 @@ contract OracleStakingTest is OracleFixture {
 
         // The backend catches up while the stake is still locked.
         vm.prank(slasher);
-        staking.slash(nodeA, MIN_STAKE / 10, REASON_OUTLIER);
+        staking.slash(nodeA, 1, MIN_STAKE / 10, REASON_OUTLIER);
 
         assertEq(staking.stakeOf(nodeA), MIN_STAKE - MIN_STAKE / 10, "the slash landed");
     }
@@ -44,7 +44,7 @@ contract OracleStakingTest is OracleFixture {
         staking.requestUnstake(MIN_STAKE);
 
         vm.prank(slasher);
-        uint256 slashed = staking.slash(nodeA, MIN_STAKE / 10, REASON_OUTLIER);
+        uint256 slashed = staking.slash(nodeA, 1, MIN_STAKE / 10, REASON_OUTLIER);
 
         skip(UNBONDING);
         vm.prank(nodeA);
@@ -116,6 +116,89 @@ contract OracleStakingTest is OracleFixture {
         assertEq(staking.activeNodeCount(), 1);
     }
 
+    // --- one penalty per node per round ---
+
+    /// The executor cannot know whether a transaction it lost track of landed. This guard is what
+    /// makes retrying safe: the second attempt reverts rather than taking the stake twice.
+    function test_secondSlashForTheSameRoundReverts() public {
+        _registerNode(nodeA, MIN_STAKE);
+
+        vm.prank(slasher);
+        staking.slash(nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER);
+
+        uint256 afterFirst = staking.stakeOf(nodeA);
+
+        vm.prank(slasher);
+        vm.expectRevert(abi.encodeWithSelector(IOracleStaking.AlreadySlashedForRound.selector, nodeA, 7));
+        staking.slash(nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER);
+
+        assertEq(staking.stakeOf(nodeA), afterFirst, "a retry moved the stake a second time");
+    }
+
+    /// The guard is per round, so a node penalised in one round can still be penalised in the next.
+    function test_slashInALaterRoundIsAllowed() public {
+        _registerNode(nodeA, MIN_STAKE);
+
+        vm.startPrank(slasher);
+        staking.slash(nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER);
+        staking.slash(nodeA, 8, MIN_STAKE / 100, REASON_MISSED);
+        vm.stopPrank();
+
+        assertTrue(staking.slashedInRound(7, nodeA));
+        assertTrue(staking.slashedInRound(8, nodeA));
+    }
+
+    /// The guard is per node, so one node's penalty does not shield another's.
+    function test_guardIsScopedToTheNode() public {
+        _registerNode(nodeA, MIN_STAKE);
+        _registerNode(nodeB, MIN_STAKE);
+
+        vm.startPrank(slasher);
+        staking.slash(nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER);
+        staking.slash(nodeB, 7, MIN_STAKE / 100, REASON_OUTLIER);
+        vm.stopPrank();
+
+        assertTrue(staking.slashedInRound(7, nodeB));
+    }
+
+    /// Round zero is not a round. Allowing it would give every caller a slot the guard cannot
+    /// distinguish, which is an unbounded repeat.
+    function test_slashRejectsRoundZero() public {
+        _registerNode(nodeA, MIN_STAKE);
+
+        vm.prank(slasher);
+        vm.expectRevert(abi.encodeWithSelector(IOracleStaking.InvalidRound.selector, uint256(0)));
+        staking.slash(nodeA, 0, MIN_STAKE / 100, REASON_OUTLIER);
+    }
+
+    /// A reverted attempt must not consume the round: the node was never penalised for it.
+    function test_failedSlashDoesNotConsumeTheRound() public {
+        _registerNode(nodeA, MIN_STAKE);
+
+        uint256 cap = (MIN_STAKE * MAX_SLASH_BPS) / 10_000;
+        vm.prank(slasher);
+        vm.expectRevert();
+        staking.slash(nodeA, 7, cap + 1, REASON_OUTLIER);
+
+        assertFalse(staking.slashedInRound(7, nodeA), "a rejected slash marked the round used");
+
+        vm.prank(slasher);
+        staking.slash(nodeA, 7, cap, REASON_OUTLIER);
+        assertTrue(staking.slashedInRound(7, nodeA));
+    }
+
+    function test_slashEmitsTheRound() public {
+        _registerNode(nodeA, MIN_STAKE);
+
+        vm.expectEmit(true, true, true, true, address(staking));
+        emit IOracleStaking.NodeSlashed(
+            nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER, MIN_STAKE - MIN_STAKE / 100
+        );
+
+        vm.prank(slasher);
+        staking.slash(nodeA, 7, MIN_STAKE / 100, REASON_OUTLIER);
+    }
+
     // --- slash caps ---
 
     /// SLASHER_ROLE is a hot key. The ceiling is enforced here rather than trusted to the caller.
@@ -125,7 +208,7 @@ contract OracleStakingTest is OracleFixture {
         uint256 cap = (MIN_STAKE * MAX_SLASH_BPS) / 10_000;
         vm.prank(slasher);
         vm.expectRevert(abi.encodeWithSelector(IOracleStaking.SlashExceedsCap.selector, cap + 1, cap));
-        staking.slash(nodeA, cap + 1, REASON_OUTLIER);
+        staking.slash(nodeA, 1, cap + 1, REASON_OUTLIER);
     }
 
     /// A compromised key cannot drain a node in one transaction; each slash is capped against the
@@ -136,7 +219,7 @@ contract OracleStakingTest is OracleFixture {
         for (uint256 i = 0; i < 10; i++) {
             uint256 cap = (staking.stakeOf(nodeA) * MAX_SLASH_BPS) / 10_000;
             vm.prank(slasher);
-            staking.slash(nodeA, cap, REASON_OUTLIER);
+            staking.slash(nodeA, i + 1, cap, REASON_OUTLIER);
         }
 
         assertGt(staking.stakeOf(nodeA), (MIN_STAKE * 30) / 100, "ten max slashes leave over 30%");
@@ -146,10 +229,11 @@ contract OracleStakingTest is OracleFixture {
         _registerNode(nodeA, MIN_STAKE);
 
         // Drive the stake under the floor with repeated capped slashes.
+        uint256 round = 1;
         while (staking.stakeOf(nodeA) >= STAKE_FLOOR) {
             uint256 cap = (staking.stakeOf(nodeA) * MAX_SLASH_BPS) / 10_000;
             vm.prank(slasher);
-            staking.slash(nodeA, cap, REASON_MISSED);
+            staking.slash(nodeA, round++, cap, REASON_MISSED);
         }
 
         assertFalse(staking.isActive(nodeA), "a node under the floor stops participating");
@@ -165,13 +249,13 @@ contract OracleStakingTest is OracleFixture {
                 IAccessControl.AccessControlUnauthorizedAccount.selector, outsider, Roles.SLASHER_ROLE
             )
         );
-        staking.slash(nodeA, 1e18, REASON_OUTLIER);
+        staking.slash(nodeA, 1, 1e18, REASON_OUTLIER);
     }
 
     function test_slashUnregisteredNodeReverts() public {
         vm.prank(slasher);
         vm.expectRevert(abi.encodeWithSelector(IOracleStaking.NotRegistered.selector, outsider));
-        staking.slash(outsider, 1e18, REASON_OUTLIER);
+        staking.slash(outsider, 1, 1e18, REASON_OUTLIER);
     }
 
     // --- registration ---

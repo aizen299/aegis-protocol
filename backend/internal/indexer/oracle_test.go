@@ -442,6 +442,7 @@ func TestSlashRecordsAuditRowWithReadableReason(t *testing.T) {
 
 	ev := oracleEvent(t, roundsHex, eventNodeSlashed, map[string]any{
 		"node":           mustID(t, nodeHex),
+		"roundId":        big.NewInt(7),
 		"amount":         mustBigInt(t, "1000000000000000000000"),
 		"reason":         reason,
 		"remainingStake": mustBigInt(t, "9000000000000000000000"),
@@ -456,6 +457,9 @@ func TestSlashRecordsAuditRowWithReadableReason(t *testing.T) {
 	}
 	if sl.Amount.String() != "1000000000000000000000" || sl.RemainingStake.String() != "9000000000000000000000" {
 		t.Errorf("slash amounts wrong: %+v", sl)
+	}
+	if sl.RoundID.String() != "7" {
+		t.Errorf("round = %s, want 7 — a penalty must be traceable to what caused it", sl.RoundID)
 	}
 }
 

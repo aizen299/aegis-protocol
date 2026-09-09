@@ -55,9 +55,10 @@ contract OracleStaking is
     uint256 private _activeNodeCount;
     uint256 private _nodeSetVersion;
     mapping(address node => NodeInfo info) private _nodes;
+    mapping(uint256 roundId => mapping(address node => bool slashed)) private _slashedInRound;
 
     // slither-disable-next-line unused-state
-    uint256[41] private __gap;
+    uint256[40] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -204,16 +205,24 @@ contract OracleStaking is
     ///      decision.
     function slash(
         address node_,
+        uint256 roundId,
         uint256 amount,
         bytes32 reason
     ) external nonReentrant onlyRole(Roles.SLASHER_ROLE) returns (uint256 slashed) {
         NodeInfo storage node = _nodes[node_];
         if (!node.registered) revert NotRegistered(node_);
         if (amount == 0) revert ZeroAmount();
+        if (roundId == 0) revert InvalidRound(roundId);
+
+        // One penalty per node per round. This is what makes the backend's retry-after-crash safe:
+        // the executor cannot know whether a transaction it lost track of landed, so a second
+        // attempt must revert rather than take the stake twice.
+        if (_slashedInRound[roundId][node_]) revert AlreadySlashedForRound(node_, roundId);
 
         uint256 cap = Math.mulDiv(node.stake, _maxSlashBps, _BPS_DENOMINATOR);
         if (amount > cap) revert SlashExceedsCap(amount, cap);
 
+        _slashedInRound[roundId][node_] = true;
         slashed = Math.min(amount, node.stake);
         node.stake -= slashed;
         node.slashedTotal += slashed;
@@ -222,7 +231,7 @@ contract OracleStaking is
             _deactivate(node_, node, "BELOW_STAKE_FLOOR");
         }
 
-        emit NodeSlashed(node_, slashed, reason, node.stake);
+        emit NodeSlashed(node_, roundId, slashed, reason, node.stake);
     }
 
     // --- admin ---
@@ -341,6 +350,14 @@ contract OracleStaking is
     }
 
     /// @notice Stake that is not spoken for by a pending unstake request.
+    /// @notice Whether a node has already been penalised for a round.
+    function slashedInRound(
+        uint256 roundId,
+        address node_
+    ) public view returns (bool) {
+        return _slashedInRound[roundId][node_];
+    }
+
     function slashableStake(
         address node_
     ) public view returns (uint256) {

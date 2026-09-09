@@ -85,10 +85,23 @@ const qSetNodeActive = `
 	UPDATE oracle_nodes SET active = $3 WHERE chain_id = $1 AND address = $2
 `
 
+// Reconciles against a decision the aggregator already recorded for this node and round: the
+// executed slash and the reason it happened are the same row, not two. Falls back to inserting when
+// no decision exists, which is how a manual slash outside the service still lands in the audit
+// trail.
+// The decided reason is left alone: it records why the service concluded a penalty was due, which
+// is not the same claim as the bytes32 that reached the chain. The amount is taken from the event,
+// because the contract clamps it to the remaining stake and that is what actually moved.
+const qReconcileSlash = `
+	UPDATE oracle_slashings
+	SET executed_at = $4, tx_hash = $5, log_index = $6, block_number = $7, amount = $8
+	WHERE chain_id = $1 AND node_address = $2 AND round_id = $3 AND executed_at IS NULL
+`
+
 const qRecordSlash = `
 	INSERT INTO oracle_slashings
-		(chain_id, node_address, amount, reason, decided_at, executed_at, tx_hash, log_index, block_number)
-	VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8)
+		(chain_id, node_address, round_id, amount, reason, decided_at, executed_at, tx_hash, log_index, block_number)
+	VALUES ($1, $2, $9, $3, $4, $5, $5, $6, $7, $8)
 	ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
 `
 
@@ -147,6 +160,7 @@ type NodeStakeEvent struct {
 type Slash struct {
 	ChainID        int64
 	Node           string
+	RoundID        types.Raw
 	Amount         types.Raw
 	RemainingStake types.Raw
 	Reason         string
@@ -254,9 +268,16 @@ func (s *Store) RecordOracleSlash(ctx context.Context, sl Slash) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, qRecordSlash, sl.ChainID, sl.Node, sl.Amount, sl.Reason, sl.At,
-		sl.TxHash, int32(sl.LogIndex), int64(sl.BlockNumber)); err != nil {
-		return fmt.Errorf("record slash %s: %w", sl.Node, err)
+	tag, err := tx.Exec(ctx, qReconcileSlash, sl.ChainID, sl.Node, sl.RoundID, sl.At,
+		sl.TxHash, int32(sl.LogIndex), int64(sl.BlockNumber), sl.Amount)
+	if err != nil {
+		return fmt.Errorf("reconcile slash %s: %w", sl.Node, err)
+	}
+	if tag.RowsAffected() == 0 {
+		if _, err := tx.Exec(ctx, qRecordSlash, sl.ChainID, sl.Node, sl.Amount, sl.Reason, sl.At,
+			sl.TxHash, int32(sl.LogIndex), int64(sl.BlockNumber), sl.RoundID); err != nil {
+			return fmt.Errorf("record slash %s: %w", sl.Node, err)
+		}
 	}
 	if _, err := tx.Exec(ctx, qApplySlash, sl.ChainID, sl.Node, sl.RemainingStake, sl.Amount); err != nil {
 		return fmt.Errorf("apply slash %s: %w", sl.Node, err)

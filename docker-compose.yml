@@ -83,6 +83,31 @@ services:
       redis: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
 
+  # Holds the SLASHER_ROLE key, so it is the one service that can move value. Profiled off by
+  # default: bringing up the stack should not start a signer unless it is wanted.
+  aggregator:
+    build:
+      context: ./backend
+      dockerfile: docker/aggregator.Dockerfile
+    profiles: ["oracle"]
+    environment:
+      SERVICE_NAME: aggregator
+      APP_ENV: ${APP_ENV:?set APP_ENV to local, staging, or production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_DSN: postgres://pb:pb_local@postgres:5432/aegis?sslmode=disable
+      REDIS_ADDR: redis:6379
+      CHAIN_RPC_URL: ${CHAIN_RPC_URL:-http://anvil:8545}
+      CHAIN_ID: ${CHAIN_ID:-31337}
+      CONTRACT_ORACLE_ROUNDS: ${CONTRACT_ORACLE_ROUNDS:?the aggregator needs the oracle contracts}
+      CONTRACT_ORACLE_STAKING: ${CONTRACT_ORACLE_STAKING:?the aggregator needs the oracle contracts}
+      SLASHER_KEY_REF: ${SLASHER_KEY_REF:-SLASHER_PRIVATE_KEY}
+      SLASHER_PRIVATE_KEY: ${SLASHER_PRIVATE_KEY:-}
+      AWS_REGION: ${AWS_REGION:-}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
   zk-service:
     build:
       context: ./zk

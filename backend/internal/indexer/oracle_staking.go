@@ -149,10 +149,15 @@ func (h *OracleStakingHandler) handleSlashed(ctx context.Context, ev chain.Event
 	if err != nil {
 		return err
 	}
+	roundID, err := rawField(ev, "roundId")
+	if err != nil {
+		return err
+	}
 
 	return h.store.RecordOracleSlash(ctx, db.Slash{
 		ChainID:        ev.ChainID,
 		Node:           address,
+		RoundID:        roundID,
 		Amount:         amount,
 		RemainingStake: remaining,
 		Reason:         trimBytes32(reason),
