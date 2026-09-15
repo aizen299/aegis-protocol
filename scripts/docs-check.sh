@@ -86,10 +86,13 @@ while read -r version; do
   else
     fail "README references $version as released, but no such tag exists"
   fi
-done < <(grep -oE 'tagged \`v[0-9]+\.[0-9]+\.[0-9]+\`' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -u)
+done < <(grep -oE 'tagged `?v[0-9]+\.[0-9]+\.[0-9]+`?' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -u)
 
-if grep -qE 'ready to tag \`(v[0-9]+\.[0-9]+\.[0-9]+)\`' README.md; then
-  pending=$(grep -oE 'ready to tag \`v[0-9]+\.[0-9]+\.[0-9]+\`' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+# Backticks are optional in both patterns. They were required until v0.4, and the README writes
+# "ready to tag v0.4.0" without them — so this guard silently matched nothing and never fired once,
+# which is precisely the failure it exists to catch.
+if grep -qE 'ready to tag `?v[0-9]+\.[0-9]+\.[0-9]+`?' README.md; then
+  pending=$(grep -oE 'ready to tag `?v[0-9]+\.[0-9]+\.[0-9]+`?' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   if git rev-parse "$pending" >/dev/null 2>&1; then
     fail "README says \"ready to tag $pending\" but $pending already exists"
   else

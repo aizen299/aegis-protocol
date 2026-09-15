@@ -13,8 +13,8 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
 | v0.3 | DAO Governance | **Released** — tagged `v0.3.0` |
-| v0.4 | zk Privacy Layer | **Complete** — ready to tag v0.4.0 |
-| v1.0 | Production Release | Not started |
+| v0.4 | zk Privacy Layer | **Released** — tagged `v0.4.0` |
+| v1.0 | Production Release | **Next** — hardening, load testing, staging deployment, audit simulation |
 
 No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
 for v1.0 staging.
