@@ -16,6 +16,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/governance"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
+	zkcontracts "github.com/aizen299/aegis-protocol/backend/pkg/contracts/zk"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
@@ -73,6 +74,20 @@ func main() {
 		registrations = append(registrations, evm.Registration{Address: *oracleStaking, ABI: oracle.StakingABI()})
 	}
 
+	zkTree, err := optionalAddress(cfg.Contracts.ZkTree)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_ZK_TREE")
+	}
+	zkGate, err := optionalAddress(cfg.Contracts.ZkGate)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid CONTRACT_ZK_GATE")
+	}
+	if zkTree != nil && zkGate != nil {
+		registrations = append(registrations,
+			evm.Registration{Address: *zkTree, ABI: zkcontracts.TreeABI()},
+			evm.Registration{Address: *zkGate, ABI: zkcontracts.GateABI()})
+	}
+
 	governorAddress, err := optionalAddress(cfg.Contracts.Governor)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid CONTRACT_GOVERNOR")
@@ -105,10 +120,15 @@ func main() {
 		handlers = append(handlers,
 			indexer.NewGovernanceHandler(store, client, evm.NewGovernanceReader(client), *governorAddress))
 	}
+	if zkTree != nil && zkGate != nil {
+		handlers = append(handlers,
+			indexer.NewZkHandler(store, client, evm.NewZkReader(client), *zkTree, *zkGate))
+	}
 
 	log.Info().
 		Bool("oracle", cfg.OracleEnabled()).
 		Bool("governance", cfg.GovernanceEnabled()).
+		Bool("zk", cfg.ZkEnabled()).
 		Int("handlers", len(handlers)).
 		Msg("handlers wired")
 

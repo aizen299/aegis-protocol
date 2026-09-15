@@ -63,6 +63,8 @@ type Config struct {
 		OracleStaking string `env:"CONTRACT_ORACLE_STAKING"`
 		OracleStake   string `env:"CONTRACT_ORACLE_STAKE_TOKEN"`
 		Governor      string `env:"CONTRACT_GOVERNOR"`
+		ZkTree        string `env:"CONTRACT_ZK_TREE"`
+		ZkGate        string `env:"CONTRACT_ZK_GATE"`
 	}
 
 	API struct {
@@ -161,12 +163,24 @@ func (c *Config) ValidateIndexer() error {
 	if (c.Contracts.OracleStaking == "") != (c.Contracts.OracleStake == "") {
 		return fmt.Errorf("CONTRACT_ORACLE_STAKING and CONTRACT_ORACLE_STAKE_TOKEN must be set together")
 	}
+	// Same reasoning as the oracle pair: half of the zk deployment indexes state the other half is
+	// needed to interpret.
+	if (c.Contracts.ZkTree == "") != (c.Contracts.ZkGate == "") {
+		return fmt.Errorf("CONTRACT_ZK_TREE and CONTRACT_ZK_GATE must be set together")
+	}
 	return nil
 }
 
 // OracleEnabled reports whether oracle contracts were configured for indexing.
 func (c *Config) OracleEnabled() bool {
 	return c.Contracts.OracleRounds != "" || c.Contracts.OracleStaking != ""
+}
+
+// ZkEnabled reports whether the zk contracts were configured for indexing. Both are required
+// together: a gate without its tree indexes spent nullifiers with no commitment set to interpret
+// them against, and a tree without its gate mirrors a set nothing consumes.
+func (c *Config) ZkEnabled() bool {
+	return c.Contracts.ZkTree != "" && c.Contracts.ZkGate != ""
 }
 
 // GovernanceEnabled reports whether the governor was configured for indexing. The vote token is not

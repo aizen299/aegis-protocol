@@ -30,6 +30,7 @@ type Deps struct {
 	Vault      *vault.Service
 	Oracle     OracleService
 	Governance GovernanceService
+	Zk         ZkService
 	Chain      chain.Client
 	ChainID    int64
 }
@@ -39,6 +40,7 @@ func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 		vault:       deps.Vault,
 		oracle:      deps.Oracle,
 		governance:  deps.Governance,
+		zk:          deps.Zk,
 		store:       deps.Store,
 		cache:       deps.Cache,
 		chainClient: deps.Chain,
@@ -90,6 +92,13 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 		r.Get("/governance/proposals/{proposalId}", h.getProposal)
 		r.Get("/governance/proposals/{proposalId}/votes", h.listProposalVotes)
 		r.Get("/governance/voters/{address}/votes", h.listVoterVotes)
+
+		r.Get("/zk/gate", h.getZkGate)
+		r.Get("/zk/anonymity-set", h.getAnonymitySet)
+		r.Get("/zk/commitments", h.listCommitments)
+		r.Get("/zk/actions", h.listZkActions)
+		r.Get("/zk/private-actions", h.listPrivateActions)
+		r.Get("/zk/nullifiers/{nullifier}", h.getNullifierStatus)
 	})
 
 	return r

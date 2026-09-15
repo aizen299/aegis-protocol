@@ -328,6 +328,10 @@ backend-abi: ## Re-export contract ABIs consumed by the indexer
 		> ../backend/pkg/contracts/oracle/OracleStaking.abi.json
 	cd contracts && forge inspect Governor abi --json \
 		> ../backend/pkg/contracts/governance/Governor.abi.json
+	cd contracts && forge inspect CommitmentTree abi --json \
+		> ../backend/pkg/contracts/zk/CommitmentTree.abi.json
+	cd contracts && forge inspect ZkVaultGate abi --json \
+		> ../backend/pkg/contracts/zk/ZkVaultGate.abi.json
 
 .PHONY: migrate-up
 migrate-up:

@@ -16,6 +16,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/internal/oracle"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
+	"github.com/aizen299/aegis-protocol/backend/internal/zk"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 )
 
@@ -65,6 +66,7 @@ func main() {
 		Vault:      vault.NewService(store, redis, log, cfg.Chain.ChainID),
 		Oracle:     oracle.NewService(store, redis, log, cfg.Chain.ChainID),
 		Governance: governance.NewService(store, redis, log, cfg.Chain.ChainID),
+		Zk:         zk.NewService(store, redis, log, cfg.Chain.ChainID),
 		Chain:      client,
 		ChainID:    cfg.Chain.ChainID,
 	})

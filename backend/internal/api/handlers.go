@@ -43,6 +43,7 @@ type handlers struct {
 	vault       *vault.Service
 	oracle      OracleService
 	governance  GovernanceService
+	zk          ZkService
 	store       *db.Store
 	cache       *cache.Client
 	chainClient IdentityCodec
