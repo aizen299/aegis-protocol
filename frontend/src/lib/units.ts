@@ -37,3 +37,18 @@ export function shareDecimals(
   if (assetDecimals === undefined || offset === undefined) return undefined;
   return assetDecimals + offset;
 }
+
+// The API sends unscaled integers as strings — a uint256 is not a JS number and never becomes one.
+// Parsing failure returns undefined rather than 0, so a malformed field reads as unavailable.
+export function formatRaw(
+  raw: string | undefined,
+  decimals: number | undefined,
+  symbol?: string,
+): string | undefined {
+  if (raw === undefined || decimals === undefined) return undefined;
+  try {
+    return formatAmount(BigInt(raw), decimals, symbol);
+  } catch {
+    return undefined;
+  }
+}

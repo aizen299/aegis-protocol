@@ -43,7 +43,7 @@ logs: ## Follow service logs
 	$(COMPOSE) logs -f indexer api
 
 .PHONY: test
-test: contracts-test backend-test zk-test ## Run every layer's test suite
+test: contracts-test backend-test zk-test frontend-test ## Run every layer's test suite
 
 .PHONY: e2e
 e2e: ## End-to-end smoke test: real chain, real database, real indexer and API
@@ -381,8 +381,18 @@ frontend-build:
 	cd frontend && npm run build
 
 .PHONY: frontend-lint
-frontend-lint:
+frontend-lint: frontend-api-types
 	cd frontend && npm run typecheck && npm run lint
+
+.PHONY: frontend-test
+frontend-test:
+	cd frontend && npm test
+
+# The frontend hand-mirrors backend/pkg/types in TypeScript. Nothing connects the two, so a field
+# renamed in Go stays compiling and fails at runtime as an undefined.
+.PHONY: frontend-api-types
+frontend-api-types: ## Fail if the frontend's API types drift from backend/pkg/types
+	python3 scripts/check-api-types.py
 
 .PHONY: frontend-dev
 frontend-dev:

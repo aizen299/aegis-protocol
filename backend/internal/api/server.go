@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -76,6 +77,7 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 	r.Use(middleware.Timeout(cfg.API.WriteTimeout))
 	r.Use(requestLogger(log))
 	r.Use(requestMetrics(h.metrics))
+	r.Use(cors(cfg.API.CORSOrigins))
 
 	r.Get("/health", h.health)
 	r.Get("/ready", h.ready)
@@ -170,6 +172,43 @@ func requestMetrics(metrics *observability.Metrics) func(http.Handler) http.Hand
 					Unit:  observability.UnitCount,
 				},
 			)
+		})
+	}
+}
+
+// cors answers browser preflights for the origins configuration names, and no others.
+//
+// Without it no browser can call this API cross-origin, which is how a REST API written for a
+// frontend went four releases without a browser ever reaching it.
+//
+// The origin is echoed rather than a wildcard returned, so the allowlist stays legible in the
+// response, and an unlisted origin gets no header at all rather than a header naming someone else.
+func cors(origins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(origins))
+	for _, origin := range origins {
+		if trimmed := strings.TrimSpace(origin); trimmed != "" {
+			allowed[trimmed] = true
+		}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+
+			if origin != "" && allowed[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Max-Age", "600")
+				w.Header().Add("Vary", "Origin")
+			}
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

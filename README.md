@@ -100,7 +100,7 @@ against the gate address deployment produced — not a fixture — executed on a
 replay refused; a proof made for one gate is refused by another even when both trees hold the same
 root.
 
-Current: **337 contract tests**, **19 circuit tests**, **25 zk service tests**, **18 frontend tests**, 15 backend packages, **38 end-to-end tests**, Slither clean.
+Current: **337 contract tests**, **19 circuit tests**, **25 zk service tests**, **36 frontend tests**, 15 backend packages, **38 end-to-end tests**, Slither clean.
 [`docs/v1.0-production-plan.md`](docs/v1.0-production-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.
@@ -111,7 +111,7 @@ it took and where it deviated from the locked specs.
 contracts/   Solidity + Foundry      settlement layer
 backend/     Go                      indexing, aggregation, APIs
 zk/          Rust + Noir circuits    proof generation
-frontend/    Next.js                 vault dashboard only (see frontend/README.md)
+frontend/    Next.js                 vault, oracle, and governance (no zk — see frontend/README.md)
 infra/       Terraform               AWS
 tools/       Node                    generators for committed artifacts
 ```

@@ -81,6 +81,9 @@ services:
       CHAIN_RPC_URL: ${CHAIN_RPC_URL:-http://anvil:8545}
       CHAIN_ID: ${CHAIN_ID:-31337}
       API_ADDR: ":8090"
+      # The frontend runs outside compose on :3000, so it is a different origin. Without this no
+      # browser can read this API at all.
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

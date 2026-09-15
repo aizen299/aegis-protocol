@@ -7,9 +7,9 @@ Next.js + TypeScript + Tailwind + Wagmi/Viem/RainbowKit.
 | Version | Surface | State |
 |---|---|---|
 | v0.1 | Vault dashboard (deposit / withdraw) | Implemented |
-| v0.2 | Oracle operator interface | Not started |
-| v0.3 | Governance portal | Not started |
-| v0.4 | zk interaction UI | Not started |
+| v0.2 | Oracle feeds, rounds, submissions, nodes | Implemented, read-only |
+| v0.3 | Governance proposals, tallies, timelock, votes | Implemented, read-only |
+| v0.4 | zk interaction UI | Blocked — see ZK-1 in DEFERRED.md |
 
 ## Commands
 

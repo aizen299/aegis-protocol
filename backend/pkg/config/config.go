@@ -73,6 +73,12 @@ type Config struct {
 		WriteTimeout    time.Duration `env:"API_WRITE_TIMEOUT" envDefault:"30s"`
 		ShutdownTimeout time.Duration `env:"API_SHUTDOWN_TIMEOUT" envDefault:"15s"`
 		MaxPageSize     int           `env:"API_MAX_PAGE_SIZE" envDefault:"100"`
+
+		// Origins permitted to call this API from a browser. Empty by default: no origin is
+		// trusted unless one is named, and a wildcard is never inferred. The API is read-only and
+		// carries no cookies or credentials, but an allowlist that defaults to "anyone" is a habit
+		// worth not forming.
+		CORSOrigins []string `env:"API_CORS_ORIGINS" envSeparator:","`
 	}
 }
 
