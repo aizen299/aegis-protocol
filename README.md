@@ -111,7 +111,7 @@ it took and where it deviated from the locked specs.
 contracts/   Solidity + Foundry      settlement layer
 backend/     Go                      indexing, aggregation, APIs
 zk/          Rust + Noir circuits    proof generation
-frontend/    Next.js                 dashboards
+frontend/    Next.js                 vault dashboard only (see frontend/README.md)
 infra/       Terraform               AWS
 tools/       Node                    generators for committed artifacts
 ```
