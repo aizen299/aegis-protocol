@@ -61,6 +61,10 @@ jobs:
       # regenerate it leaves a verifier no proof can satisfy.
       - name: Fail if the committed verifier differs from a fresh generation
         run: make zk-verifier-check
+      # The service's unit tests can only prove it refuses bad input. This is the only place it
+      # produces a proof, and it needs the toolchain this job installs.
+      - name: Prove for real through the service
+        run: make zk-service-e2e
 
   test:
     runs-on: ubuntu-latest

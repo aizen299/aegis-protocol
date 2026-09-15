@@ -171,6 +171,12 @@ zk-verifier-check: ## Fail if the committed verifier differs from a fresh genera
 zk-proof-fixture: ## Regenerate the committed proof the contract suite verifies (needs nargo, bb, Node)
 	./tools/gen-proof-fixture.sh
 
+.PHONY: zk-service-e2e
+zk-service-e2e: ## Prove for real through the Rust service (needs nargo and bb)
+	# Single-threaded: the leftover-file assertion scans the whole circuit directory, so it cannot
+	# run beside another test that is mid-proof. The concurrency test spawns its own threads.
+	cd zk && cargo test --test prove_integration -- --ignored --test-threads=1
+
 .PHONY: zk-toolchain-check
 zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned one
 	@pinned=$$(awk '/^nargo /{print $$2}' zk/circuits/toolchain.txt); \
@@ -201,6 +207,16 @@ zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned on
 	grep -q "tag = \"$$dep\"" zk/circuits/vault_membership/Nargo.toml || { \
 		echo "vault_membership/Nargo.toml does not pin poseidon $$dep"; exit 1; }; \
 	echo "poseidon $$dep matches the pin"
+
+# Coverage instruments the bytecode, which changes every contract's creation code and therefore its
+# CREATE2 address. The zk suites deploy the gate at an address the committed proof binds as a public
+# input, so under instrumentation that address moves and no proof verifies. They are excluded here
+# and run in full under `forge test`; excluding them costs coverage numbers, not assertions.
+COVERAGE_EXCLUDE ?= ZkVaultGateTest|ZkProbeTest|ZkInvariantTest
+
+.PHONY: contracts-coverage
+contracts-coverage: ## Coverage report, minus the suites whose addresses instrumentation moves
+	cd contracts && forge coverage --report lcov --no-match-contract '$(COVERAGE_EXCLUDE)'
 
 .PHONY: contracts-slither
 contracts-slither: ## Mandatory before any contract is considered complete

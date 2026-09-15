@@ -70,6 +70,26 @@ at which point routing around the governor requires a passed proposal and the di
 
 ---
 
+## Accepted for v0.4
+
+### A secret touches disk while a proof is generated
+
+`nargo` reads its witness from a `Prover.toml` on disk, so the proof service writes one containing
+the caller's secret. It is created with mode 0600 and removed when proving returns, on the failure
+path as much as the success one, and `no_witness_file_survives_a_run` asserts that. But between
+those two moments the material is on a filesystem, where a crash, a core dump, or a backup could
+capture it.
+
+Removing this means feeding the witness to the prover over a pipe or in memory, which the `nargo`
+CLI does not offer. The alternative is linking Barretenberg directly — a second implementation of
+the proving path, and a second thing that can disagree with the binaries that generate the verifier
+the contract deploys.
+
+**Revisit when** the toolchain gains an in-memory witness interface, or when the service moves to a
+Barretenberg binding for other reasons. Either makes this disappear rather than mitigating it.
+
+---
+
 ## Deferred to a named version
 
 ### Indexer lag metric and its CloudWatch alarm

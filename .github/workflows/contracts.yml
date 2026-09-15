@@ -50,7 +50,12 @@ jobs:
       - name: Storage layout matches the released baseline
         run: make contracts-layout-check
         working-directory: .
-      - run: forge coverage --report lcov
+      # Not `forge coverage` directly: instrumentation changes contract addresses, and the zk
+      # suites verify a proof that binds the gate's address. See COVERAGE_EXCLUDE in the Makefile.
+      # Those suites still run in full in the `forge test` step above.
+      - name: Coverage
+        run: make contracts-coverage
+        working-directory: .
       - uses: actions/upload-artifact@v4
         with:
           name: contracts-coverage

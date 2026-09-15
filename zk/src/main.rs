@@ -3,9 +3,7 @@
 //! Scaffold only. The circuit framework decision (Circom vs Noir) is open — see docs/zk.md.
 //! Private inputs must never be logged and are zeroized after use.
 
-mod api;
-mod prover;
-mod types;
+use zk_service::{api, prover};
 
 use std::net::SocketAddr;
 
@@ -27,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, "zk-service listening");
 
-    axum::serve(listener, api::router())
+    axum::serve(listener, api::router(prover::ProverConfig::default()))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 

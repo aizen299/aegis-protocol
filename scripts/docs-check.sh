@@ -47,6 +47,16 @@ else
   fail "README claims $claimed_circuit_tests circuit tests, found $actual_circuit_tests"
 fi
 
+actual_zk_service=$(grep -rhoE '^\s*(#\[test\]|#\[tokio::test\])' zk/src zk/tests 2>/dev/null | wc -l | tr -d ' ')
+claimed_zk_service=$(claimed "zk service tests")
+if [ "$claimed_zk_service" = "missing" ]; then
+  pass "zk service tests: not claimed"
+elif [ "$claimed_zk_service" = "$actual_zk_service" ]; then
+  pass "zk service tests: $actual_zk_service"
+else
+  fail "README claims $claimed_zk_service zk service tests, found $actual_zk_service"
+fi
+
 actual_e2e=$(grep -rhoE '^func Test[A-Za-z0-9_]*\(' backend/internal/e2e/ | wc -l | tr -d ' ')
 claimed_e2e=$(claimed "end-to-end tests")
 if [ "$claimed_e2e" = "$actual_e2e" ]; then

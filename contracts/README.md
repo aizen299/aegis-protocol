@@ -9,7 +9,20 @@ Solidity + Foundry. Settlement layer only — protocol intelligence lives in `ba
 | v0.1 | `src/vault/` | Implemented — 73 tests, Slither clean |
 | v0.2 | `src/oracle/` | Implemented — 150 tests, Slither clean |
 | v0.3 | `src/governance/` | Implemented — fuzzed, invariants enforced, layouts baselined at v0.3.0; 261 tests, Slither clean |
-| v0.4 | `src/zk/` | In progress — fuzzed and invariant-tested, layouts baselined at v0.4.0; 321 tests, Slither clean |
+| v0.4 | `src/zk/` | In progress — fuzzed and invariant-tested, layouts baselined at v0.4.0; 334 tests, Slither clean |
+
+## Coverage
+
+`make contracts-coverage`, not `forge coverage` directly.
+
+Coverage instruments the bytecode, which changes every contract's creation code and therefore its
+CREATE2 address. The zk suites deploy the gate at the address the committed proof binds as a public
+input, so under instrumentation that address moves and no proof verifies. Those three suites are
+excluded from the coverage run and execute in full under `forge test`.
+
+`ZkVaultGate`'s rules that hold without a valid proof live in `ZkVaultGateRules.t.sol`, which needs
+no fixed address and so stays measurable — the contract reports 93% rather than the 0% a blanket
+exclusion would have shown. The uncovered remainder is the verify-and-spend path itself.
 
 ## Commands
 
