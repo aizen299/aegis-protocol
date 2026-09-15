@@ -160,7 +160,7 @@ func (s *governanceStack) proposeAndPass(t *testing.T, newValue int, remote bool
 	t.Helper()
 	d := s.deployment
 
-	send(t, deployerKey, d.AegisToken, "delegate(address)", deployerAddr)
+	delegateVotes(t, deployerKey, d.AegisToken, deployerAddr)
 
 	targetChain := chainID
 	if remote {

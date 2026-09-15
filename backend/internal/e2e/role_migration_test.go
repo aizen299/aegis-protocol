@@ -21,6 +21,9 @@ func TestRoleMigrationOnALocalDeployment(t *testing.T) {
 	const vaultManagerRole = "VAULT_MANAGER_ROLE"
 	role := cast(t, "keccak", vaultManagerRole)
 
+	t.Logf("vault=%s timelock=%s governor=%s multisig(deployer)=%s role=%s (%s)",
+		vault.VaultProxy, gov.Timelock, gov.Governor, deployerAddr, vaultManagerRole, role)
+
 	// Stage 1: the timelock receives the role while the deployer — standing in for the multisig —
 	// keeps it. Nothing has been given up yet.
 	send(t, deployerKey, vault.VaultProxy, "grantRole(bytes32,address)", role, gov.Timelock)
@@ -37,8 +40,13 @@ func TestRoleMigrationOnALocalDeployment(t *testing.T) {
 		t.Fatal("the governor was granted a protocol role")
 	}
 
+	t.Logf("stage 1 observed: timelock=%t multisig=%t governor=%t",
+		hasRole(t, vault.VaultProxy, role, gov.Timelock),
+		hasRole(t, vault.VaultProxy, role, deployerAddr),
+		hasRole(t, vault.VaultProxy, role, gov.Governor))
+
 	// Stage 2: a proposal exercises the role end to end.
-	send(t, deployerKey, gov.AegisToken, "delegate(address)", deployerAddr)
+	delegateVotes(t, deployerKey, gov.AegisToken, deployerAddr)
 
 	const newCap = "777000000000000000000"
 	payload := cast(t, "calldata", "setDepositCap(uint256)", newCap)
@@ -57,6 +65,8 @@ func TestRoleMigrationOnALocalDeployment(t *testing.T) {
 	// Still observable, still not in effect. That is what the delay buys.
 	if got := depositCap(t, vault.VaultProxy); got == newCap {
 		t.Fatal("the cap moved before the delay elapsed")
+	} else {
+		t.Logf("stage 2 before the delay: depositCap=%s (unchanged), proposal queued", got)
 	}
 
 	advanceTime(t, timelockSeconds+1)
@@ -64,6 +74,8 @@ func TestRoleMigrationOnALocalDeployment(t *testing.T) {
 
 	if got := depositCap(t, vault.VaultProxy); got != newCap {
 		t.Fatalf("deposit cap = %s, want %s — governance could not exercise the role", got, newCap)
+	} else {
+		t.Logf("stage 2 after execution: depositCap=%s, set by the timelock", got)
 	}
 
 	// Stage 3: only now, with governance seen to work, does the deployer step back.
@@ -85,6 +97,11 @@ func TestRoleMigrationOnALocalDeployment(t *testing.T) {
 	if hasRole(t, vault.VaultProxy, slasher, gov.Timelock) {
 		t.Fatal("the slasher role was migrated to a multi-day timelock")
 	}
+
+	t.Logf("stage 3 observed: timelock=%t multisig=%t; multisig setDepositCap reverted; slasher on timelock=%t",
+		hasRole(t, vault.VaultProxy, role, gov.Timelock),
+		hasRole(t, vault.VaultProxy, role, deployerAddr),
+		hasRole(t, vault.VaultProxy, slasher, gov.Timelock))
 }
 
 // cast renders a uint256 as "<decimal> [<scientific>]"; only the first field is the value.

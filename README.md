@@ -14,10 +14,16 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
 | v0.3 | DAO Governance | **Released** — tagged `v0.3.0` |
 | v0.4 | zk Privacy Layer | **Released** — tagged `v0.4.0` |
-| v1.0 | Production Release | **Next** — hardening, load testing, staging deployment, audit simulation |
+| v1.0 | Production Release | **Released** — tagged `v1.0.0` |
 
-No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
-for v1.0 staging.
+**v1.0 is production-ready and has never been deployed.** No AWS account exists for this project, so
+the staging deployment named in `docs/project-spec.md` §5 and the Arbitrum Sepolia target in §7 did
+not happen — a recorded deviation, with the infrastructure defined and validated but never applied.
+No external audit; the review in [`docs/v1.0-audit-simulation.md`](docs/v1.0-audit-simulation.md) is
+the authors reviewing their own work. No mainnet, no real funds, no custody of value.
+
+[`docs/v1.0-release-notes.md`](docs/v1.0-release-notes.md) states precisely what this release is and
+is not, including one known High-severity finding accepted with a trigger.
 
 ### What is built
 
@@ -42,8 +48,9 @@ Postgres and served over `/v1/governance`, with every raw weight accompanied by 
 makes it readable, and the whole path is exercised end to end against a real chain, a real
 database, and the real API. The role-migration procedure is written up in
 [`docs/role-migration.md`](docs/role-migration.md) and executed by tests at both layers — v0.3
-builds that capability and proves it, but grants governance nothing; performing the migration is a
-v1.0 step.
+builds that capability and proves it, but grants governance nothing; the migration itself was
+performed at v1.0 and recorded in
+[`docs/v1.0-role-migration-record.md`](docs/v1.0-role-migration-record.md).
 
 **v0.4 — zk Privacy Layer.** The membership circuit in Noir, proving ownership of a commitment in
 the vault's tree without revealing which one. The plan
@@ -94,7 +101,7 @@ replay refused; a proof made for one gate is refused by another even when both t
 root.
 
 Current: **337 contract tests**, **19 circuit tests**, **25 zk service tests**, 15 backend packages, **38 end-to-end tests**, Slither clean.
-[`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
+[`docs/v1.0-production-plan.md`](docs/v1.0-production-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.
 

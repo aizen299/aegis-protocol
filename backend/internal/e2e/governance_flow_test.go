@@ -14,7 +14,7 @@ func TestGovernanceProposalReachesExecution(t *testing.T) {
 	requireDeps(t)
 	d := deployGovernance(t)
 
-	send(t, deployerKey, d.AegisToken, "delegate(address)", deployerAddr)
+	delegateVotes(t, deployerKey, d.AegisToken, deployerAddr)
 
 	payload := cast(t, "calldata", "setValue(uint256)", "42")
 	proposalAction := action(chainID, d.GovernedTarget, "0", payload)
@@ -83,7 +83,7 @@ func TestGovernanceRemoteProposalNeverPerformsALocalCall(t *testing.T) {
 	requireDeps(t)
 	d := deployGovernance(t)
 
-	send(t, deployerKey, d.AegisToken, "delegate(address)", deployerAddr)
+	delegateVotes(t, deployerKey, d.AegisToken, deployerAddr)
 
 	payload := cast(t, "calldata", "setValue(uint256)", "99")
 	remoteAction := action(chainID+1, d.GovernedTarget, "0", payload)
@@ -116,7 +116,7 @@ func TestGovernanceCancelledProposalClearsTheQueue(t *testing.T) {
 	requireDeps(t)
 	d := deployGovernance(t)
 
-	send(t, deployerKey, d.AegisToken, "delegate(address)", deployerAddr)
+	delegateVotes(t, deployerKey, d.AegisToken, deployerAddr)
 
 	payload := cast(t, "calldata", "setValue(uint256)", "7")
 	proposalAction := action(chainID, d.GovernedTarget, "0", payload)

@@ -110,6 +110,50 @@ hardening release would trade a known risk for an untested one.
 **Trigger — not a date.** Before any contract consumes `PrivateActionExecuted` or gates on
 `isSpent`. At that point a frontrunner receives what the gate confers and this becomes theft.
 
+### No penalty for a node that never submits (ORC-1) — Medium
+
+`docs/oracle.md` lists four slashable conditions. Two are implemented: `OUTLIER_SUBMISSION` and
+`INVALID_SIGNATURE`. `MISSED_ROUND` and `CONSECUTIVE_MISSES` are not, and the aggregator iterates
+the submissions a round received rather than the eligible nodes that did not submit, so a silent
+node is invisible to it.
+
+The dead `ReasonMissedRound` and `penaltyMissedRoundBps` constants have been **removed**. They made
+the gap read as implemented, and unused Go constants do not fail a build.
+
+Quorum is judged against `eligibleCount`, frozen at `openRound` from `activeNodeCount`. Nodes that
+stake and never submit raise the denominator without raising the numerator: an adversary holding
+just over 40% of active slots at a 60% quorum halts the feed, is never slashed, and withdraws in
+full after unbonding. The cost is the time-value of locked capital and nothing else — which is
+exactly the cost the missing penalty exists to raise.
+
+Accepted because implementing it reopens v0.2: the aggregator would need the eligible set per round,
+not just the submissions, and the penalty is only meaningful once nodes are operated by parties who
+do not already bear the cost of a halted feed.
+
+**Trigger:** the first oracle node operated by someone outside the project, or any contract reading
+a feed value to make a decision that moves funds. Either makes a free liveness attack worth
+mounting.
+
+### No slippage bound on vault deposit or withdraw (VLT-1) — Medium
+
+`deposit(assets, receiver)` and `withdraw(shares, receiver)` accept no minimum. `docs/solidity.md`'s
+vulnerability table lists "Frontrunning — use commit-reveal or slippage params where needed", and
+this is the unmet half of it.
+
+Share price moves with `totalAssets()`, which reads the strategy. A withdrawal submitted before a
+strategy loss executes at the worse rate with no revert, because the user had no way to express a
+floor. The virtual-shares offset defeats the first-depositor inflation attack, which is a different
+problem; it does nothing about price movement between submission and inclusion.
+
+Accepted because adding a minimum changes external signatures that the indexer ABI, the frontend,
+and the committed storage-layout baselines all track — an interface decision, not a hardening patch
+— and because no strategy is deployed, so today the price cannot move between submission and
+inclusion at all.
+
+**Trigger:** attaching any strategy on a chain where someone other than the operator holds shares.
+At that point the price moves for reasons outside a depositor's control and the bound is the only
+thing that lets them say no.
+
 ### The root history window is fixed at deployment — Low
 
 `CommitmentTree` has no setter for `rootHistorySize`, so the value chosen at initialization is

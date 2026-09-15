@@ -11,20 +11,22 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
-// Slash reason codes, matching the schedule in docs/oracle.md. Stored as text and passed on-chain
-// as bytes32.
+// Slash reason codes. Stored as text and passed on-chain as bytes32.
+//
+// docs/oracle.md lists four conditions; these are the two that are implemented. MISSED_ROUND and
+// CONSECUTIVE_MISSES are not, and their constants were removed rather than left declared — unused
+// Go constants do not fail a build, so keeping them made the gap read as implemented. The absent
+// liveness penalty is recorded in DEFERRED.md as ORC-1.
 const (
 	ReasonOutlier          = "OUTLIER_SUBMISSION"
 	ReasonInvalidSignature = "INVALID_SIGNATURE"
-	ReasonMissedRound      = "MISSED_ROUND"
 )
 
-// Penalties in basis points of remaining stake. All sit under the contract's 10% per-slash cap, so
+// Penalties in basis points of remaining stake. Both sit under the contract's 10% per-slash cap, so
 // the cap constrains a compromised key without constraining intended behaviour.
 const (
 	penaltyOutlierBps          = 100 // 1%
 	penaltyInvalidSignatureBps = 500 // 5%
-	penaltyMissedRoundBps      = 50  // 0.5%
 )
 
 // AggregatorStore is the write surface the analysis needs.

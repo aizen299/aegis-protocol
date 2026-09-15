@@ -86,6 +86,17 @@ func deployGovernance(t *testing.T) governanceDeployment {
 
 // advanceTime moves the chain clock forward and mines, which is what makes the timestamp visible.
 // Anvil applies an increase only on the next mined block.
+// delegateVotes self-delegates and lets a second pass.
+//
+// The governor reads voting power one tick back, so power delegated in the same second as a
+// proposal does not count — that is what stops a proposal threshold being met with borrowed weight.
+// Every caller needs the tick, so it lives here rather than at five call sites.
+func delegateVotes(t *testing.T, key, token, holder string) {
+	t.Helper()
+	send(t, key, token, "delegate(address)", holder)
+	advanceTime(t, 1)
+}
+
 func advanceTime(t *testing.T, seconds int64) {
 	t.Helper()
 	cast(t, "rpc", "--rpc-url", anvilRPC, "evm_increaseTime", fmt.Sprintf("0x%x", seconds))
