@@ -28,4 +28,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # Ordered before the build: a build proves the code compiles, not that it behaves. The
+      # dashboard's read-state handling regressed silently for a whole release because nothing here
+      # asserted behaviour.
+      - run: npm test
       - run: npm run build

@@ -2,12 +2,15 @@ import { formatUnits, parseUnits } from "viem";
 
 // Decimals are a property of the asset, never a protocol constant. Nothing here assumes 18.
 
+// Returns undefined rather than a dash when it cannot render. The caller knows whether the value is
+// missing because a read is in flight, because it failed, or because it is genuinely absent; a dash
+// chosen here would erase that distinction before the caller ever saw it.
 export function formatAmount(
   value: bigint | undefined,
   decimals: number | undefined,
   symbol?: string,
-): string {
-  if (value === undefined || decimals === undefined) return "—";
+): string | undefined {
+  if (value === undefined || decimals === undefined) return undefined;
 
   const formatted = Number(formatUnits(value, decimals)).toLocaleString(undefined, {
     maximumFractionDigits: Math.min(decimals, 6),

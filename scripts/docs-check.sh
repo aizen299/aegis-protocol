@@ -57,6 +57,17 @@ else
   fail "README claims $claimed_zk_service zk service tests, found $actual_zk_service"
 fi
 
+# Counts it(...) cases, not describe(...) blocks: a suite's name is not a test.
+actual_frontend_tests=$(grep -rhoE '^\s*it\(' frontend/src --include='*.test.ts' --include='*.test.tsx' 2>/dev/null | wc -l | tr -d ' ')
+claimed_frontend_tests=$(claimed "frontend tests")
+if [ "$claimed_frontend_tests" = "missing" ]; then
+  pass "frontend tests: not claimed"
+elif [ "$claimed_frontend_tests" = "$actual_frontend_tests" ]; then
+  pass "frontend tests: $actual_frontend_tests"
+else
+  fail "README claims $claimed_frontend_tests frontend tests, found $actual_frontend_tests"
+fi
+
 actual_e2e=$(grep -rhoE '^func Test[A-Za-z0-9_]*\(' backend/internal/e2e/ | wc -l | tr -d ' ')
 claimed_e2e=$(claimed "end-to-end tests")
 if [ "$claimed_e2e" = "$actual_e2e" ]; then

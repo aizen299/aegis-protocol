@@ -157,31 +157,6 @@ inclusion at all.
 At that point the price moves for reasons outside a depositor's control and the bound is the only
 thing that lets them say no.
 
-### The dashboard cannot distinguish a failed read from an empty vault — Medium
-
-Every stat in `VaultDashboard` renders as `—` when its value is absent, and absent covers three
-different things: the read is still in flight, the read failed, and the value is genuinely zero or
-unset. Nothing surfaces an error to the user.
-
-Observed rather than reasoned about. Running the UI against a local Anvil without Multicall3
-deployed, wagmi batched all seven contract reads into one multicall against an empty address; every
-read failed and the dashboard showed a vault that looked merely empty. The browser console carried
-no related error — only unrelated WalletConnect noise. On a real deployment an RPC outage, a wrong
-`NEXT_PUBLIC_VAULT_ADDRESS`, and a chain the vault is not deployed on all look identical, and all
-look like "nothing has been deposited yet".
-
-**Trigger:** none needed — this is scheduled work, not a risk to watch. It is the substance of
-roadmap step 2 and should be fixed before any further UI is built on the same pattern.
-
-### The frontend has no tests — Medium
-
-Frontend CI runs `typecheck`, `lint`, and `build`. None of them assert behaviour, so every rendering
-rule in the UI — including the decimals handling that keeps a six-decimal asset from being
-misrendered by twelve orders of magnitude — is unverified. The defect above survived because nothing
-could have caught it.
-
-**Trigger:** none needed — scheduled with step 2, alongside the fix above.
-
 ### The UI covers the vault only — Medium
 
 `frontend/` implements v0.1's deposit, withdraw, and dashboard. There is no interface for oracle
@@ -262,5 +237,7 @@ apply` followed immediately by `terraform destroy` — it costs cents and conver
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| The dashboard could not distinguish a failed read from an empty vault | Fixed after v1.0. Reads now resolve to loading, failed, or value; a failed vault read shows an alert saying the figures are unavailable rather than zero. Mutation-tested by restoring the original collapsed rendering, which fails four tests. |
+| The frontend has no tests | Fixed after v1.0. Vitest and React Testing Library, 18 tests over the dashboard's read states and the decimals handling, wired into Frontend CI before the build — a build proves compilation, not behaviour. Coverage is the vault surface only; new surfaces need their own. |
 | Indexer lag metric and its alarm | Done in v1.0. Emitted in seconds and blocks through CloudWatch EMF, with `indexer_lag_seconds` alarming on a stalled indexer rather than only a crashed one. Was deferred from v0.2. |
 | Vault metadata table | Done in v0.2. `vaults` completes the pattern `assets` and `oracle_feeds` follow: a foreign key from every share-bearing row, so a share cannot be stored without its scale. |
