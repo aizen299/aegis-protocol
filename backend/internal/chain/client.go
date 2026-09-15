@@ -48,6 +48,12 @@ type Client interface {
 	// Head returns the current chain head. It is not necessarily confirmed.
 	Head(ctx context.Context) (uint64, error)
 
+	// BlockTime returns a block's timestamp in Unix seconds. Chain-generic: every chain stamps its
+	// blocks, and an SVM implementation would answer from a slot. It exists so lag can be measured
+	// in seconds — a block count is an unstable unit of time, and on Arbitrum 100 blocks is about
+	// 25 seconds. See docs/v1.0-production-plan.md §2.2.
+	BlockTime(ctx context.Context, number uint64) (int64, error)
+
 	// ConfirmationDepth is how far behind the head a block must be before it is safe to process.
 	// The finality rule lives here because it differs per chain: an EVM confirmation window is not
 	// how Solana finality works.

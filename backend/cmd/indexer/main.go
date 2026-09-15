@@ -137,6 +137,7 @@ func main() {
 		StartBlock:   cfg.Chain.StartBlock,
 		BatchSize:    cfg.Chain.BatchSize,
 		PollInterval: cfg.Chain.PollInterval,
+		Metrics:      observability.NewMetrics(serviceName, cfg.Environment),
 	}, handlers...)
 
 	if err := idx.Run(ctx); err != nil {

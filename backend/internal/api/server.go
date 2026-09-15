@@ -14,6 +14,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
 	"github.com/aizen299/aegis-protocol/backend/internal/chain"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
+	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 )
@@ -33,6 +34,9 @@ type Deps struct {
 	Zk         ZkService
 	Chain      chain.Client
 	ChainID    int64
+
+	// Metrics is optional. Nil disables emission, which is what handler tests use.
+	Metrics *observability.Metrics
 }
 
 func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
@@ -41,6 +45,7 @@ func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 		oracle:      deps.Oracle,
 		governance:  deps.Governance,
 		zk:          deps.Zk,
+		metrics:     deps.Metrics,
 		store:       deps.Store,
 		cache:       deps.Cache,
 		chainClient: deps.Chain,
@@ -70,6 +75,7 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(cfg.API.WriteTimeout))
 	r.Use(requestLogger(log))
+	r.Use(requestMetrics(h.metrics))
 
 	r.Get("/health", h.health)
 	r.Get("/ready", h.ready)
@@ -118,6 +124,54 @@ func (s *Server) Start() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
+}
+
+// requestMetrics publishes the two measurements the required alarms need: latency, from which
+// CloudWatch derives p99, and the request and 5xx counts an error rate is computed from.
+//
+// The rate is deliberately not computed here. A service that reports its own error rate reports it
+// from inside the thing that may be failing, and a percentage emitted per request is meaningless
+// anyway — the alarm divides two sums over its own window.
+//
+// Health and readiness are excluded: they are polled by the load balancer far more often than any
+// real endpoint, and including them would dilute both the latency percentile and the error rate
+// until neither described user traffic.
+func requestMetrics(metrics *observability.Metrics) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if metrics == nil || r.URL.Path == "/health" || r.URL.Path == "/ready" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+
+			serverErrors := 0.0
+			if ww.Status() >= http.StatusInternalServerError {
+				serverErrors = 1
+			}
+
+			metrics.Emit(
+				observability.Measurement{
+					Name:  observability.MetricAPILatencyMillis,
+					Value: float64(time.Since(start).Milliseconds()),
+					Unit:  observability.UnitMilliseconds,
+				},
+				observability.Measurement{
+					Name:  observability.MetricAPIRequests,
+					Value: 1,
+					Unit:  observability.UnitCount,
+				},
+				observability.Measurement{
+					Name:  observability.MetricAPIServerErrors,
+					Value: serverErrors,
+					Unit:  observability.UnitCount,
+				},
+			)
+		})
+	}
 }
 
 func requestLogger(log zerolog.Logger) func(http.Handler) http.Handler {

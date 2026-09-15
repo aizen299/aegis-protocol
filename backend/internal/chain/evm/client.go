@@ -103,6 +103,21 @@ func (c *Client) Head(ctx context.Context) (uint64, error) {
 	return head, nil
 }
 
+// BlockTime returns a block's timestamp in Unix seconds.
+//
+// Only the header is fetched. HeaderByNumber over a full block body matters here because this is
+// called on every indexer poll.
+func (c *Client) BlockTime(ctx context.Context, number uint64) (int64, error) {
+	header, err := c.rpc.HeaderByNumber(ctx, new(big.Int).SetUint64(number))
+	if err != nil {
+		return 0, fmt.Errorf("header at %d: %w", number, err)
+	}
+	if header == nil {
+		return 0, fmt.Errorf("header at %d: not found", number)
+	}
+	return int64(header.Time), nil
+}
+
 func (c *Client) EncodeIdentity(id pbtypes.Identity) string {
 	return id.EVMHex()
 }

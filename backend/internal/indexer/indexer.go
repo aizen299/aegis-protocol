@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/aizen299/aegis-protocol/backend/internal/chain"
+	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 )
 
 // CursorStore persists indexing progress. Narrowed to an interface so the indexer's
@@ -34,6 +35,9 @@ type Options struct {
 	BatchSize    uint64
 	PollInterval time.Duration
 	RetryBackoff time.Duration
+
+	// Metrics is optional. Nil disables emission, which is what the tests and local runs use.
+	Metrics *observability.Metrics
 }
 
 type Indexer struct {
@@ -155,7 +159,60 @@ func (idx *Indexer) Step(ctx context.Context) (bool, error) {
 			Uint64("lag", head-to).Msg("batch processed")
 	}
 
+	idx.emitLag(ctx, head, to)
 	return true, nil
+}
+
+// emitLag publishes how far behind the chain the committed data is.
+//
+// Seconds, not blocks. docs/devops.md asks for an alarm at 100 blocks, which on Arbitrum is about
+// 25 seconds — inside a single batch of the indexer's own window, so it would fire constantly and
+// be muted. The block count is emitted too because it is what an operator debugging a stalled
+// cursor wants to see; the alarm is on the seconds. See docs/v1.0-production-plan.md §2.2.
+//
+// A failure here is logged at debug and dropped: an indexer that stops indexing because it could
+// not report its lag has turned observability into an outage.
+func (idx *Indexer) emitLag(ctx context.Context, head, processed uint64) {
+	if idx.opts.Metrics == nil {
+		return
+	}
+
+	blocks := uint64(0)
+	if head > processed {
+		blocks = head - processed
+	}
+
+	processedAt, err := idx.client.BlockTime(ctx, processed)
+	if err != nil {
+		idx.log.Debug().Err(err).Uint64("block", processed).Msg("lag in seconds unavailable")
+		idx.opts.Metrics.Emit(observability.Measurement{
+			Name:  observability.MetricIndexerLagBlocks,
+			Value: float64(blocks),
+			Unit:  observability.UnitCount,
+		})
+		return
+	}
+
+	// Measured against the wall clock rather than the head block's timestamp: what an operator
+	// needs to know is how stale the served data is, and a chain that stops producing blocks
+	// entirely would otherwise report a lag of zero.
+	seconds := time.Now().Unix() - processedAt
+	if seconds < 0 {
+		seconds = 0
+	}
+
+	idx.opts.Metrics.Emit(
+		observability.Measurement{
+			Name:  observability.MetricIndexerLagSeconds,
+			Value: float64(seconds),
+			Unit:  observability.UnitSeconds,
+		},
+		observability.Measurement{
+			Name:  observability.MetricIndexerLagBlocks,
+			Value: float64(blocks),
+			Unit:  observability.UnitCount,
+		},
+	)
 }
 
 func (idx *Indexer) dispatch(ctx context.Context, ev chain.Event) error {

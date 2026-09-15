@@ -11,6 +11,7 @@ import (
 
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
+	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
@@ -44,6 +45,7 @@ type handlers struct {
 	oracle      OracleService
 	governance  GovernanceService
 	zk          ZkService
+	metrics     *observability.Metrics
 	store       *db.Store
 	cache       *cache.Client
 	chainClient IdentityCodec

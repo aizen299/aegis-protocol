@@ -69,6 +69,7 @@ func main() {
 		Zk:         zk.NewService(store, redis, log, cfg.Chain.ChainID),
 		Chain:      client,
 		ChainID:    cfg.Chain.ChainID,
+		Metrics:    observability.NewMetrics(serviceName, cfg.Environment),
 	})
 
 	errCh := make(chan error, 1)

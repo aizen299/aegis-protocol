@@ -93,7 +93,7 @@ against the gate address deployment produced — not a fixture — executed on a
 replay refused; a proof made for one gate is refused by another even when both trees hold the same
 root.
 
-Current: **334 contract tests**, **19 circuit tests**, **25 zk service tests**, 13 backend packages, **37 end-to-end tests**, Slither clean.
+Current: **334 contract tests**, **19 circuit tests**, **25 zk service tests**, 14 backend packages, **37 end-to-end tests**, Slither clean.
 [`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

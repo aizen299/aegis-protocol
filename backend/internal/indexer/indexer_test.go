@@ -1,9 +1,13 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,6 +27,9 @@ type fakeClient struct {
 	ranges   [][2]uint64
 	events   map[uint64][]chain.Event
 	headErr  error
+
+	blockTimeBase int64
+	blockTimeErr  error
 }
 
 func (f *fakeClient) ChainID() int64            { return testChainID }
@@ -48,6 +55,16 @@ func (f *fakeClient) LogsInRange(_ context.Context, from, to uint64, _ []chain.F
 		out = append(out, f.events[b]...)
 	}
 	return out, nil
+}
+
+// blockTime is deterministic so a test can assert a lag rather than a wall clock.
+func (f *fakeClient) BlockTime(_ context.Context, number uint64) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.blockTimeErr != nil {
+		return 0, f.blockTimeErr
+	}
+	return f.blockTimeBase + int64(number), nil
 }
 
 func (f *fakeClient) EncodeIdentity(id types.Identity) string { return id.EVMHex() }
@@ -281,4 +298,92 @@ func TestRunStopsOnContextCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return after context cancellation")
 	}
+}
+
+// --- lag metrics ---
+
+// The alarm the project needs is on seconds, not blocks: 100 blocks on Arbitrum is about 25
+// seconds, inside a single batch of the indexer's own window. See docs/v1.0-production-plan.md §2.2.
+func TestTheIndexerEmitsLagInSecondsAndBlocks(t *testing.T) {
+	var out bytes.Buffer
+
+	client := &fakeClient{head: 100, confirms: 10, events: map[uint64][]chain.Event{}}
+	// Block N is stamped base+N, so the block the indexer commits to is a known distance behind now.
+	client.blockTimeBase = time.Now().Unix() - 200
+
+	idx := newTestIndexer(client, &fakeCursors{}, Options{
+		Metrics: observability.NewMetricsTo(&out, "indexer", "test"),
+	})
+
+	if _, err := idx.Step(context.Background()); err != nil {
+		t.Fatalf("step: %v", err)
+	}
+
+	line := singleMetricLine(t, &out)
+
+	seconds, ok := line[observability.MetricIndexerLagSeconds].(float64)
+	if !ok {
+		t.Fatalf("no lag in seconds: %v", line)
+	}
+	// Committed block is head - confirms = 90, stamped base+90, so lag is about 200-90 = 110s.
+	if seconds < 100 || seconds > 120 {
+		t.Errorf("lag = %vs, want about 110s from the committed block's timestamp", seconds)
+	}
+
+	blocks, ok := line[observability.MetricIndexerLagBlocks].(float64)
+	if !ok {
+		t.Fatalf("no lag in blocks: %v", line)
+	}
+	if blocks != 10 {
+		t.Errorf("lag = %v blocks, want 10 (the confirmation depth)", blocks)
+	}
+}
+
+// A chain that cannot answer must not stop the indexer, and the block count still tells an operator
+// whether the cursor is moving.
+func TestLagFallsBackToBlocksWhenTheBlockTimeIsUnavailable(t *testing.T) {
+	var out bytes.Buffer
+
+	client := &fakeClient{head: 100, confirms: 10, events: map[uint64][]chain.Event{}}
+	client.blockTimeErr = errors.New("rpc down")
+
+	idx := newTestIndexer(client, &fakeCursors{}, Options{
+		Metrics: observability.NewMetricsTo(&out, "indexer", "test"),
+	})
+
+	if _, err := idx.Step(context.Background()); err != nil {
+		t.Fatalf("a failed block-time lookup stopped indexing: %v", err)
+	}
+
+	line := singleMetricLine(t, &out)
+	if _, present := line[observability.MetricIndexerLagSeconds]; present {
+		t.Error("reported a lag in seconds it could not measure")
+	}
+	if line[observability.MetricIndexerLagBlocks] != float64(10) {
+		t.Errorf("lag in blocks = %v, want 10", line[observability.MetricIndexerLagBlocks])
+	}
+}
+
+func TestNoMetricsClientEmitsNothing(t *testing.T) {
+	client := &fakeClient{head: 100, confirms: 10, events: map[uint64][]chain.Event{}}
+	idx := newTestIndexer(client, &fakeCursors{}, Options{})
+
+	if _, err := idx.Step(context.Background()); err != nil {
+		t.Fatalf("step: %v", err)
+	}
+}
+
+func singleMetricLine(t *testing.T, out *bytes.Buffer) map[string]any {
+	t.Helper()
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 1 || lines[0] == "" {
+		t.Fatalf("emitted %d lines, want 1: %q", len(lines), out.String())
+	}
+
+	var line map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &line); err != nil {
+		t.Fatalf("metric line is not JSON: %v", err)
+	}
+	return line
 }
