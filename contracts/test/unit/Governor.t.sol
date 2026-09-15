@@ -3,10 +3,10 @@ pragma solidity 0.8.28;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
-import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {AegisToken} from "../../src/governance/AegisToken.sol";
 import {Governor} from "../../src/governance/Governor.sol";
+import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
+import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {GovernedTarget, GovernorFixture} from "../utils/GovernorFixture.sol";
 
 /// @dev Acquires voting power, proposes, and returns it — all in one transaction. Stands in for a
