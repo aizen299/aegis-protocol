@@ -92,13 +92,30 @@ Barretenberg binding for other reasons. Either makes this disappear rather than 
 
 ## Deferred to a named version
 
-### Indexer lag metric and its CloudWatch alarm
+### The AWS staging deployment
 
-`docs/devops.md` lists "indexer lag > 100 blocks" as a required v1.0 alarm. The indexer logs its
-lag but emits no metric, so `infra/modules/ecs/alarms.tf` alarms on the task disappearing instead —
-which catches a crashed indexer but not a silently stalled one.
+`docs/project-spec.md` §5 lists an AWS staging deployment for v1.0 and §7 names Arbitrum Sepolia.
+Neither happens: no AWS account exists for this project and none is planned. v1.0 therefore ships
+as production-*ready* — infrastructure defined, validated, and preflight-checked — and has never
+been applied.
 
-**Trigger:** v1.0, with the rest of the observability work.
+What stays unproven, stated rather than implied:
+
+- **That the Terraform applies at all.** `terraform validate` checks syntax and types. Quotas, IAM
+  propagation delays, subnet and AZ mismatches, and parameter-group defaults are all unexercised.
+- **That an ECS task role can reach SSM.** §2.6's secret path is proven against LocalStack, which
+  exercises the SDK and the protocol but not the authorization.
+- **A staging lag baseline.** The indexer-lag alarm threshold stays provisional at 300s, stated at
+  the resource.
+- **The role migration on staging.** Re-scoped to a local Anvil deployment, which is where the
+  runbook was exercised at v0.3 step 8. Stage 4 was always out of scope.
+- **Whether `aggregator` and `oraclenode` get ECS task definitions.** The scope question raised in
+  step 4 of the v1.0 plan is deferred unanswered, because it cannot be settled without an account
+  to deploy into.
+
+**Trigger:** an AWS account existing. The first thing worth doing with one is a single `terraform
+apply` followed immediately by `terraform destroy` — it costs cents and converts "validated" into
+"applied at least once", which is the whole of the gap above that money actually buys.
 
 ---
 
@@ -111,4 +128,5 @@ which catches a crashed indexer but not a silently stalled one.
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| Indexer lag metric and its alarm | Done in v1.0. Emitted in seconds and blocks through CloudWatch EMF, with `indexer_lag_seconds` alarming on a stalled indexer rather than only a crashed one. Was deferred from v0.2. |
 | Vault metadata table | Done in v0.2. `vaults` completes the pattern `assets` and `oracle_feeds` follow: a foreign key from every share-bearing row, so a share cannot be stored without its scale. |

@@ -65,6 +65,44 @@ jobs:
           cache-dependency-path: backend/go.sum
       - run: go test ./internal/architecture/... -v
 
+  # The staging secret path against a real Parameter Store implementation. Runs here rather than in
+  # the main job because it needs a service container, and because a failure here means the secret
+  # policy is broken rather than a unit test being wrong.
+  secret-path:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      localstack:
+        image: localstack/localstack:3.8
+        env:
+          SERVICES: ssm
+          EAGER_SERVICE_LOADING: 1
+        ports: ["4566:4566"]
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      LOCALSTACK_ENDPOINT: http://127.0.0.1:4566
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: backend/go.sum
+      # Without the endpoint the suite skips every case and the job still passes green, which is
+      # the failure mode this check exists to prevent.
+      - name: Fail if the suite skipped instead of running
+        run: |
+          set -euo pipefail
+          go test -tags localstack ./internal/secrets/... -count=1 -v | tee "$RUNNER_TEMP/out.txt"
+          if grep -q -- "--- SKIP: TestStagingResolvesASecureStringFromRealParameterStore" "$RUNNER_TEMP/out.txt"; then
+            echo "::error::The SSM suite skipped — LOCALSTACK_ENDPOINT did not reach the tests."
+            exit 1
+          fi
+          grep -q -- "--- PASS: TestStagingResolvesASecureStringFromRealParameterStore" "$RUNNER_TEMP/out.txt"
+
   # Every source file must reach a clean checkout. A .gitignore pattern that swallows a package is
   # invisible locally and only surfaces as a build failure here, so assert it directly.
   tracked-sources:
