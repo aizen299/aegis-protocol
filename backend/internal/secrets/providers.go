@@ -6,9 +6,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
+
+// ambientEndpointVars redirect the SSM client at construction, from the process environment, with
+// nothing logged. See ssm/endpoints.go resolveBaseEndpoint. A staging process that read its key
+// from an attacker's endpoint would still log provider=aws-ssm, so these are refused rather than
+// honoured: outside local, the endpoint is AWS or the process does not start.
+var ambientEndpointVars = []string{"AWS_ENDPOINT_URL_SSM", "AWS_ENDPOINT_URL"}
 
 // EnvProvider reads material from a process environment variable.
 //
@@ -37,15 +44,45 @@ type ssmClient interface {
 	GetParameter(ctx context.Context, in *ssm.GetParameterInput, opts ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
 }
 
+// SSMOptions configures the SSM client.
+//
+// Endpoint points at a non-AWS Parameter Store implementation. It exists so the real provider can
+// be exercised against LocalStack, and BuildProviders refuses it outside local.
+type SSMOptions struct {
+	Region   string
+	Endpoint string
+}
+
 // NewSSMProvider builds a provider from ambient AWS configuration — task role on ECS, profile
 // locally. Failing here fails startup, which is the intent: a service that cannot reach its secret
 // source must not run.
-func NewSSMProvider(ctx context.Context, region string) (*SSMProvider, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+func NewSSMProvider(ctx context.Context, opts SSMOptions) (*SSMProvider, error) {
+	if opts.Endpoint == "" {
+		if name, set := ambientEndpointOverride(); set {
+			return nil, fmt.Errorf("%w: %s is set", ErrEndpointAmbient, name)
+		}
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(opts.Region))
 	if err != nil {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
-	return &SSMProvider{client: ssm.NewFromConfig(cfg)}, nil
+
+	client := ssm.NewFromConfig(cfg, func(o *ssm.Options) {
+		if opts.Endpoint != "" {
+			o.BaseEndpoint = aws.String(opts.Endpoint)
+		}
+	})
+	return &SSMProvider{client: client}, nil
+}
+
+func ambientEndpointOverride() (string, bool) {
+	for _, name := range ambientEndpointVars {
+		if v, ok := os.LookupEnv(name); ok && strings.TrimSpace(v) != "" {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 func (SSMProvider) Name() string { return ProviderSSM }
@@ -79,7 +116,7 @@ func BuildProviders(ctx context.Context, env Environment, region string) (map[st
 		if region == "" {
 			return nil, fmt.Errorf("AWS_REGION is required in %s", env)
 		}
-		provider, err := NewSSMProvider(ctx, region)
+		provider, err := NewSSMProvider(ctx, SSMOptions{Region: region})
 		if err != nil {
 			return nil, err
 		}

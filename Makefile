@@ -49,6 +49,10 @@ test: contracts-test backend-test zk-test ## Run every layer's test suite
 e2e: ## End-to-end smoke test: real chain, real database, real indexer and API
 	./scripts/e2e.sh
 
+.PHONY: secrets-localstack
+secrets-localstack: ## Exercise the real SSM secret path against LocalStack (needs docker)
+	./scripts/secrets-localstack.sh
+
 .PHONY: build
 build: contracts-build backend-build zk-build frontend-build ## Build every layer
 

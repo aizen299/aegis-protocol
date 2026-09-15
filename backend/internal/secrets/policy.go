@@ -29,6 +29,7 @@ var (
 	ErrEnvironmentUnknown = errors.New("APP_ENV is not one of local, staging, production")
 	ErrProviderMissing    = errors.New("no provider is registered for the source this environment requires")
 	ErrSecretEmpty        = errors.New("the configured source returned an empty secret")
+	ErrEndpointAmbient    = errors.New("an AWS endpoint override is set in the environment; the secret source location must not be redirected silently")
 )
 
 // Provider fetches material from one source.
