@@ -177,6 +177,21 @@ zk-service-e2e: ## Prove for real through the Rust service (needs nargo and bb)
 	# run beside another test that is mid-proof. The concurrency test spawns its own threads.
 	cd zk && cargo test --test prove_integration -- --ignored --test-threads=1
 
+# Load profiles from docs/v1.0-production-plan.md §2.5. The read profile points at any running API;
+# the ingest profile runs under the end-to-end harness because it needs a chain.
+.PHONY: load-read
+load-read: ## Drive the read path and check it against the alarm thresholds (API_BASE=...)
+	cd backend && go run ./cmd/loadgen \
+		-base $(or $(API_BASE),http://localhost:8090) \
+		-paths $(or $(LOAD_PATHS),/v1/oracle/feeds,/v1/oracle/nodes) \
+		-rate $(or $(LOAD_RATE),200) \
+		-duration $(or $(LOAD_DURATION),30s)
+
+.PHONY: load-ingest
+load-ingest: ## Replay a dense block range and measure how fast the indexer catches up
+	cd backend && go test -tags e2e ./internal/e2e/... -count=1 -timeout 15m -v \
+		-run TestIngestKeepsUpWithADenseBlockRange
+
 .PHONY: zk-toolchain-check
 zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned one
 	@pinned=$$(awk '/^nargo /{print $$2}' zk/circuits/toolchain.txt); \
