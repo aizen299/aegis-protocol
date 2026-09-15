@@ -95,6 +95,9 @@ Barretenberg binding for other reasons. Either makes this disappear rather than 
 Found by the internal audit simulation, `docs/v1.0-audit-simulation.md`. Severities and full failure
 scenarios are there; this records the triggers.
 
+The three frontend entries are the exception: they were found after the tag, by running the UI
+against a real local stack rather than by the review — which had omitted `frontend/` from its scope.
+
 ### A zk proof can be submitted by anyone who sees it — High
 
 Nothing binds a proof to a submitter. An observer can copy a proof out of the mempool and land it
@@ -153,6 +156,47 @@ inclusion at all.
 **Trigger:** attaching any strategy on a chain where someone other than the operator holds shares.
 At that point the price moves for reasons outside a depositor's control and the bound is the only
 thing that lets them say no.
+
+### The dashboard cannot distinguish a failed read from an empty vault — Medium
+
+Every stat in `VaultDashboard` renders as `—` when its value is absent, and absent covers three
+different things: the read is still in flight, the read failed, and the value is genuinely zero or
+unset. Nothing surfaces an error to the user.
+
+Observed rather than reasoned about. Running the UI against a local Anvil without Multicall3
+deployed, wagmi batched all seven contract reads into one multicall against an empty address; every
+read failed and the dashboard showed a vault that looked merely empty. The browser console carried
+no related error — only unrelated WalletConnect noise. On a real deployment an RPC outage, a wrong
+`NEXT_PUBLIC_VAULT_ADDRESS`, and a chain the vault is not deployed on all look identical, and all
+look like "nothing has been deposited yet".
+
+**Trigger:** none needed — this is scheduled work, not a risk to watch. It is the substance of
+roadmap step 2 and should be fixed before any further UI is built on the same pattern.
+
+### The frontend has no tests — Medium
+
+Frontend CI runs `typecheck`, `lint`, and `build`. None of them assert behaviour, so every rendering
+rule in the UI — including the decimals handling that keeps a six-decimal asset from being
+misrendered by twelve orders of magnitude — is unverified. The defect above survived because nothing
+could have caught it.
+
+**Trigger:** none needed — scheduled with step 2, alongside the fix above.
+
+### The UI covers the vault only — Medium
+
+`frontend/` implements v0.1's deposit, withdraw, and dashboard. There is no interface for oracle
+feeds, governance proposals and voting, or zk proofs, though the backend serves and end-to-end tests
+all three. `frontend/README.md` has tracked this accurately per version throughout; what was missing
+was any record of it in this register or in the release documents, which is now corrected.
+
+Not a spec violation — `docs/project-spec.md` §3.5 fixes the frontend stack and never assigns
+per-version frontend deliverables. It is still the largest gap between what the protocol does and
+what anyone can see it do.
+
+**Trigger:** none needed — this is roadmap step 3, targeted at `v1.1.0`. One ordering constraint is
+binding: the zk interface must not ship before the bearer-proof finding above is fixed. A UI is what
+first puts real proofs into a mempool, so shipping it against the current gate does not inherit that
+risk, it activates it.
 
 ### The root history window is fixed at deployment — Low
 
