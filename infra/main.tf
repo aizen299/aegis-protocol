@@ -64,5 +64,6 @@ module "ecs" {
   indexer_role_arn   = module.iam.indexer_task_role_arn
   ssm_prefix         = local.ssm_prefix
   api_desired_count  = var.api_desired_count
+  environment        = var.environment
   tags               = local.tags
 }

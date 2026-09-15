@@ -90,6 +90,11 @@ resource "aws_ecs_task_definition" "api" {
     environment = [
       { name = "SERVICE_NAME", value = "api" },
       { name = "API_ADDR", value = ":8090" },
+      # Required, no default: a process must never infer its environment. Passed in plain rather
+      # than from SSM, because APP_ENV is what selects the secret source — reading it from the
+      # secret store would be circular. It is also the Environment dimension on every metric this
+      # service emits, so it has to equal what the alarms match on.
+      { name = "APP_ENV", value = var.environment },
     ]
 
     # Secrets are injected from SSM at task start. Never baked into the image or a tfvars file.
@@ -135,7 +140,10 @@ resource "aws_ecs_task_definition" "indexer" {
     image     = "${aws_ecr_repository.indexer.repository_url}:${var.image_tag}"
     essential = true
 
-    environment = [{ name = "SERVICE_NAME", value = "indexer" }]
+    environment = [
+      { name = "SERVICE_NAME", value = "indexer" },
+      { name = "APP_ENV", value = var.environment },
+    ]
 
     secrets = [
       { name = "DB_DSN", valueFrom = "${var.ssm_prefix}/db_dsn" },
