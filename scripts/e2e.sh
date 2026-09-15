@@ -59,4 +59,8 @@ cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null
 
 echo "==> running end-to-end tests"
 cd "$ROOT/backend"
-go test -tags e2e ./internal/e2e/... -count=1 -v
+# Go's test timeout defaults to 10 minutes. This suite measures around four, so it is not close
+# today — but it grows with every proof-generating test, and a suite that crosses the default fails
+# with a message that reads like a test failure rather than a timeout. Set explicitly so the
+# margin is visible and deliberate rather than inherited.
+go test -tags e2e ./internal/e2e/... -count=1 -timeout 25m -v

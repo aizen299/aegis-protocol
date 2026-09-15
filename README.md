@@ -13,7 +13,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.1 | Vault Engine | **Released** — tagged `v0.1.0` |
 | v0.2 | Oracle Network | **Released** — tagged `v0.2.0` |
 | v0.3 | DAO Governance | **Released** — tagged `v0.3.0` |
-| v0.4 | zk Privacy Layer | **In progress** — contracts, proof service, and indexing done; end-to-end next |
+| v0.4 | zk Privacy Layer | **Complete** — ready to tag v0.4.0 |
 | v1.0 | Production Release | Not started |
 
 No mainnet deployment and no real funds are in scope. Local Anvil through v0.4; Arbitrum Sepolia
@@ -93,7 +93,7 @@ against the gate address deployment produced — not a fixture — executed on a
 replay refused; a proof made for one gate is refused by another even when both trees hold the same
 root.
 
-Current: **334 contract tests**, **19 circuit tests**, **25 zk service tests**, 13 backend packages, **32 end-to-end tests**, Slither clean.
+Current: **334 contract tests**, **19 circuit tests**, **25 zk service tests**, 13 backend packages, **37 end-to-end tests**, Slither clean.
 [`docs/v0.4-zk-plan.md`](docs/v0.4-zk-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

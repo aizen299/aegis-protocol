@@ -16,7 +16,9 @@ jobs:
   # a real contract emits a real log that a real indexer writes to a real database.
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Above the go test -timeout below, deliberately. Go's timeout prints a stack dump naming the
+    # hung test; a job killed by GitHub first would just say "cancelled".
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -83,7 +85,10 @@ jobs:
       - name: Run the end-to-end suite
         working-directory: backend
         run: |
-          go test -tags e2e ./internal/e2e/... -count=1 -v 2>&1 | tee /tmp/e2e.log
+          # Explicit -timeout: Go defaults to 10 minutes and this suite measures around four, but
+          # it grows with every proof-generating test, and crossing the default fails with a
+          # message that reads like a test failure rather than a timeout.
+          go test -tags e2e ./internal/e2e/... -count=1 -timeout 25m -v 2>&1 | tee /tmp/e2e.log
           if grep -q -- "--- SKIP" /tmp/e2e.log; then
             echo "::error::End-to-end tests skipped — anvil, postgres, or redis was unreachable."
             exit 1
@@ -101,7 +106,12 @@ jobs:
             TestReindexingIsIdempotent \
             TestRoleMigrationOnALocalDeployment \
             TestZkPrivateActionExecutesAndCannotBeReplayed \
-            TestZkProofFromAnotherGateIsRejected; do
+            TestZkProofFromAnotherGateIsRejected \
+            TestZkLifecycleIsIndexedFromRealLogs \
+            TestZkAPIServesIndexedRows \
+            TestServedZkRowsCarryNoSender \
+            TestZkReindexingIsIdempotent \
+            TestTheAnonymitySetTracksTheTree; do
             grep -q -- "--- PASS: $required" /tmp/e2e.log || {
               echo "::error::$required did not run."
               exit 1
