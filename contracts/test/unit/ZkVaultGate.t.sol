@@ -72,6 +72,22 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
         assertTrue(gate.isSpent(ProofFixture.NULLIFIER_HASH), "the nullifier was not spent");
     }
 
+    /// FINDING (v1.0 step 6): a proof is a bearer instrument. Nothing binds it to a submitter, so
+    /// anyone who sees it — the mempool is the ordinary case — can submit it first.
+    function test_aStrangerCanSubmitSomeoneElsesProof() public {
+        address stranger = makeAddr("stranger");
+
+        vm.prank(stranger);
+        gate.executePrivateAction(
+            ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
+        );
+
+        assertTrue(
+            gate.isSpent(ProofFixture.NULLIFIER_HASH),
+            "a stranger spent a nullifier they could not have proved"
+        );
+    }
+
     /// The test the circuit could not provide.
     function test_aReplayedNullifierIsRejected() public {
         gate.executePrivateAction(

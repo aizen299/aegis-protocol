@@ -90,6 +90,52 @@ Barretenberg binding for other reasons. Either makes this disappear rather than 
 
 ---
 
+## Accepted for v1.0
+
+Found by the internal audit simulation, `docs/v1.0-audit-simulation.md`. Severities and full failure
+scenarios are there; this records the triggers.
+
+### A zk proof can be submitted by anyone who sees it — High
+
+Nothing binds a proof to a submitter. An observer can copy a proof out of the mempool and land it
+first, permanently burning the honest user's nullifier — their deposit is safe, their capability is
+destroyed. `test_aStrangerCanSubmitSomeoneElsesProof` is left passing as the record, and will fail
+the moment a binding is added.
+
+Accepted only because the gate confers no benefit today: it marks a nullifier spent and emits an
+event nothing consumes. The fix is a sixth public input for the permitted submitter, a regenerated
+verifier, and a regenerated fixture — v0.4 work, and shipping a freshly changed circuit under a
+hardening release would trade a known risk for an untested one.
+
+**Trigger — not a date.** Before any contract consumes `PrivateActionExecuted` or gates on
+`isSpent`. At that point a frontrunner receives what the gate confers and this becomes theft.
+
+### The root history window is fixed at deployment — Low
+
+`CommitmentTree` has no setter for `rootHistorySize`, so the value chosen at initialization is
+permanent. At the deployed 30 it is correct; it is simply unchangeable if it turns out not to be.
+
+**Trigger:** the next `CommitmentTree` upgrade, which is the only occasion a setter can be added, or
+evidence of honest proofs failing on the root window.
+
+### `setMaxNodes` has no ceiling over an O(n²) settlement sort — Low
+
+`_median` is an insertion sort bounded by `maxNodes`. The bound is enforced, but `setMaxNodes`
+accepts any non-zero value, so `ORACLE_MANAGER_ROLE` can raise it until settlement no longer fits in
+a block. Trusted role, loud failure.
+
+**Trigger:** raising `maxNodes` beyond the low hundreds, or a deployment where
+`ORACLE_MANAGER_ROLE` is not the timelock.
+
+### The oracle submission nonce is per node, not per feed — Low
+
+A node serving two feeds must have its transactions mined in the order it signed them; reordering
+reverts the later one and forces a re-sign. Replay protection is unaffected — this is operability.
+
+**Trigger:** a second production feed, or the first `InvalidNonce` revert from an honest node.
+
+---
+
 ## Deferred to a named version
 
 ### The AWS staging deployment

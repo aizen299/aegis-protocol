@@ -66,7 +66,9 @@ contract GovernanceHandler is CommonBase, StdCheats, StdUtils {
         bool remote
     ) external {
         address actor = _actor(actorSeed);
-        if (token.getVotes(actor) < governor.proposalThreshold()) return;
+        // Mirrors the contract: propose reads power one tick back, so a guard on current power
+        // would let the handler make calls that can only revert.
+        if (token.getPastVotes(actor, block.timestamp - 1) < governor.proposalThreshold()) return;
 
         IGovernor.Action memory action = IGovernor.Action({
             targetChainId: remote ? block.chainid + 1 : block.chainid,

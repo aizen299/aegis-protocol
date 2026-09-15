@@ -5,9 +5,58 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
 import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
+import {AegisToken} from "../../src/governance/AegisToken.sol";
+import {Governor} from "../../src/governance/Governor.sol";
 import {GovernedTarget, GovernorFixture} from "../utils/GovernorFixture.sol";
 
+/// @dev Acquires voting power, proposes, and returns it — all in one transaction. Stands in for a
+///      flash loan: the mechanism that matters is that `propose` reads power the caller holds only
+///      for the duration of the call.
+contract FlashProposer {
+    function flashPropose(
+        AegisToken token,
+        Governor governor,
+        address lender,
+        uint256 amount,
+        IGovernor.Action calldata action
+    ) external returns (uint256 proposalId) {
+        token.transferFrom(lender, address(this), amount);
+        token.delegate(address(this));
+
+        proposalId = governor.propose(action, "Flash-funded", "");
+
+        token.transfer(lender, amount);
+    }
+}
+
 contract GovernorTest is GovernorFixture {
+    /// Found in the v1.0 adversarial review: `propose` read `getVotes`, so the threshold was met
+    /// with weight borrowed and returned inside one transaction. The threshold is the spam control,
+    /// and a spam control anyone can rent is not one.
+    function test_theProposalThresholdCannotBeMetWithBorrowedWeight() public {
+        FlashProposer attacker = new FlashProposer();
+        IGovernor.Action memory action = _localAction(42);
+
+        vm.prank(treasury);
+        token.approve(address(attacker), PROPOSAL_THRESHOLD);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IGovernor.BelowProposalThreshold.selector, 0, PROPOSAL_THRESHOLD)
+        );
+        attacker.flashPropose(token, governor, treasury, PROPOSAL_THRESHOLD, action);
+    }
+
+    /// The other half: a holder who has held power since before this transaction still proposes.
+    /// Without this, the fix above could be "nobody can ever propose" and the test would pass.
+    function test_aHolderWhoHeldPowerBeforeThisTransactionCanPropose() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(_localAction(42), "Ordinary", "");
+
+        assertTrue(proposalId != 0, "an established holder could not propose");
+    }
+
     // --- the §7 constraint ---
 
     /// A non-local destination has nowhere to go in Phase 1, but the branch exists so that "local"

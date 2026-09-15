@@ -107,6 +107,10 @@ abstract contract GovernorFixture is Test {
 
         vm.prank(holder);
         token.delegate(holder);
+
+        // `propose` reads power one tick back, so a holder funded in this same second has none.
+        // Real holders acquire power before they use it; the fixture now does too.
+        skip(1);
     }
 
     function _localAction(

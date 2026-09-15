@@ -84,8 +84,11 @@ contract Governor is
     // --- proposals ---
 
     /// @inheritdoc IGovernor
-    /// @dev Weight is checked against the proposer's power now; the vote snapshot is taken at
-    ///      voteStart. A proposer must already hold influence to spend gas on everyone else.
+    /// @dev Weight is read one tick back, never as it stands now. `getVotes` would count power the
+    ///      caller acquired inside this same transaction, so the threshold could be met with
+    ///      borrowed tokens and returned in the same call — the spam control the threshold exists
+    ///      to be. The clock is timestamps, so a proposer must have held influence for at least a
+    ///      second before spending everyone else's attention.
     function propose(
         Action calldata action,
         string calldata title,
@@ -93,7 +96,10 @@ contract Governor is
     ) external returns (uint256 proposalId) {
         if (bytes(title).length == 0) revert EmptyTitle();
 
-        uint256 weight = _token.getVotes(msg.sender);
+        uint256 weight = _token.getPastVotes(msg.sender, block.timestamp - 1);
+        // The comparison is on vote weight; the timestamp only selects which checkpoint to read.
+        // One second of sequencer drift moves the checkpoint, not the threshold.
+        // slither-disable-next-line timestamp
         if (weight < _proposalThreshold) revert BelowProposalThreshold(weight, _proposalThreshold);
 
         uint48 voteStart = uint48(block.timestamp) + _votingDelay;
