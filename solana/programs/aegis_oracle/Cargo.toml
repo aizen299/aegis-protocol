@@ -1,0 +1,38 @@
+[package]
+name = "aegis_oracle"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "aegis_oracle"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "=1.1.2", features = ["event-cpi", "init-if-needed"] }
+anchor-spl = { version = "=1.1.2", default-features = false, features = ["token", "token_2022"] }
+solana-instructions-sysvar = "=3.0.1"
+solana-sdk-ids = "=3.1.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+[dev-dependencies]
+litesvm = { version = "=0.16.0", features = ["precompiles"] }
+solana-account = "4.3.0"
+solana-keypair = "3.1.2"
+solana-message = "4.2.4"
+solana-program-pack = "3.1.0"
+solana-signer = "3.0.1"
+solana-transaction = "4.1.5"
+solana-clock = "3"

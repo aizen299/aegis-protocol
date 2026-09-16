@@ -8,6 +8,7 @@ skip-lint = false
 
 [programs.localnet]
 aegis_vault = "h5VEwZjPpX6zug14r44i4QzpPzYBKeAHQYa5QZdzyGo"
+aegis_oracle = "6GcRqNzxauK3JLP1EUMMTTQ9ja8qcgHVAznS1nKZjnc7"
 
 [provider]
 cluster = "localnet"

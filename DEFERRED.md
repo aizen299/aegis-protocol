@@ -135,14 +135,27 @@ permanent. At the deployed 30 it is correct; it is simply unchangeable if it tur
 **Trigger:** the next `CommitmentTree` upgrade, which is the only occasion a setter can be added, or
 evidence of honest proofs failing on the root window.
 
-### `setMaxNodes` has no ceiling over an O(n²) settlement sort — Low
+### The Arbitrum node cap can be exceeded, so the settlement sort is unbounded (ORC-2) — Medium, open
 
-`_median` is an insertion sort bounded by `maxNodes`. The bound is enforced, but `setMaxNodes`
-accepts any non-zero value, so `ORACLE_MANAGER_ROLE` can raise it until settlement no longer fits in
-a block. Trusted role, loud failure.
+*Corrected during v2.0.* This entry said `_median` "is bounded by `maxNodes`" and that only a
+trusted role could raise that bound. Neither holds:
 
-**Trigger:** raising `maxNodes` beyond the low hundreds, or a deployment where
-`ORACLE_MANAGER_ROLE` is not the timelock.
+- `stake()` and `cancelUnstake()` reactivate a node without checking `maxNodes`. Only `register`
+  checks it.
+- `_MAX_SUBMISSIONS = 31` is declared and exposed through a getter, but `submit` never enforces it.
+
+So stakers, not only `ORACLE_MANAGER_ROLE`, can grow the active set past the cap. Some active nodes
+request an unstake, freeing a slot; a new identity registers into it; the leavers cancel, and all of
+them are active again. Each repetition adds a node, at the cost of one more minimum stake. The
+insertion sort in `settleRound` is O(n²) in submissions, so a large enough set makes rounds too
+expensive to settle. The impact is oracle liveness, not the price: the median is still taken over
+eligible nodes.
+
+Found while porting the rule to Solana, where every activation checks the cap and a round holds at
+most 32 values. See `docs/v2.0-solana-plan.md` §13.
+
+**Decision pending:** fixing it on Arbitrum means a UUPS upgrade of `OracleStaking` and
+`OracleRounds`.
 
 ### The oracle submission nonce is per node, not per feed — Low
 
@@ -173,6 +186,15 @@ verifiers here are generated, never hand-written. Private actions are Arbitrum-o
 `docs/v2.0-solana-plan.md` §2.2.
 
 **Revisit when** the pinned proving toolchain can generate a verifier for Solana programs.
+
+### Solana oracle accounts are never closed
+
+Every round, submission, and slash record on the Solana oracle is its own rent-paying account, and
+none is ever closed. Closing them needs a retention rule: a slash record closed too early lets the same
+round be slashed again, and a round closed before its events are indexed loses nothing on chain but
+removes what a replay could check against. See `docs/v2.0-solana-plan.md` §12.9.
+
+**Revisit at** the first deployment of the oracle program to any cluster, where rent is real.
 
 ---
 

@@ -400,7 +400,7 @@ zk-lint:
 
 # --- solana ---
 
-SOLANA_PROGRAMS ?= aegis_vault
+SOLANA_PROGRAMS ?= aegis_vault aegis_oracle
 
 .PHONY: solana-toolchain-check
 solana-toolchain-check: ## Fail if anchor or solana differ from the pins in solana/Anchor.toml

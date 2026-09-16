@@ -1,0 +1,512 @@
+{
+  "Config": {
+    "discriminator": [
+      155,
+      12,
+      170,
+      224,
+      30,
+      250,
+      204,
+      130
+    ],
+    "size": 407,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "stake_vault_bump",
+        "type": "u8",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "paused",
+        "type": "bool",
+        "offset": 11,
+        "size": 1
+      },
+      {
+        "name": "admin",
+        "type": "pubkey",
+        "offset": 12,
+        "size": 32
+      },
+      {
+        "name": "pending_admin",
+        "type": "pubkey",
+        "offset": 44,
+        "size": 32
+      },
+      {
+        "name": "oracle_manager",
+        "type": "pubkey",
+        "offset": 76,
+        "size": 32
+      },
+      {
+        "name": "pauser",
+        "type": "pubkey",
+        "offset": 108,
+        "size": 32
+      },
+      {
+        "name": "slasher",
+        "type": "pubkey",
+        "offset": 140,
+        "size": 32
+      },
+      {
+        "name": "stake_mint",
+        "type": "pubkey",
+        "offset": 172,
+        "size": 32
+      },
+      {
+        "name": "chain_id",
+        "type": "i64",
+        "offset": 204,
+        "size": 8
+      },
+      {
+        "name": "minimum_stake",
+        "type": "u64",
+        "offset": 212,
+        "size": 8
+      },
+      {
+        "name": "min_stake_floor",
+        "type": "u64",
+        "offset": 220,
+        "size": 8
+      },
+      {
+        "name": "unbonding_period",
+        "type": "i64",
+        "offset": 228,
+        "size": 8
+      },
+      {
+        "name": "max_slash_bps",
+        "type": "u64",
+        "offset": 236,
+        "size": 8
+      },
+      {
+        "name": "max_nodes",
+        "type": "u8",
+        "offset": 244,
+        "size": 1
+      },
+      {
+        "name": "active_node_count",
+        "type": "u8",
+        "offset": 245,
+        "size": 1
+      },
+      {
+        "name": "min_quorum_nodes",
+        "type": "u8",
+        "offset": 246,
+        "size": 1
+      },
+      {
+        "name": "quorum_bps",
+        "type": "u64",
+        "offset": 247,
+        "size": 8
+      },
+      {
+        "name": "round_duration",
+        "type": "i64",
+        "offset": 255,
+        "size": 8
+      },
+      {
+        "name": "node_set_version",
+        "type": "u64",
+        "offset": 263,
+        "size": 8
+      },
+      {
+        "name": "next_round_id",
+        "type": "u64",
+        "offset": 271,
+        "size": 8
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;128]",
+        "offset": 279,
+        "size": 128
+      }
+    ]
+  },
+  "Feed": {
+    "discriminator": [
+      69,
+      191,
+      16,
+      227,
+      132,
+      187,
+      84,
+      227
+    ],
+    "size": 148,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "registered",
+        "type": "bool",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "decimals",
+        "type": "u8",
+        "offset": 11,
+        "size": 1
+      },
+      {
+        "name": "feed_id",
+        "type": "[u8;32]",
+        "offset": 12,
+        "size": 32
+      },
+      {
+        "name": "current_round_id",
+        "type": "u64",
+        "offset": 44,
+        "size": 8
+      },
+      {
+        "name": "last_settled_round_id",
+        "type": "u64",
+        "offset": 52,
+        "size": 8
+      },
+      {
+        "name": "last_value",
+        "type": "u128",
+        "offset": 60,
+        "size": 16
+      },
+      {
+        "name": "last_settled_at",
+        "type": "i64",
+        "offset": 76,
+        "size": 8
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;64]",
+        "offset": 84,
+        "size": 64
+      }
+    ]
+  },
+  "Node": {
+    "discriminator": [
+      208,
+      53,
+      1,
+      3,
+      49,
+      122,
+      180,
+      49
+    ],
+    "size": 155,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "active",
+        "type": "bool",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "node",
+        "type": "pubkey",
+        "offset": 11,
+        "size": 32
+      },
+      {
+        "name": "stake",
+        "type": "u64",
+        "offset": 43,
+        "size": 8
+      },
+      {
+        "name": "pending_unstake",
+        "type": "u64",
+        "offset": 51,
+        "size": 8
+      },
+      {
+        "name": "claimable_at",
+        "type": "i64",
+        "offset": 59,
+        "size": 8
+      },
+      {
+        "name": "slashed_total",
+        "type": "u64",
+        "offset": 67,
+        "size": 8
+      },
+      {
+        "name": "activated_at_version",
+        "type": "u64",
+        "offset": 75,
+        "size": 8
+      },
+      {
+        "name": "nonce",
+        "type": "u64",
+        "offset": 83,
+        "size": 8
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;64]",
+        "offset": 91,
+        "size": 64
+      }
+    ]
+  },
+  "Round": {
+    "discriminator": [
+      87,
+      127,
+      165,
+      51,
+      73,
+      78,
+      116,
+      174
+    ],
+    "size": 645,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "state",
+        "type": "u8",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "eligible_count",
+        "type": "u8",
+        "offset": 11,
+        "size": 1
+      },
+      {
+        "name": "submission_count",
+        "type": "u8",
+        "offset": 12,
+        "size": 1
+      },
+      {
+        "name": "round_id",
+        "type": "u64",
+        "offset": 13,
+        "size": 8
+      },
+      {
+        "name": "feed_id",
+        "type": "[u8;32]",
+        "offset": 21,
+        "size": 32
+      },
+      {
+        "name": "opened_at",
+        "type": "i64",
+        "offset": 53,
+        "size": 8
+      },
+      {
+        "name": "deadline",
+        "type": "i64",
+        "offset": 61,
+        "size": 8
+      },
+      {
+        "name": "settled_at",
+        "type": "i64",
+        "offset": 69,
+        "size": 8
+      },
+      {
+        "name": "node_set_version",
+        "type": "u64",
+        "offset": 77,
+        "size": 8
+      },
+      {
+        "name": "aggregated_value",
+        "type": "u128",
+        "offset": 85,
+        "size": 16
+      },
+      {
+        "name": "values",
+        "type": "[u128;32]",
+        "offset": 101,
+        "size": 512
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;32]",
+        "offset": 613,
+        "size": 32
+      }
+    ]
+  },
+  "SlashRecord": {
+    "discriminator": [
+      107,
+      134,
+      175,
+      65,
+      150,
+      130,
+      94,
+      68
+    ],
+    "size": 74,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "round_id",
+        "type": "u64",
+        "offset": 10,
+        "size": 8
+      },
+      {
+        "name": "node",
+        "type": "pubkey",
+        "offset": 18,
+        "size": 32
+      },
+      {
+        "name": "amount",
+        "type": "u64",
+        "offset": 50,
+        "size": 8
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;16]",
+        "offset": 58,
+        "size": 16
+      }
+    ]
+  },
+  "Submission": {
+    "discriminator": [
+      58,
+      194,
+      159,
+      158,
+      75,
+      102,
+      178,
+      197
+    ],
+    "size": 82,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "round_id",
+        "type": "u64",
+        "offset": 10,
+        "size": 8
+      },
+      {
+        "name": "node",
+        "type": "pubkey",
+        "offset": 18,
+        "size": 32
+      },
+      {
+        "name": "value",
+        "type": "u128",
+        "offset": 50,
+        "size": 16
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;16]",
+        "offset": 66,
+        "size": 16
+      }
+    ]
+  }
+}
