@@ -367,14 +367,20 @@ backend-abi: ## Re-export contract ABIs consumed by the indexer
 		> ../backend/pkg/contracts/zk/ZkVaultGate.abi.json
 
 .PHONY: backend-idl
+BACKEND_IDLS := aegis_vault:solvault aegis_oracle:soloracle
+
 backend-idl: ## Copy Solana program IDLs consumed by the indexer
-	cp solana/idl/aegis_vault.json backend/pkg/contracts/solvault/aegis_vault.json
+	@for pair in $(BACKEND_IDLS); do \
+		cp solana/idl/$${pair%%:*}.json backend/pkg/contracts/$${pair##*:}/$${pair%%:*}.json; \
+	done
 
 .PHONY: backend-idl-check
-backend-idl-check: ## Fail if the indexer's embedded IDL differs from solana/idl
-	@diff -u solana/idl/aegis_vault.json backend/pkg/contracts/solvault/aegis_vault.json \
-		|| { echo "IDL DRIFT: backend/pkg/contracts/solvault is stale. Run 'make backend-idl'."; exit 1; }
-	@echo "backend IDL matches solana/idl"
+backend-idl-check: ## Fail if an embedded IDL differs from solana/idl
+	@set -e; for pair in $(BACKEND_IDLS); do \
+		diff -u solana/idl/$${pair%%:*}.json backend/pkg/contracts/$${pair##*:}/$${pair%%:*}.json \
+			|| { echo "IDL DRIFT: backend/pkg/contracts/$${pair##*:} is stale. Run 'make backend-idl'."; exit 1; }; \
+		echo "$${pair%%:*} IDL matches solana/idl"; \
+	done
 
 .PHONY: migrate-up
 migrate-up:

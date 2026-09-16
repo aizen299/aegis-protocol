@@ -275,3 +275,29 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod vector {
+    use super::*;
+
+    // The same bytes are asserted in backend/internal/chain/svm/oracle_test.go. The node signs in Go
+    // and the program verifies in Rust, so the two constructions may never drift apart.
+    pub const SHARED_VECTOR: &str = "61656769732d6f7261636c652d7375626d697373696f6e2d7631111111111111111111111111111111111111111111111111111111111111111103000000000000400700000000000000333333333333333333333333333333333333333333333333333333333333333300505a4f7e9f4eb1060000000000000022222222222222222222222222222222222222222222222222222222222222220500000000000000";
+
+    #[test]
+    fn the_message_matches_the_vector_the_go_signer_asserts() {
+        let program = Pubkey::new_from_array([0x11; 32]);
+        let node = Pubkey::new_from_array([0x22; 32]);
+        let msg = submission_message(
+            &program,
+            (1 << 62) + 3,
+            7,
+            &[0x33; 32],
+            123_456_789_000_000_000_000u128,
+            &node,
+            5,
+        );
+        let hex: String = msg.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(hex, SHARED_VECTOR);
+    }
+}

@@ -65,7 +65,7 @@ func TestASolanaDepositIsIndexedAndServedBesideAnArbitrumOne(t *testing.T) {
 	lastSlot := transactionSlot(t, failedSig)
 	indexSolana(t, s, client, idl.Program, "e2e-solana", lastSlot)
 
-	aliceAddress := svm.Encode(alice.id())
+	aliceAddress := svm.Encode(alice.Identity())
 	deposits, err := s.store.ListVaultDeposits(ctx, solanaChainID, aliceAddress, 10, 0)
 	if err != nil {
 		t.Fatal(err)

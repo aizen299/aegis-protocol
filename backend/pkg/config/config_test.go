@@ -189,3 +189,34 @@ func TestAPIChainsRefuseUnknownAndRepeatedNames(t *testing.T) {
 		}
 	}
 }
+
+func TestSolanaContractsRefuseModulesNotOnSolana(t *testing.T) {
+	cfg := &Config{}
+	cfg.Contracts.VaultEngine = "vault"
+	if err := cfg.ValidateSolanaContracts(); err != nil {
+		t.Fatalf("vault only: %v", err)
+	}
+
+	cfg.Contracts.OracleRounds, cfg.Contracts.OracleStaking = "oracle", "oracle"
+	if err := cfg.ValidateSolanaContracts(); err != nil {
+		t.Fatalf("one oracle program: %v", err)
+	}
+
+	cfg.Contracts.OracleStaking = "another"
+	if err := cfg.ValidateSolanaContracts(); err == nil {
+		t.Error("different staking and rounds programs accepted")
+	}
+	cfg.Contracts.OracleStaking = "oracle"
+
+	for name, set := range map[string]func(*Config){
+		"governor": func(c *Config) { c.Contracts.Governor = "x" },
+		"zk tree":  func(c *Config) { c.Contracts.ZkTree = "x" },
+		"zk gate":  func(c *Config) { c.Contracts.ZkGate = "x" },
+	} {
+		c := *cfg
+		set(&c)
+		if err := c.ValidateSolanaContracts(); err == nil {
+			t.Errorf("%s accepted on Solana", name)
+		}
+	}
+}

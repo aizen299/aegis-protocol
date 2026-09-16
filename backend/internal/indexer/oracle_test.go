@@ -109,9 +109,8 @@ func (f *fakeOracleStore) SetOracleNodeStake(_ context.Context, _ int64, node st
 	return nil
 }
 
-func (f *fakeOracleStore) SetOracleNodeUnstake(_ context.Context, _ int64, node string, pending types.Raw, _ *time.Time, active bool) error {
+func (f *fakeOracleStore) SetOracleNodeUnstake(_ context.Context, _ int64, node string, pending types.Raw, _ *time.Time) error {
 	f.unstakes[node] = pending
-	f.activeFlags[node] = active
 	return nil
 }
 
@@ -420,7 +419,7 @@ func TestStakeAssetResolutionRetriesAfterFailure(t *testing.T) {
 	}
 }
 
-func TestUnstakeRequestDeactivatesNode(t *testing.T) {
+func TestUnstakeRequestRecordsThePendingAmount(t *testing.T) {
 	store := newFakeOracleStore()
 	h := newStakingHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}})
 
@@ -432,12 +431,41 @@ func TestUnstakeRequestDeactivatesNode(t *testing.T) {
 	if err := h.Handle(context.Background(), ev); err != nil {
 		t.Fatalf("handle: %v", err)
 	}
-
-	if store.activeFlags[nodeHex] {
-		t.Error("a node that asked to leave must not stay active, or it counts toward quorum")
-	}
 	if store.unstakes[nodeHex].String() != "10000000000000000000000" {
 		t.Errorf("pending unstake = %s", store.unstakes[nodeHex])
+	}
+}
+
+// ORC-2. A cancelled unstake reactivates a node only if it has the minimum stake and there is room,
+// and the contract says so with NodeReactivated. The cancel alone must not mark the node active, or an
+// aggregation service would count a node the contract left out of the set.
+func TestAnUnstakeCancelDoesNotReactivateANode(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newStakingHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}})
+	node := mustID(t, nodeHex)
+
+	for _, ev := range []chain.Event{
+		oracleEvent(t, roundsHex, eventNodeDeactivated, map[string]any{"node": node, "reason": [32]byte{'U'}, "nodeSetVersion": big.NewInt(4)}),
+		oracleEvent(t, roundsHex, eventUnstakeRequest, map[string]any{"node": node, "amount": big.NewInt(1), "claimableAt": big.NewInt(1)}),
+		oracleEvent(t, roundsHex, eventUnstakeCancel, map[string]any{"node": node, "amount": big.NewInt(1)}),
+	} {
+		if err := h.Handle(context.Background(), ev); err != nil {
+			t.Fatalf("handle %s: %v", ev.Name, err)
+		}
+	}
+	if active, set := store.activeFlags[nodeHex]; !set || active {
+		t.Fatalf("active = %v (recorded %v); a cancel without NodeReactivated marked the node active", active, set)
+	}
+}
+
+// On Solana the staking and rounds events come from one program, so this handler sees round events
+// too and must leave them alone rather than fail on their missing node field.
+func TestStakingHandlerIgnoresEventsItDoesNotOwn(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newStakingHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}})
+	ev := oracleEvent(t, roundsHex, eventFeedRegistered, map[string]any{"feedId": feedID, "name": "ETH/USD", "decimals": uint8(8)})
+	if err := h.Handle(context.Background(), ev); err != nil {
+		t.Fatalf("a rounds event failed the staking handler: %v", err)
 	}
 }
 

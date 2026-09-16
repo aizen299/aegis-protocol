@@ -77,7 +77,7 @@ const qSetNodeStake = `
 
 const qSetNodeUnstake = `
 	UPDATE oracle_nodes
-	SET pending_unstake = $3, claimable_at = $4, active = $5
+	SET pending_unstake = $3, claimable_at = $4
 	WHERE chain_id = $1 AND address = $2
 `
 
@@ -245,8 +245,8 @@ func (s *Store) SetOracleNodeStake(ctx context.Context, chainID int64, node stri
 	return nil
 }
 
-func (s *Store) SetOracleNodeUnstake(ctx context.Context, chainID int64, node string, pending types.Raw, claimableAt *time.Time, active bool) error {
-	if _, err := s.pool.Exec(ctx, qSetNodeUnstake, chainID, node, pending, claimableAt, active); err != nil {
+func (s *Store) SetOracleNodeUnstake(ctx context.Context, chainID int64, node string, pending types.Raw, claimableAt *time.Time) error {
+	if _, err := s.pool.Exec(ctx, qSetNodeUnstake, chainID, node, pending, claimableAt); err != nil {
 		return fmt.Errorf("set unstake %s: %w", node, err)
 	}
 	return nil

@@ -107,7 +107,7 @@ against the gate address deployment produced — not a fixture — executed on a
 replay refused; a proof made for one gate is refused by another even when both trees hold the same
 root.
 
-Current: **353 contract tests**, **21 circuit tests**, **26 zk service tests**, **61 Solana tests**, **112 frontend tests**, 16 backend packages, **42 end-to-end tests**, Slither clean.
+Current: **353 contract tests**, **21 circuit tests**, **26 zk service tests**, **62 Solana tests**, **112 frontend tests**, 16 backend packages, **43 end-to-end tests**, Slither clean.
 [`docs/v1.0-production-plan.md`](docs/v1.0-production-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
 it took and where it deviated from the locked specs.

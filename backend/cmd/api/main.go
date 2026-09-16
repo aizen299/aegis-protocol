@@ -58,13 +58,14 @@ func main() {
 	defer redis.Close()
 
 	// The API reads no chain state, so it opens no RPC connection: an address needs only its chain's
-	// encoding. Modules not yet on Solana are left nil and answer 404 there. §10.8.
+	// encoding. Governance and zk are not on Solana, so they are left nil and answer 404 there. §10.8.
 	deps := make([]api.ChainDeps, 0, len(chains))
 	for _, c := range chains {
 		d := api.ChainDeps{ID: c.ID, Vault: vault.NewService(store, redis, log, c.ID)}
 		switch c.VM {
 		case types.VMSVM:
 			d.Codec = svm.Codec{}
+			d.Oracle = oracle.NewService(store, redis, log, c.ID)
 		default:
 			d.Codec = evm.Codec{}
 			d.Oracle = oracle.NewService(store, redis, log, c.ID)

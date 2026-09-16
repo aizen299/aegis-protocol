@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
+	"unicode/utf8"
 
 	pbtypes "github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
@@ -52,6 +54,8 @@ const (
 	kindBool
 	kindEnum
 	kindBytes
+	kindArray
+	kindString
 )
 
 type field struct {
@@ -59,6 +63,8 @@ type field struct {
 	kind     fieldKind
 	size     int
 	variants []string
+	elem     *field
+	count    int
 }
 
 type layout struct {
@@ -102,7 +108,7 @@ func ParseIDL(raw []byte) (*IDL, error) {
 			}
 			fields := make([]field, 0, len(def.Type.Fields))
 			for _, f := range def.Type.Fields {
-				parsed, err := parseField(f, types)
+				parsed, err := parseField(f, types, what == "event")
 				if err != nil {
 					return nil, fmt.Errorf("%s %s.%s: %w", what, n.Name, f.Name, err)
 				}
@@ -147,14 +153,23 @@ var primitives = map[string]field{
 	"i64": {kind: kindInt, size: 8}, "i128": {kind: kindInt, size: 16},
 }
 
-func parseField(f idlField, types map[string]idlTypeDef) (field, error) {
-	var name string
-	if err := json.Unmarshal(f.Type, &name); err == nil {
-		p, ok := primitives[name]
-		if !ok {
-			return field{}, fmt.Errorf("type %q is not supported", name)
+// parseField reduces an IDL type to a decoder. Field names become camelCase, matching the Solidity
+// event parameters the indexer's handlers read, so one handler serves both chains.
+//
+// A string is accepted only in events: an event is decoded in full and must consume its data
+// exactly, but an account layout needs every field at a fixed offset.
+func parseField(f idlField, types map[string]idlTypeDef, event bool) (field, error) {
+	name := camelCase(f.Name)
+	var typeName string
+	if err := json.Unmarshal(f.Type, &typeName); err == nil {
+		if typeName == "string" && event {
+			return field{name: name, kind: kindString}, nil
 		}
-		p.name = f.Name
+		p, ok := primitives[typeName]
+		if !ok {
+			return field{}, fmt.Errorf("type %q is not supported", typeName)
+		}
+		p.name = name
 		return p, nil
 	}
 
@@ -164,9 +179,14 @@ func parseField(f idlField, types map[string]idlTypeDef) (field, error) {
 	if err := json.Unmarshal(f.Type, &array); err == nil && len(array.Array) == 2 {
 		var elem string
 		var count int
-		if json.Unmarshal(array.Array[0], &elem) == nil && elem == "u8" && json.Unmarshal(array.Array[1], &count) == nil && count > 0 {
-			// Only byte arrays, and only for padding: decoded values never come from them.
-			return field{name: f.Name, kind: kindBytes, size: count}, nil
+		if json.Unmarshal(array.Array[0], &elem) == nil && json.Unmarshal(array.Array[1], &count) == nil && count > 0 {
+			if elem == "u8" {
+				return field{name: name, kind: kindBytes, size: count}, nil
+			}
+			if p, ok := primitives[elem]; ok && (p.kind == kindUint || p.kind == kindInt) {
+				e := p
+				return field{name: name, kind: kindArray, size: p.size * count, elem: &e, count: count}, nil
+			}
 		}
 	}
 
@@ -187,7 +207,7 @@ func parseField(f idlField, types map[string]idlTypeDef) (field, error) {
 			}
 			variants[i] = v.Name
 		}
-		return field{name: f.Name, kind: kindEnum, size: 1, variants: variants}, nil
+		return field{name: name, kind: kindEnum, size: 1, variants: variants}, nil
 	}
 	return field{}, fmt.Errorf("type %s is not supported", string(f.Type))
 }
@@ -229,11 +249,23 @@ func decodeFields(fields []field, data []byte, exact bool) (map[string]any, erro
 	out := make(map[string]any, len(fields))
 	offset := 0
 	for _, f := range fields {
-		if offset+f.size > len(data) {
-			return nil, fmt.Errorf("field %s: data ends at %d, need %d", f.name, len(data), offset+f.size)
+		size := f.size
+		if f.kind == kindString {
+			if offset+4 > len(data) {
+				return nil, fmt.Errorf("field %s: no length prefix", f.name)
+			}
+			n := int(uint32(data[offset]) | uint32(data[offset+1])<<8 | uint32(data[offset+2])<<16 | uint32(data[offset+3])<<24)
+			offset += 4
+			if n < 0 || n > len(data)-offset {
+				return nil, fmt.Errorf("field %s: length %d exceeds the data", f.name, n)
+			}
+			size = n
 		}
-		chunk := data[offset : offset+f.size]
-		offset += f.size
+		if offset+size > len(data) {
+			return nil, fmt.Errorf("field %s: data ends at %d, need %d", f.name, len(data), offset+size)
+		}
+		chunk := data[offset : offset+size]
+		offset += size
 
 		switch f.kind {
 		case kindPubkey:
@@ -249,15 +281,47 @@ func decodeFields(fields []field, data []byte, exact bool) (map[string]any, erro
 				return nil, fmt.Errorf("field %s: variant %d out of range", f.name, chunk[0])
 			}
 			out[f.name] = f.variants[chunk[0]]
+		case kindString:
+			if !utf8.Valid(chunk) {
+				return nil, fmt.Errorf("field %s: not valid UTF-8", f.name)
+			}
+			out[f.name] = string(chunk)
 		case kindBytes:
+			if f.size == 32 {
+				out[f.name] = [32]byte(chunk)
+			} else {
+				out[f.name] = append([]byte(nil), chunk...)
+			}
+		case kindArray:
+			values := make([]*big.Int, f.count)
+			for i := range values {
+				start := i * f.elem.size
+				values[i] = littleEndian(chunk[start:start+f.elem.size], f.elem.kind == kindInt)
+			}
+			out[f.name] = values
 		case kindUint, kindInt:
-			out[f.name] = littleEndian(chunk, f.kind == kindInt)
+			// uint8 stays a uint8, as go-ethereum decodes it; wider integers are *big.Int.
+			if f.kind == kindUint && f.size == 1 {
+				out[f.name] = chunk[0]
+			} else {
+				out[f.name] = littleEndian(chunk, f.kind == kindInt)
+			}
 		}
 	}
 	if exact && offset != len(data) {
 		return nil, fmt.Errorf("%d trailing bytes", len(data)-offset)
 	}
 	return out, nil
+}
+
+func camelCase(s string) string {
+	parts := strings.Split(s, "_")
+	for i := 1; i < len(parts); i++ {
+		if parts[i] != "" {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return strings.Join(parts, "")
 }
 
 func littleEndian(b []byte, signed bool) *big.Int {

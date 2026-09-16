@@ -15,7 +15,7 @@ type OracleNodeStore interface {
 	UpsertAsset(ctx context.Context, a types.AssetMetadata) error
 	UpsertOracleNode(ctx context.Context, e db.NodeStakeEvent) error
 	SetOracleNodeStake(ctx context.Context, chainID int64, node string, stake types.Raw) error
-	SetOracleNodeUnstake(ctx context.Context, chainID int64, node string, pending types.Raw, claimableAt *time.Time, active bool) error
+	SetOracleNodeUnstake(ctx context.Context, chainID int64, node string, pending types.Raw, claimableAt *time.Time) error
 	SetOracleNodeActive(ctx context.Context, chainID int64, node string, active bool) error
 	RecordOracleSlash(ctx context.Context, sl db.Slash) error
 	OpenOracleNodeInterval(ctx context.Context, chainID int64, node string, version types.Raw, at time.Time) error
@@ -61,8 +61,20 @@ func (h *OracleStakingHandler) Filters() []chain.Filter {
 	}}
 }
 
+// Handle records staking events. Whether a node is active is set only by NodeReactivated and
+// NodeDeactivated, which the contract emits exactly when the set changes. An unstake request, cancel,
+// or completion does not imply either: a cancel below the minimum stake, or into a full set, leaves the
+// node inactive. ORC-2.
 func (h *OracleStakingHandler) Handle(ctx context.Context, ev chain.Event) error {
 	if ev.Contract != h.contract {
+		return nil
+	}
+	// On Solana one program emits both staking and round events, so an event from this contract is not
+	// necessarily one this handler owns.
+	switch ev.Name {
+	case eventNodeRegistered, eventNodeStaked, eventUnstakeRequest, eventUnstakeCancel,
+		eventNodeUnstaked, eventNodeSlashed, eventNodeDeactivated, eventNodeReactivated:
+	default:
 		return nil
 	}
 
@@ -84,13 +96,13 @@ func (h *OracleStakingHandler) Handle(ctx context.Context, ev chain.Event) error
 	case eventUnstakeRequest:
 		return h.handleUnstakeRequested(ctx, ev, address)
 	case eventUnstakeCancel:
-		return h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, types.Raw{}, nil, true)
+		return h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, types.Raw{}, nil)
 	case eventNodeUnstaked:
 		remaining, err := rawField(ev, "remainingStake")
 		if err != nil {
 			return err
 		}
-		if err := h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, types.Raw{}, nil, false); err != nil {
+		if err := h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, types.Raw{}, nil); err != nil {
 			return err
 		}
 		return h.store.SetOracleNodeStake(ctx, ev.ChainID, address, remaining)
@@ -159,9 +171,8 @@ func (h *OracleStakingHandler) handleUnstakeRequested(ctx context.Context, ev ch
 		return err
 	}
 
-	// Requesting an exit deactivates the node on-chain, so the registry must reflect that or an
-	// aggregation service would count a departing node toward quorum.
-	return h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, amount, &claimableAt, false)
+	// The deactivation that accompanies a request arrives as its own NodeDeactivated event.
+	return h.store.SetOracleNodeUnstake(ctx, ev.ChainID, address, amount, &claimableAt)
 }
 
 func (h *OracleStakingHandler) handleSlashed(ctx context.Context, ev chain.Event, address string) error {

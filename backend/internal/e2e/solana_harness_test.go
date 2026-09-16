@@ -5,7 +5,6 @@ package e2e
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -13,7 +12,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"testing"
 	"time"
 
@@ -30,22 +28,19 @@ var (
 	bpfLoaderUpgrade = svm.MustIdentity("BPFLoaderUpgradeab1e11111111111111111111111")
 )
 
-type solanaKey struct {
-	priv ed25519.PrivateKey
-}
+type (
+	solanaKey   = svm.Keypair
+	accountMeta = svm.AccountMeta
+	instruction = svm.Instruction
+)
 
 func newSolanaKey(t *testing.T) solanaKey {
 	t.Helper()
-	_, priv, err := ed25519.GenerateKey(nil)
+	key, err := svm.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return solanaKey{priv: priv}
-}
-
-func (k solanaKey) id() pbtypes.Identity {
-	id, _ := pbtypes.IdentityFromBytes(k.priv.Public().(ed25519.PublicKey))
-	return id
+	return key
 }
 
 // requireSolana skips when no validator is running, unless SOLANA_E2E=1 says one must be: CI sets it,
@@ -68,11 +63,11 @@ func requireSolana(t *testing.T) solanaKey {
 	if err != nil {
 		t.Fatalf("read authority keypair: %v", err)
 	}
-	var bytes []byte
-	if err := json.Unmarshal(raw, &bytes); err != nil || len(bytes) != ed25519.PrivateKeySize {
-		t.Fatalf("authority keypair %s is not a 64-byte keypair", path)
+	key, err := svm.KeypairFromJSON(string(raw))
+	if err != nil {
+		t.Fatalf("authority keypair %s: %v", path, err)
 	}
-	return solanaKey{priv: ed25519.PrivateKey(bytes)}
+	return key
 }
 
 func solanaCall(ctx context.Context, method string, params []any, out any) error {
@@ -105,91 +100,10 @@ func solanaCall(ctx context.Context, method string, params []any, out any) error
 	return json.Unmarshal(envelope.Result, out)
 }
 
-type accountMeta struct {
-	key      pbtypes.Identity
-	signer   bool
-	writable bool
-}
-
-type instruction struct {
-	program  pbtypes.Identity
-	accounts []accountMeta
-	data     []byte
-}
-
-func compactLen(n int) []byte {
-	var out []byte
-	for {
-		b := byte(n & 0x7f)
-		n >>= 7
-		if n == 0 {
-			return append(out, b)
-		}
-		out = append(out, b|0x80)
-	}
-}
-
-// buildTransaction serialises a legacy transaction: accounts ordered signer-writable,
-// signer-readonly, writable, readonly, with the fee payer first.
+// buildTransaction serialises with the production builder, so every end-to-end transaction exercises
+// it against a real validator.
 func buildTransaction(t *testing.T, payer solanaKey, signers []solanaKey, ixs []instruction) []byte {
 	t.Helper()
-	type entry struct {
-		accountMeta
-		order int
-	}
-	merged := map[pbtypes.Identity]*entry{payer.id(): {accountMeta{payer.id(), true, true}, 0}}
-	add := func(m accountMeta) {
-		if e, ok := merged[m.key]; ok {
-			e.signer = e.signer || m.signer
-			e.writable = e.writable || m.writable
-			return
-		}
-		merged[m.key] = &entry{m, len(merged)}
-	}
-	for _, ix := range ixs {
-		for _, a := range ix.accounts {
-			add(a)
-		}
-		add(accountMeta{key: ix.program})
-	}
-	entries := make([]*entry, 0, len(merged))
-	for _, e := range merged {
-		entries = append(entries, e)
-	}
-	rank := func(e *entry) int {
-		switch {
-		case e.key == payer.id():
-			return 0
-		case e.signer && e.writable:
-			return 1
-		case e.signer:
-			return 2
-		case e.writable:
-			return 3
-		}
-		return 4
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		if rank(entries[i]) != rank(entries[j]) {
-			return rank(entries[i]) < rank(entries[j])
-		}
-		return entries[i].order < entries[j].order
-	})
-
-	index := map[pbtypes.Identity]int{}
-	var numSigners, readonlySigned, readonlyUnsigned int
-	for i, e := range entries {
-		index[e.key] = i
-		if e.signer {
-			numSigners++
-			if !e.writable {
-				readonlySigned++
-			}
-		} else if !e.writable {
-			readonlyUnsigned++
-		}
-	}
-
 	var blockhash struct {
 		Value struct {
 			Blockhash string `json:"blockhash"`
@@ -198,38 +112,11 @@ func buildTransaction(t *testing.T, payer solanaKey, signers []solanaKey, ixs []
 	if err := solanaCall(context.Background(), "getLatestBlockhash", []any{map[string]any{"commitment": "confirmed"}}, &blockhash); err != nil {
 		t.Fatal(err)
 	}
-	recent := svm.MustIdentity(blockhash.Value.Blockhash)
-
-	msg := []byte{byte(numSigners), byte(readonlySigned), byte(readonlyUnsigned)}
-	msg = append(msg, compactLen(len(entries))...)
-	for _, e := range entries {
-		msg = append(msg, e.key[:]...)
+	raw, err := svm.BuildTransaction(svm.MustIdentity(blockhash.Value.Blockhash), payer, signers, ixs)
+	if err != nil {
+		t.Fatal(err)
 	}
-	msg = append(msg, recent[:]...)
-	msg = append(msg, compactLen(len(ixs))...)
-	for _, ix := range ixs {
-		msg = append(msg, byte(index[ix.program]))
-		msg = append(msg, compactLen(len(ix.accounts))...)
-		for _, a := range ix.accounts {
-			msg = append(msg, byte(index[a.key]))
-		}
-		msg = append(msg, compactLen(len(ix.data))...)
-		msg = append(msg, ix.data...)
-	}
-
-	keys := map[pbtypes.Identity]solanaKey{payer.id(): payer}
-	for _, s := range signers {
-		keys[s.id()] = s
-	}
-	tx := compactLen(numSigners)
-	for _, e := range entries[:numSigners] {
-		k, ok := keys[e.key]
-		if !ok {
-			t.Fatalf("no key for signer %s", svm.Encode(e.key))
-		}
-		tx = append(tx, ed25519.Sign(k.priv, msg)...)
-	}
-	return append(tx, msg...)
+	return raw
 }
 
 // sendSolana submits without preflight, so a transaction that fails still lands on chain, and waits
@@ -295,26 +182,26 @@ func createAccount(t *testing.T, payer, account solanaKey, size int, owner pbtyp
 	data = append(data, u64le(rentExempt(t, size))...)
 	data = append(data, u64le(uint64(size))...)
 	data = append(data, owner[:]...)
-	return instruction{program: systemProgram, data: data, accounts: []accountMeta{
-		{payer.id(), true, true}, {account.id(), true, true},
+	return instruction{Program: systemProgram, Data: data, Accounts: []accountMeta{
+		{Key: payer.Identity(), Signer: true, Writable: true}, {Key: account.Identity(), Signer: true, Writable: true},
 	}}
 }
 
 func initializeMint(mint, authority pbtypes.Identity, decimals byte) instruction {
 	data := append([]byte{20, decimals}, authority[:]...)
 	data = append(data, 0)
-	return instruction{program: svm.TokenProgram, data: data, accounts: []accountMeta{{key: mint, writable: true}}}
+	return instruction{Program: svm.TokenProgram, Data: data, Accounts: []accountMeta{{Key: mint, Writable: true}}}
 }
 
 func initializeTokenAccount(account, mint, owner pbtypes.Identity) instruction {
-	return instruction{program: svm.TokenProgram, data: append([]byte{18}, owner[:]...), accounts: []accountMeta{
-		{key: account, writable: true}, {key: mint},
+	return instruction{Program: svm.TokenProgram, Data: append([]byte{18}, owner[:]...), Accounts: []accountMeta{
+		{Key: account, Writable: true}, {Key: mint},
 	}}
 }
 
 func mintTo(mint, to pbtypes.Identity, authority solanaKey, amount uint64) instruction {
-	return instruction{program: svm.TokenProgram, data: append([]byte{7}, u64le(amount)...), accounts: []accountMeta{
-		{key: mint, writable: true}, {key: to, writable: true}, {authority.id(), true, false},
+	return instruction{Program: svm.TokenProgram, Data: append([]byte{7}, u64le(amount)...), Accounts: []accountMeta{
+		{Key: mint, Writable: true}, {Key: to, Writable: true}, {Key: authority.Identity(), Signer: true},
 	}}
 }
 
@@ -342,7 +229,7 @@ type solanaVault struct {
 
 func (v solanaVault) eventAccounts() []accountMeta {
 	authority, _, _ := svm.FindProgramAddress([][]byte{[]byte("__event_authority")}, v.program)
-	return []accountMeta{{key: authority}, {key: v.program}}
+	return []accountMeta{{Key: authority}, {Key: v.program}}
 }
 
 func (v solanaVault) position(owner pbtypes.Identity) pbtypes.Identity {
@@ -353,41 +240,41 @@ func (v solanaVault) position(owner pbtypes.Identity) pbtypes.Identity {
 // setupSolanaVault creates a six-decimal mint and its vault, and funds a depositor.
 func setupSolanaVault(t *testing.T, program pbtypes.Identity, authority solanaKey, depositor solanaKey, funded uint64) (solanaVault, pbtypes.Identity) {
 	t.Helper()
-	airdrop(t, authority.id(), 10_000_000_000)
-	airdrop(t, depositor.id(), 10_000_000_000)
+	airdrop(t, authority.Identity(), 10_000_000_000)
+	airdrop(t, depositor.Identity(), 10_000_000_000)
 
 	mint, depositorTokens := newSolanaKey(t), newSolanaKey(t)
 	sendOK(t, authority, []solanaKey{mint, depositorTokens}, "confirmed",
 		createAccount(t, authority, mint, 82, svm.TokenProgram),
-		initializeMint(mint.id(), authority.id(), 6),
+		initializeMint(mint.Identity(), authority.Identity(), 6),
 		createAccount(t, authority, depositorTokens, 165, svm.TokenProgram),
-		initializeTokenAccount(depositorTokens.id(), mint.id(), depositor.id()),
-		mintTo(mint.id(), depositorTokens.id(), authority, funded),
+		initializeTokenAccount(depositorTokens.Identity(), mint.Identity(), depositor.Identity()),
+		mintTo(mint.Identity(), depositorTokens.Identity(), authority, funded),
 	)
 
-	v := solanaVault{program: program, mint: mint.id(), authority: authority}
+	v := solanaVault{program: program, mint: mint.Identity(), authority: authority}
 	v.vault = pda(t, program, []byte("vault"), v.mint[:])
 	v.vaultTokens = pda(t, program, []byte("tokens"), v.vault[:])
 
-	manager, pauser := newSolanaKey(t).id(), newSolanaKey(t).id()
+	manager, pauser := newSolanaKey(t).Identity(), newSolanaKey(t).Identity()
 	data := anchorDiscriminator("initialize_vault")
 	data = append(data, manager[:]...)
 	data = append(data, pauser[:]...)
 	data = append(data, u64le(0)...)
 	data = append(data, u64le(0)...)
 	accounts := []accountMeta{
-		{authority.id(), true, true},
-		{key: v.vault, writable: true},
-		{key: v.vaultTokens, writable: true},
-		{key: v.mint},
-		{key: program},
-		{key: pda(t, bpfLoaderUpgrade, program[:])},
-		{key: svm.TokenProgram},
-		{key: systemProgram},
+		{Key: authority.Identity(), Signer: true, Writable: true},
+		{Key: v.vault, Writable: true},
+		{Key: v.vaultTokens, Writable: true},
+		{Key: v.mint},
+		{Key: program},
+		{Key: pda(t, bpfLoaderUpgrade, program[:])},
+		{Key: svm.TokenProgram},
+		{Key: systemProgram},
 	}
 	accounts = append(accounts, v.eventAccounts()...)
-	sendOK(t, authority, nil, "confirmed", instruction{program: program, data: data, accounts: accounts})
-	return v, depositorTokens.id()
+	sendOK(t, authority, nil, "confirmed", instruction{Program: program, Data: data, Accounts: accounts})
+	return v, depositorTokens.Identity()
 }
 
 func (v solanaVault) depositIx(depositor solanaKey, from pbtypes.Identity, amount uint64, minShares uint64) instruction {
@@ -396,16 +283,16 @@ func (v solanaVault) depositIx(depositor solanaKey, from pbtypes.Identity, amoun
 	data = append(data, u64le(minShares)...)
 	data = append(data, make([]byte, 8)...)
 	accounts := []accountMeta{
-		{depositor.id(), true, true},
-		{key: depositor.id()},
-		{key: v.vault, writable: true},
-		{key: v.vaultTokens, writable: true},
-		{key: from, writable: true},
-		{key: v.position(depositor.id()), writable: true},
-		{key: svm.TokenProgram},
-		{key: systemProgram},
+		{Key: depositor.Identity(), Signer: true, Writable: true},
+		{Key: depositor.Identity()},
+		{Key: v.vault, Writable: true},
+		{Key: v.vaultTokens, Writable: true},
+		{Key: from, Writable: true},
+		{Key: v.position(depositor.Identity()), Writable: true},
+		{Key: svm.TokenProgram},
+		{Key: systemProgram},
 	}
-	return instruction{program: v.program, data: data, accounts: append(accounts, v.eventAccounts()...)}
+	return instruction{Program: v.program, Data: data, Accounts: append(accounts, v.eventAccounts()...)}
 }
 
 func sendOK(t *testing.T, payer solanaKey, signers []solanaKey, commitment string, ixs ...instruction) string {

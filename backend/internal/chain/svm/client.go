@@ -3,6 +3,7 @@ package svm
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -27,6 +28,8 @@ var genesisHashes = map[int64]string{
 	pbtypes.ChainIDSolanaMainnet: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
 	pbtypes.ChainIDSolanaDevnet:  "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
 }
+
+var errAccountMissing = errors.New("account does not exist")
 
 type Registration struct {
 	IDL *IDL
@@ -316,16 +319,20 @@ func (c *Client) transactionEvents(ctx context.Context, signature string, wanted
 	return events, nil
 }
 
-func (c *Client) account(ctx context.Context, address pbtypes.Identity) (owner pbtypes.Identity, data []byte, err error) {
+func (c *Client) account(ctx context.Context, address pbtypes.Identity) (pbtypes.Identity, []byte, error) {
+	return c.accountAt(ctx, address, commitment)
+}
+
+func (c *Client) accountAt(ctx context.Context, address pbtypes.Identity, level string) (owner pbtypes.Identity, data []byte, err error) {
 	var result struct {
 		Value *accountInfo `json:"value"`
 	}
-	cfg := map[string]any{"commitment": commitment, "encoding": "base64"}
+	cfg := map[string]any{"commitment": level, "encoding": "base64"}
 	if err := c.rpc.call(ctx, "getAccountInfo", []any{Encode(address), cfg}, &result); err != nil {
 		return owner, nil, err
 	}
 	if result.Value == nil {
-		return owner, nil, fmt.Errorf("account %s does not exist", Encode(address))
+		return owner, nil, fmt.Errorf("account %s: %w", Encode(address), errAccountMissing)
 	}
 	if len(result.Value.Data) != 2 || result.Value.Data[1] != "base64" {
 		return owner, nil, fmt.Errorf("account %s: unexpected data encoding", Encode(address))
@@ -387,9 +394,9 @@ func (l *VaultLocator) LocateVault(ctx context.Context, emitter, asset pbtypes.I
 	if !ok {
 		return pbtypes.Identity{}, pbtypes.Identity{}, 0, fmt.Errorf("vault %s: no mint field", Encode(vault))
 	}
-	offset, ok := fields["share_offset"].(interface{ Uint64() uint64 })
+	offset, ok := fields["shareOffset"].(uint8)
 	if !ok {
-		return pbtypes.Identity{}, pbtypes.Identity{}, 0, fmt.Errorf("vault %s: no share_offset field", Encode(vault))
+		return pbtypes.Identity{}, pbtypes.Identity{}, 0, fmt.Errorf("vault %s: no shareOffset field", Encode(vault))
 	}
-	return vault, mint, uint8(offset.Uint64()), nil
+	return vault, mint, offset, nil
 }

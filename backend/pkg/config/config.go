@@ -222,6 +222,19 @@ func (c *Config) ValidateIndexer() error {
 	return nil
 }
 
+// ValidateSolanaContracts checks the contract settings make sense for a Solana cluster. One oracle
+// program holds both staking and rounds, so the two addresses must name the same program; governance
+// and zk are not on Solana, and a setting for them would otherwise be silently ignored.
+func (c *Config) ValidateSolanaContracts() error {
+	if c.GovernanceEnabled() || c.Contracts.ZkTree != "" || c.Contracts.ZkGate != "" {
+		return fmt.Errorf("governance and zk contracts are not deployed on Solana; unset CONTRACT_GOVERNOR, CONTRACT_ZK_TREE, and CONTRACT_ZK_GATE")
+	}
+	if c.OracleEnabled() && c.Contracts.OracleRounds != c.Contracts.OracleStaking {
+		return fmt.Errorf("on Solana one program holds staking and rounds: CONTRACT_ORACLE_ROUNDS and CONTRACT_ORACLE_STAKING must be the same program id")
+	}
+	return nil
+}
+
 // OracleEnabled reports whether oracle contracts were configured for indexing.
 func (c *Config) OracleEnabled() bool {
 	return c.Contracts.OracleRounds != "" || c.Contracts.OracleStaking != ""

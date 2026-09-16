@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Starts solana-test-validator with the vault program at its declared id, upgradeable, and a fresh
-# keypair as its upgrade authority. Only that authority may create a vault, so tests need the key.
+# Starts solana-test-validator with every Solana program at its declared id, upgradeable, and a fresh
+# keypair as their upgrade authority. Only that authority may initialize them, so tests need the key.
 #
 # Usage: solana-validator.sh DIR
 # Writes DIR/authority.json and DIR/validator.pid, and returns once the validator is healthy.
@@ -10,14 +10,21 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIR="${1:?usage: solana-validator.sh DIR}"
 RPC=http://127.0.0.1:8899
 
-VAULT_SO="$ROOT/solana/target/deploy/aegis_vault.so"
-[ -f "$VAULT_SO" ] || { echo "solana-validator: $VAULT_SO is missing; run 'make solana-build'" >&2; exit 1; }
-VAULT_PROGRAM=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['address'])" "$ROOT/solana/idl/aegis_vault.json")
-
 mkdir -p "$DIR"
 solana-keygen new --no-bip39-passphrase --silent --force --outfile "$DIR/authority.json" >/dev/null
-nohup solana-test-validator --reset --quiet --ledger "$DIR/ledger" \
-  --upgradeable-program "$VAULT_PROGRAM" "$VAULT_SO" "$(solana-keygen pubkey "$DIR/authority.json")" \
+AUTHORITY=$(solana-keygen pubkey "$DIR/authority.json")
+
+# Every program with a committed IDL, each at the id its IDL declares.
+PROGRAMS=()
+for idl in "$ROOT"/solana/idl/*.json; do
+  name=$(basename "$idl" .json)
+  so="$ROOT/solana/target/deploy/$name.so"
+  [ -f "$so" ] || { echo "solana-validator: $so is missing; run 'make solana-build'" >&2; exit 1; }
+  address=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['address'])" "$idl")
+  PROGRAMS+=(--upgradeable-program "$address" "$so" "$AUTHORITY")
+done
+
+nohup solana-test-validator --reset --quiet --ledger "$DIR/ledger" "${PROGRAMS[@]}" \
   >"$DIR/validator.log" 2>&1 &
 echo $! > "$DIR/validator.pid"
 

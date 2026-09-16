@@ -19,6 +19,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/governance"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
+	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/soloracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/solvault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
 	zkcontracts "github.com/aizen299/aegis-protocol/backend/pkg/contracts/zk"
@@ -170,32 +171,59 @@ func evmHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log z
 // solanaHandlers builds the Solana client. Only the vault exists on Solana so far, so a configured
 // oracle, governance, or zk contract is refused rather than silently not indexed.
 func solanaHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log zerolog.Logger) (chain.Client, []indexer.Handler) {
-	if cfg.OracleEnabled() || cfg.GovernanceEnabled() || cfg.ZkEnabled() || cfg.Contracts.ZkTree != "" || cfg.Contracts.ZkGate != "" {
-		log.Fatal().Msg("only CONTRACT_VAULT_ENGINE is supported on Solana; unset the oracle, governance, and zk contracts")
+	if err := cfg.ValidateSolanaContracts(); err != nil {
+		log.Fatal().Err(err).Msg("invalid configuration")
 	}
-	program, err := svm.Decode(cfg.Contracts.VaultEngine)
-	if err != nil {
-		log.Fatal().Err(err).Str("value", cfg.Contracts.VaultEngine).Msg("invalid vault program id")
+
+	// Each program's IDL decodes by discriminator, so a configured id that is not the program the IDL
+	// describes would have another program's events decoded as ours.
+	programFor := func(value, env string, raw []byte) (types.Identity, *svm.IDL) {
+		program, err := svm.Decode(value)
+		if err != nil {
+			log.Fatal().Err(err).Str("value", value).Msg("invalid " + env)
+		}
+		idl, err := svm.ParseIDL(raw)
+		if err != nil {
+			log.Fatal().Err(err).Msg("embedded idl is invalid")
+		}
+		if idl.Program != program {
+			log.Fatal().Str("configured", value).Str("idl", svm.Encode(idl.Program)).
+				Msg(env + " is not the program the embedded idl describes")
+		}
+		return program, idl
 	}
-	idl, err := svm.ParseIDL(solvault.IDL)
-	if err != nil {
-		log.Fatal().Err(err).Msg("embedded vault idl is invalid")
-	}
-	// The IDL decodes by discriminator, so the wrong program's events would decode as ours.
-	if idl.Program != program {
-		log.Fatal().Str("configured", cfg.Contracts.VaultEngine).Str("idl", svm.Encode(idl.Program)).
-			Msg("CONTRACT_VAULT_ENGINE is not the program the embedded idl describes")
+
+	vaultProgram, vaultIDL := programFor(cfg.Contracts.VaultEngine, "CONTRACT_VAULT_ENGINE", solvault.IDL)
+	registrations := []svm.Registration{{IDL: vaultIDL}}
+
+	var oracleProgram, stakeMint types.Identity
+	if cfg.OracleEnabled() {
+		var oracleIDL *svm.IDL
+		oracleProgram, oracleIDL = programFor(cfg.Contracts.OracleRounds, "CONTRACT_ORACLE_ROUNDS", soloracle.IDL)
+		registrations = append(registrations, svm.Registration{IDL: oracleIDL})
+		mint, err := svm.Decode(cfg.Contracts.OracleStake)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid CONTRACT_ORACLE_STAKE_TOKEN")
+		}
+		stakeMint = mint
 	}
 
 	client, err := svm.New(ctx, svm.Options{
 		RPCURL:   cfg.Chain.RPCURL,
 		ChainID:  cfg.Chain.ChainID,
-		Programs: []svm.Registration{{IDL: idl}},
+		Programs: registrations,
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("chain client unavailable")
 	}
-	return client, []indexer.Handler{indexer.NewVaultHandler(store, client, svm.NewVaultLocator(client), program)}
+
+	handlers := []indexer.Handler{indexer.NewVaultHandler(store, client, svm.NewVaultLocator(client), vaultProgram)}
+	if cfg.OracleEnabled() {
+		handlers = append(handlers,
+			indexer.NewOracleRoundsHandler(store, client, oracleProgram),
+			indexer.NewOracleStakingHandler(store, client, oracleProgram, stakeMint))
+	}
+	return client, handlers
 }
 
 // optionalAddress parses a contract address that may legitimately be unset.
