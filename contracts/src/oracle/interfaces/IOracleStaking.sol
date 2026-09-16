@@ -38,6 +38,7 @@ interface IOracleStaking {
     error NotRegistered(address node);
     error StakeBelowMinimum(uint256 provided, uint256 minimum);
     error NodeSetFull(uint256 maxNodes);
+    error MaxNodesAboveCeiling(uint256 value, uint256 ceiling);
     error UnstakeAlreadyRequested(address node);
     error NoUnstakeRequested(address node);
     error UnbondingNotElapsed(uint256 claimableAt, uint256 nowTimestamp);

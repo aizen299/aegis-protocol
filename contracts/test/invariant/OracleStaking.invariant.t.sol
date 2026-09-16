@@ -10,6 +10,11 @@ contract OracleStakingInvariantTest is OracleFixture {
     function setUp() public override {
         super.setUp();
 
+        // Fewer slots than the handler has nodes, so exits, re-entries, and top-ups compete for
+        // room. At the fixture's cap of 31 the set could never fill and ORC-2 could not show.
+        vm.prank(oracleManager);
+        staking.setMaxNodes(3);
+
         handler = new OracleStakingHandler(staking, stakeToken, slasher);
         targetContract(address(handler));
 
@@ -39,6 +44,11 @@ contract OracleStakingInvariantTest is OracleFixture {
     /// The cached counter cannot drift from the real active set — quorum is computed from it.
     function invariant_activeCountMatchesRealSet() public view {
         assertEq(staking.activeNodeCount(), handler.countActive());
+    }
+
+    /// ORC-2: every path into the active set respects the cap, not only registration.
+    function invariant_activeSetNeverExceedsMaxNodes() public view {
+        assertLe(staking.activeNodeCount(), staking.maxNodes());
     }
 
     /// A node that asked to leave never keeps participating, which is what makes the unbonding

@@ -161,6 +161,10 @@ contract OracleRounds is
             revert NotEligible(msg.sender, round.nodeSetVersion);
         }
         if (_submitted[roundId][msg.sender]) revert AlreadySubmitted(roundId, msg.sender);
+        // Bounds the settlement sort even if the staking contract's cap were ever bypassed. ORC-2.
+        if (_roundValues[roundId].length >= _MAX_SUBMISSIONS) {
+            revert SubmissionLimitReached(roundId, _MAX_SUBMISSIONS);
+        }
 
         uint256 expected = _nonces[msg.sender];
         if (nonce != expected) revert InvalidNonce(nonce, expected);

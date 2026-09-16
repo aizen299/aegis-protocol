@@ -34,6 +34,9 @@ contract OracleStaking is
     ///      than that decision takes. Anything shorter makes every penalty optional for a node that
     ///      unstakes on time. See docs/v0.2-oracle-plan.md §2.3.
     uint256 private constant _MIN_UNBONDING_PERIOD = 1 days;
+    /// @dev Equal to OracleRounds' submission limit. Settlement sorts every submission, so the active
+    ///      set is what bounds its gas, and nothing may raise it past what a round will accept. ORC-2.
+    uint256 private constant _MAX_NODES_CEILING = 31;
 
     struct NodeInfo {
         uint256 stake;
@@ -81,6 +84,7 @@ contract OracleStaking is
         }
         if (minStakeFloor_ > minimumStake_) revert StakeBelowMinimum(minimumStake_, minStakeFloor_);
         if (maxNodes_ == 0) revert ZeroAmount();
+        if (maxNodes_ > _MAX_NODES_CEILING) revert MaxNodesAboveCeiling(maxNodes_, _MAX_NODES_CEILING);
 
         __UUPSUpgradeable_init();
         __AccessControl_init();
@@ -128,8 +132,12 @@ contract OracleStaking is
         node.stake += amount;
         _stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Topping back above the floor reactivates a node that was deactivated for being under it.
-        if (!node.active && node.pendingUnstake == 0 && node.stake >= _minimumStake) {
+        // Topping back above the floor reactivates a node that was deactivated for being under it, if
+        // there is room. Without the room check a staker could grow the set past maxNodes. ORC-2.
+        if (
+            !node.active && node.pendingUnstake == 0 && node.stake >= _minimumStake
+                && _activeNodeCount < _maxNodes
+        ) {
             _activate(msg.sender, node);
         }
 
@@ -166,7 +174,8 @@ contract OracleStaking is
         node.pendingUnstake = 0;
         node.claimableAt = 0;
 
-        if (node.stake >= _minimumStake) _activate(msg.sender, node);
+        // Room is checked for the same reason as in stake(): a cancelled exit is not a free slot. ORC-2.
+        if (node.stake >= _minimumStake && _activeNodeCount < _maxNodes) _activate(msg.sender, node);
 
         emit UnstakeCancelled(msg.sender, cancelled);
     }
@@ -279,6 +288,7 @@ contract OracleStaking is
         uint256 value
     ) external onlyRole(Roles.ORACLE_MANAGER_ROLE) {
         if (value == 0) revert ZeroAmount();
+        if (value > _MAX_NODES_CEILING) revert MaxNodesAboveCeiling(value, _MAX_NODES_CEILING);
         emit MaxNodesUpdated(_maxNodes, value);
         _maxNodes = value;
     }
@@ -347,6 +357,10 @@ contract OracleStaking is
 
     function maxNodes() public view returns (uint256) {
         return _maxNodes;
+    }
+
+    function maxNodesCeiling() public pure returns (uint256) {
+        return _MAX_NODES_CEILING;
     }
 
     /// @notice Stake that is not spoken for by a pending unstake request.

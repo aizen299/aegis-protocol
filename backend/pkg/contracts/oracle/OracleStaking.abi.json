@@ -256,6 +256,19 @@
   },
   {
     "type": "function",
+    "name": "maxNodesCeiling",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "maxSlashBps",
     "inputs": [],
     "outputs": [
@@ -1150,6 +1163,22 @@
     "inputs": [
       {
         "name": "roundId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MaxNodesAboveCeiling",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "ceiling",
         "type": "uint256",
         "internalType": "uint256"
       }

@@ -74,6 +74,7 @@ interface IOracleRounds {
     error InvalidDecimals(uint8 decimals);
     error NoSettledRound(bytes32 feedId);
     error StaleValue(uint256 settledAt, uint256 maxStaleness);
+    error SubmissionLimitReached(uint256 roundId, uint256 limit);
 
     function openRound(
         bytes32 feedId

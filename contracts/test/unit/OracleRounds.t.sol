@@ -370,4 +370,26 @@ contract OracleRoundsTest is OracleRoundsFixture {
         vm.expectRevert(IOracleRounds.ZeroValue.selector);
         rounds.submit(roundId, 0, nonce, abi.encodePacked(r, s, v));
     }
+
+    /// ORC-2. The staking cap already keeps eligible nodes at or under the limit, so a 32nd submitter
+    /// is simulated by mocking its eligibility: the round must refuse it anyway, because settlement
+    /// sorts every value it accepts.
+    function test_submissionsStopAtTheLimit() public {
+        uint256 limit = rounds.maxSubmissions();
+        _spawnNodes(limit);
+        uint256 roundId = rounds.openRound(FEED);
+        for (uint256 i = 0; i < keyed.length; i++) {
+            _submit(keyed[i], roundId, 1_000 + i);
+        }
+
+        (address extra, uint256 key) = makeAddrAndKey("one-too-many");
+        vm.mockCall(
+            address(staking), abi.encodeWithSelector(staking.isEligibleAt.selector, extra), abi.encode(true)
+        );
+        Node memory node = Node({addr: extra, key: key});
+        bytes memory signature = _sign(node, roundId, 1);
+        vm.expectRevert(abi.encodeWithSelector(IOracleRounds.SubmissionLimitReached.selector, roundId, limit));
+        vm.prank(extra);
+        rounds.submit(roundId, 1, 0, signature);
+    }
 }

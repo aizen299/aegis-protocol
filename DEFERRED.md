@@ -135,28 +135,6 @@ permanent. At the deployed 30 it is correct; it is simply unchangeable if it tur
 **Trigger:** the next `CommitmentTree` upgrade, which is the only occasion a setter can be added, or
 evidence of honest proofs failing on the root window.
 
-### The Arbitrum node cap can be exceeded, so the settlement sort is unbounded (ORC-2) — Medium, open
-
-*Corrected during v2.0.* This entry said `_median` "is bounded by `maxNodes`" and that only a
-trusted role could raise that bound. Neither holds:
-
-- `stake()` and `cancelUnstake()` reactivate a node without checking `maxNodes`. Only `register`
-  checks it.
-- `_MAX_SUBMISSIONS = 31` is declared and exposed through a getter, but `submit` never enforces it.
-
-So stakers, not only `ORACLE_MANAGER_ROLE`, can grow the active set past the cap. Some active nodes
-request an unstake, freeing a slot; a new identity registers into it; the leavers cancel, and all of
-them are active again. Each repetition adds a node, at the cost of one more minimum stake. The
-insertion sort in `settleRound` is O(n²) in submissions, so a large enough set makes rounds too
-expensive to settle. The impact is oracle liveness, not the price: the median is still taken over
-eligible nodes.
-
-Found while porting the rule to Solana, where every activation checks the cap and a round holds at
-most 32 values. See `docs/v2.0-solana-plan.md` §13.
-
-**Decision pending:** fixing it on Arbitrum means a UUPS upgrade of `OracleStaking` and
-`OracleRounds`.
-
 ### The oracle submission nonce is per node, not per feed — Low
 
 A node serving two feeds must have its transactions mined in the order it signed them; reordering
@@ -236,6 +214,7 @@ apply` followed immediately by `terraform destroy` — it costs cents and conver
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| The Arbitrum node cap could be exceeded, leaving the settlement sort unbounded (ORC-2) | Fixed during v2.0. `stake()` and `cancelUnstake()` reactivated nodes without checking `maxNodes`, so stakers could cycle unstake, register, and cancel to grow the active set past its cap, and `_MAX_SUBMISSIONS` was declared but never enforced. Every reactivation now checks for room, `maxNodes` has a ceiling of 31, the same as the submission limit, and `submit` enforces that limit. Found while porting the rule to Solana, where it was designed in from the start. Reproduced before the fix: a cap of 2 left 3 active nodes. Covered by unit tests for each path, an invariant with fewer slots than nodes that fails on the unfixed contracts, and a submission-limit test. This entry had previously described the sort as bounded. See `docs/v2.0-solana-plan.md` §13. |
 | No penalty for a node that never submits (ORC-1) | Fixed after v1.2. A missed round costs 0.5% and a third consecutive miss 10% instead, judged strictly in round order. Excused: a round nobody submitted to, a round settled before its deadline, and a removal by an admin or for low stake before the deadline. Requesting to unstake is not an excuse. Required emitting the node-set version on activation and deactivation, since nothing could otherwise say which rounds expected to hear from a node. Found on the way: `missed_rounds` had never been written, so the v1.1 Nodes page said misses were recorded when every count was zero. See `docs/v1.3-missed-round-slashing-plan.md`. |
 | No slippage bound on vault deposit or withdraw (VLT-1) | Fixed after v1.1. `deposit` and `withdraw` take `minShares` / `minAssets` and revert below them, checked before any state is written. The signatures were replaced rather than overloaded: an overload leaves the unguarded path callable by anyone who does not know to avoid it. Zero still means no bound, and that is stated rather than enforced away — requiring a non-zero value is ceremony, since `1` satisfies it. |
 | A zk proof could be submitted by anyone who saw it (ZK-1) | Fixed after v1.0. The proof now carries a sixth public input naming its permitted submitter, and the gate reads that from `msg.sender`. Deliberately outside the nullifier: a nullifier that varied with the submitter would let one commitment be spent once per address. Proven by `ZkVerifier.t.sol` tampering with every public input in turn, by a stranger's submission being refused in `ZkVaultGate.t.sol`, and end to end against a real chain. |

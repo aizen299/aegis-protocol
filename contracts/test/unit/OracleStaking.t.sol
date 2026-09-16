@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {OracleStaking} from "../../src/oracle/OracleStaking.sol";
@@ -409,6 +410,70 @@ contract OracleStakingTest is OracleFixture {
         vm.prank(third);
         vm.expectRevert(abi.encodeWithSelector(IOracleStaking.NodeSetFull.selector, 2));
         staking.register(MIN_STAKE);
+    }
+
+    /// ORC-2. Leaving frees a slot; cancelling must not take it back once someone else has.
+    /// Before the fix this left three active nodes under a cap of two.
+    function test_cancellingAnUnstakeDoesNotReactivateIntoAFullSet() public {
+        vm.prank(oracleManager);
+        staking.setMaxNodes(2);
+        _registerNode(nodeA, MIN_STAKE);
+        _registerNode(nodeB, MIN_STAKE);
+
+        vm.prank(nodeA);
+        staking.requestUnstake(1);
+        _registerNode(makeAddr("third"), MIN_STAKE);
+
+        vm.prank(nodeA);
+        staking.cancelUnstake();
+
+        assertEq(staking.activeNodeCount(), 2, "the active set grew past maxNodes");
+        assertFalse(staking.isActive(nodeA), "reactivated into a full set");
+        assertEq(staking.nodeInfo(nodeA).pendingUnstake, 0, "the cancel itself still applies");
+    }
+
+    /// ORC-2, through the other reactivation path: a top-up above the minimum.
+    function test_toppingUpDoesNotReactivateIntoAFullSet() public {
+        vm.prank(oracleManager);
+        staking.setMaxNodes(2);
+        _registerNode(nodeA, MIN_STAKE);
+        _registerNode(nodeB, MIN_STAKE);
+
+        vm.prank(admin);
+        staking.deactivate(nodeA, "MANUAL");
+        _registerNode(makeAddr("third"), MIN_STAKE);
+
+        _fundNode(nodeA, MIN_STAKE);
+        vm.prank(nodeA);
+        staking.stake(1);
+
+        assertEq(staking.activeNodeCount(), 2, "the active set grew past maxNodes");
+        assertFalse(staking.isActive(nodeA), "reactivated into a full set");
+        assertEq(staking.stakeOf(nodeA), MIN_STAKE + 1, "the stake itself still applies");
+    }
+
+    /// The cap may never exceed what a round will accept, or settlement gas is unbounded again.
+    function test_maxNodesCannotExceedTheCeiling() public {
+        uint256 ceiling = staking.maxNodesCeiling();
+
+        vm.prank(oracleManager);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOracleStaking.MaxNodesAboveCeiling.selector, ceiling + 1, ceiling)
+        );
+        staking.setMaxNodes(ceiling + 1);
+
+        vm.prank(oracleManager);
+        staking.setMaxNodes(ceiling);
+
+        OracleStaking implementation = new OracleStaking();
+        bytes memory initData = abi.encodeCall(
+            OracleStaking.initialize,
+            (admin, address(stakeToken), MIN_STAKE, STAKE_FLOOR, UNBONDING, MAX_SLASH_BPS, ceiling + 1)
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(IOracleStaking.MaxNodesAboveCeiling.selector, ceiling + 1, ceiling)
+        );
+        new ERC1967Proxy(address(implementation), initData);
     }
 
     function test_stakeTopUpReactivatesNodeAboveMinimum() public {
