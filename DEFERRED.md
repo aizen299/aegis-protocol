@@ -100,30 +100,6 @@ against a real local stack rather than by the review — which had omitted `fron
 
 ZK-1, the only High in this section, was **fixed after v1.0** and moved to the decided table below.
 
-### No penalty for a node that never submits (ORC-1) — Medium
-
-`docs/oracle.md` lists four slashable conditions. Two are implemented: `OUTLIER_SUBMISSION` and
-`INVALID_SIGNATURE`. `MISSED_ROUND` and `CONSECUTIVE_MISSES` are not, and the aggregator iterates
-the submissions a round received rather than the eligible nodes that did not submit, so a silent
-node is invisible to it.
-
-The dead `ReasonMissedRound` and `penaltyMissedRoundBps` constants have been **removed**. They made
-the gap read as implemented, and unused Go constants do not fail a build.
-
-Quorum is judged against `eligibleCount`, frozen at `openRound` from `activeNodeCount`. Nodes that
-stake and never submit raise the denominator without raising the numerator: an adversary holding
-just over 40% of active slots at a 60% quorum halts the feed, is never slashed, and withdraws in
-full after unbonding. The cost is the time-value of locked capital and nothing else — which is
-exactly the cost the missing penalty exists to raise.
-
-Accepted because implementing it reopens v0.2: the aggregator would need the eligible set per round,
-not just the submissions, and the penalty is only meaningful once nodes are operated by parties who
-do not already bear the cost of a halted feed.
-
-**Trigger:** the first oracle node operated by someone outside the project, or any contract reading
-a feed value to make a decision that moves funds. Either makes a free liveness attack worth
-mounting.
-
 ### zk proofs are generated in the browser, not by the Rust service — deviation
 
 `docs/zk.md`'s architecture routes private inputs to the Rust proof service. v1.3 proves in the browser
@@ -204,6 +180,7 @@ apply` followed immediately by `terraform destroy` — it costs cents and conver
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| No penalty for a node that never submits (ORC-1) | Fixed after v1.2. A missed round costs 0.5% and a third consecutive miss 10% instead, judged strictly in round order. Excused: a round nobody submitted to, a round settled before its deadline, and a removal by an admin or for low stake before the deadline. Requesting to unstake is not an excuse. Required emitting the node-set version on activation and deactivation, since nothing could otherwise say which rounds expected to hear from a node. Found on the way: `missed_rounds` had never been written, so the v1.1 Nodes page said misses were recorded when every count was zero. See `docs/v1.3-missed-round-slashing-plan.md`. |
 | No slippage bound on vault deposit or withdraw (VLT-1) | Fixed after v1.1. `deposit` and `withdraw` take `minShares` / `minAssets` and revert below them, checked before any state is written. The signatures were replaced rather than overloaded: an overload leaves the unguarded path callable by anyone who does not know to avoid it. Zero still means no bound, and that is stated rather than enforced away — requiring a non-zero value is ceremony, since `1` satisfies it. |
 | A zk proof could be submitted by anyone who saw it (ZK-1) | Fixed after v1.0. The proof now carries a sixth public input naming its permitted submitter, and the gate reads that from `msg.sender`. Deliberately outside the nullifier: a nullifier that varied with the submitter would let one commitment be spent once per address. Proven by `ZkVerifier.t.sol` tampering with every public input in turn, by a stranger's submission being refused in `ZkVaultGate.t.sol`, and end to end against a real chain. |
 | The dashboard could not distinguish a failed read from an empty vault | Fixed after v1.0. Reads now resolve to loading, failed, or value; a failed vault read shows an alert saying the figures are unavailable rather than zero. Mutation-tested by restoring the original collapsed rendering, which fails four tests. |

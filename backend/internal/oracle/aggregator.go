@@ -37,6 +37,13 @@ type AggregatorStore interface {
 	RecordSlashDecision(ctx context.Context, d SlashDecision) error
 	MarkRoundAggregated(ctx context.Context, chainID int64, roundID, serviceValue types.Raw, mismatch bool, at time.Time) error
 	OracleNode(ctx context.Context, chainID int64, address string) (types.OracleNode, error)
+
+	NextRoundToJudge(ctx context.Context, chainID int64) (types.OracleRound, bool, error)
+	RoundSubmitters(ctx context.Context, chainID int64, roundID types.Raw) (map[string]bool, error)
+	NodeIntervalsAt(ctx context.Context, chainID int64, version types.Raw) ([]NodeInterval, error)
+	RecordRoundOutcomes(ctx context.Context, chainID int64, roundID types.Raw, verdicts []Verdict) error
+	NodeOutcomeHistory(ctx context.Context, chainID int64, node string) ([]Outcome, error)
+	MarkMissesJudged(ctx context.Context, chainID int64, roundID types.Raw) error
 }
 
 // SignatureVerifier checks a stored signature against the submission it claims to cover.
@@ -100,6 +107,88 @@ func (a *Aggregator) Step(ctx context.Context) (int, error) {
 		}
 	}
 	return len(rounds), nil
+}
+
+// JudgeMisses judges rounds for missed submissions, strictly in round order, and reports how many it
+// judged.
+//
+// Separate from Step because Step runs in settlement order and streaks depend on round order: a round
+// on one feed can settle while an earlier round on another is still open, and a penalty decided with
+// that earlier round missing from the streak cannot be taken back when it is judged later. So this
+// stops at the first unfinished round rather than skipping past it.
+func (a *Aggregator) JudgeMisses(ctx context.Context) (int, error) {
+	judged := 0
+	for judged < a.opts.BatchSize {
+		round, found, err := a.store.NextRoundToJudge(ctx, a.opts.ChainID)
+		if err != nil {
+			return judged, err
+		}
+		if !found || (round.State != types.RoundStateSettled && round.State != types.RoundStateFailed) {
+			return judged, nil
+		}
+
+		submitters, err := a.store.RoundSubmitters(ctx, a.opts.ChainID, round.RoundID)
+		if err != nil {
+			return judged, err
+		}
+		// Fewer indexed submissions than the round recorded means the indexer is behind. Judging now
+		// would turn an unindexed submission into a miss, so wait for it.
+		if len(submitters) < int(round.SubmissionCount) {
+			a.log.Warn().
+				Str("round", round.RoundID.String()).
+				Int("indexed", len(submitters)).
+				Int32("recorded", round.SubmissionCount).
+				Msg("submissions not fully indexed; deferring missed-round judgement")
+			return judged, nil
+		}
+
+		if err := a.judgeRound(ctx, round, submitters); err != nil {
+			return judged, fmt.Errorf("judge round %s: %w", round.RoundID, err)
+		}
+		judged++
+	}
+	return judged, nil
+}
+
+func (a *Aggregator) judgeRound(ctx context.Context, round types.OracleRound, submitters map[string]bool) error {
+	intervals, err := a.store.NodeIntervalsAt(ctx, a.opts.ChainID, round.NodeSetVersion)
+	if err != nil {
+		return err
+	}
+
+	verdicts := JudgeRound(JudgedRound{
+		RoundID:        round.RoundID.Big(),
+		NodeSetVersion: round.NodeSetVersion.Big(),
+		Deadline:       round.Deadline,
+		SettledAt:      round.SettledAt,
+		Submitters:     submitters,
+	}, intervals)
+
+	// Recorded before any decision, so a crash between the two replays the same history.
+	if err := a.store.RecordRoundOutcomes(ctx, a.opts.ChainID, round.RoundID, verdicts); err != nil {
+		return err
+	}
+
+	for _, verdict := range verdicts {
+		if verdict.Outcome != Missed {
+			continue
+		}
+		history, err := a.store.NodeOutcomeHistory(ctx, a.opts.ChainID, verdict.Node)
+		if err != nil {
+			return err
+		}
+		penalties := PenaltiesFor(history)
+		// Rounds are judged in order, so this round is the last in the node's history.
+		if len(penalties) == 0 || penalties[len(penalties)-1] == nil {
+			return fmt.Errorf("node %s: a recorded miss produced no penalty", verdict.Node)
+		}
+		penalty := penalties[len(penalties)-1]
+		if err := a.decide(ctx, round, verdict.Node, penalty.Reason, penalty.Bps); err != nil {
+			return err
+		}
+	}
+
+	return a.store.MarkMissesJudged(ctx, a.opts.ChainID, round.RoundID)
 }
 
 func (a *Aggregator) analyse(ctx context.Context, round types.OracleRound) error {

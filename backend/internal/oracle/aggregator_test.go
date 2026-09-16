@@ -29,6 +29,14 @@ type fakeAggStore struct {
 	verifications []verification
 	marked        []markCall
 	sigErr        error
+
+	// Missed-round judgement. judgeRounds is kept in round-id order, as the SQL orders it.
+	judgeRounds []types.OracleRound
+	submitters  map[string]map[string]bool
+	intervals   []NodeInterval
+	outcomes    map[string]map[string]Outcome // round -> node -> outcome
+	outcomeRuns int
+	judged      map[string]bool
 }
 
 type verification struct {
@@ -353,4 +361,65 @@ func TestOutlierIsRecordedOnTheSubmission(t *testing.T) {
 	if flagged != 1 {
 		t.Fatalf("flagged %d submissions as outliers, want 1", flagged)
 	}
+}
+
+// --- missed-round judgement ---
+
+func (s *fakeAggStore) NextRoundToJudge(_ context.Context, _ int64) (types.OracleRound, bool, error) {
+	for _, r := range s.judgeRounds {
+		if !s.judged[r.RoundID.String()] {
+			return r, true, nil
+		}
+	}
+	return types.OracleRound{}, false, nil
+}
+
+func (s *fakeAggStore) RoundSubmitters(_ context.Context, _ int64, roundID types.Raw) (map[string]bool, error) {
+	return s.submitters[roundID.String()], nil
+}
+
+func (s *fakeAggStore) NodeIntervalsAt(_ context.Context, _ int64, version types.Raw) ([]NodeInterval, error) {
+	var out []NodeInterval
+	for _, iv := range s.intervals {
+		if iv.contains(version.Big()) {
+			out = append(out, iv)
+		}
+	}
+	return out, nil
+}
+
+func (s *fakeAggStore) RecordRoundOutcomes(_ context.Context, _ int64, roundID types.Raw, verdicts []Verdict) error {
+	s.outcomeRuns++
+	if s.outcomes == nil {
+		s.outcomes = map[string]map[string]Outcome{}
+	}
+	byNode := s.outcomes[roundID.String()]
+	if byNode == nil {
+		byNode = map[string]Outcome{}
+		s.outcomes[roundID.String()] = byNode
+	}
+	for _, v := range verdicts {
+		if _, exists := byNode[v.Node]; !exists {
+			byNode[v.Node] = v.Outcome
+		}
+	}
+	return nil
+}
+
+func (s *fakeAggStore) NodeOutcomeHistory(_ context.Context, _ int64, node string) ([]Outcome, error) {
+	var out []Outcome
+	for _, r := range s.judgeRounds {
+		if o, ok := s.outcomes[r.RoundID.String()][node]; ok {
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+func (s *fakeAggStore) MarkMissesJudged(_ context.Context, _ int64, roundID types.Raw) error {
+	if s.judged == nil {
+		s.judged = map[string]bool{}
+	}
+	s.judged[roundID.String()] = true
+	return nil
 }

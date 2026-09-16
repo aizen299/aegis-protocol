@@ -18,6 +18,14 @@ type OracleFeed struct {
 // OracleRound carries the eligibility snapshot the contract froze when the round opened.
 // EligibleCount and NodeSetVersion are what quorum was judged against, not the live node set, so a
 // settled round can be audited against the set that actually applied to it.
+// Round states as the indexer writes them. Mirrors IOracleRounds.RoundState.
+const (
+	RoundStateOpen      = "open"
+	RoundStateQuorumMet = "quorum_met"
+	RoundStateSettled   = "settled"
+	RoundStateFailed    = "failed"
+)
+
 type OracleRound struct {
 	ChainID         int64      `json:"chainId"`
 	RoundID         Raw        `json:"roundId"`

@@ -48,14 +48,20 @@ describe("NodeList", () => {
     expect(screen.getByText("50")).toBeInTheDocument();
   });
 
-  // docs/v1.1-frontend-plan.md §2.4: a count that implies an enforcement which does not exist
-  // tells an operator something untrue.
-  it("states that missed rounds carry no penalty", () => {
+  // The page states the penalty rules an operator is held to, and never again the claim it shipped
+  // with in v1.1 — that misses were recorded but not penalised, when in fact neither was true.
+  it("states the missed-round penalties and what is excused", () => {
     mocks.useOracleNodes.mockReturnValue(ok([node]));
     render(<NodeList />);
 
     expect(screen.getByText("12")).toBeInTheDocument();
-    expect(screen.getByText(/not penalised/i)).toBeInTheDocument();
+
+    const rules = screen.getByTestId("missed-round-rules");
+    expect(rules).toHaveTextContent(/0\.5%/);
+    expect(rules).toHaveTextContent(/third consecutive miss costs 10%/i);
+    expect(rules).toHaveTextContent(/settled before its deadline/i);
+    expect(rules).toHaveTextContent(/unstake is not an excuse/i);
+    expect(rules).not.toHaveTextContent(/not penalised/i);
   });
 });
 

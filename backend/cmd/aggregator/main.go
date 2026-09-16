@@ -146,12 +146,22 @@ func run(ctx context.Context, log zerolog.Logger, aggregator *oracle.Aggregator,
 			log.Error().Err(err).Msg("analysis failed")
 		}
 
+		// Before execution, so a missed-round decision reaches the chain in the same cycle it is made.
+		judged, err := aggregator.JudgeMisses(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("missed-round judgement failed")
+		}
+
 		submitted, err := executor.Step(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("execution failed")
 		}
-		if analysed > 0 || submitted > 0 {
-			log.Info().Int("rounds_analysed", analysed).Int("slashes_submitted", submitted).Msg("cycle complete")
+		if analysed > 0 || judged > 0 || submitted > 0 {
+			log.Info().
+				Int("rounds_analysed", analysed).
+				Int("rounds_judged_for_misses", judged).
+				Int("slashes_submitted", submitted).
+				Msg("cycle complete")
 		}
 
 		select {

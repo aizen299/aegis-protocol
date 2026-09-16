@@ -199,7 +199,10 @@ func truncateOracle(t *testing.T, dsn string) {
 	}
 	defer conn.Close(ctx)
 
+	// The interval and outcome tables have no foreign keys for CASCADE to follow, so they are named. Left
+	// behind, one test's intervals would be judged against the next test's rounds.
 	const q = `TRUNCATE oracle_slashings, oracle_submissions, oracle_rounds, oracle_nodes,
+	           oracle_node_intervals, oracle_round_outcomes,
 	           oracle_feeds, vaults, assets, indexer_cursors RESTART IDENTITY CASCADE`
 	if _, err := conn.Exec(ctx, q); err != nil {
 		t.Fatalf("truncate oracle tables: %v", err)

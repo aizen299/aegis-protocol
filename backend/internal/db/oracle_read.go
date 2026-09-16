@@ -63,7 +63,10 @@ const qListSubmissions = `
 
 const qNodeColumns = `
 	n.chain_id, n.address, n.stake_asset, n.staked_amount, n.slashed_total, n.pending_unstake,
-	a.decimals, n.claimable_at, n.missed_rounds, n.active, n.registered_at
+	a.decimals, n.claimable_at,
+	       (SELECT COUNT(*) FROM oracle_round_outcomes o
+	        WHERE o.chain_id = n.chain_id AND o.node = n.address AND o.outcome = 'missed')::INT,
+	       n.active, n.registered_at
 `
 
 const qListNodes = `
