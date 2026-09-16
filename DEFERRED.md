@@ -124,42 +124,6 @@ do not already bear the cost of a halted feed.
 a feed value to make a decision that moves funds. Either makes a free liveness attack worth
 mounting.
 
-### No slippage bound on vault deposit or withdraw (VLT-1) — Medium
-
-`deposit(assets, receiver)` and `withdraw(shares, receiver)` accept no minimum. `docs/solidity.md`'s
-vulnerability table lists "Frontrunning — use commit-reveal or slippage params where needed", and
-this is the unmet half of it.
-
-Share price moves with `totalAssets()`, which reads the strategy. A withdrawal submitted before a
-strategy loss executes at the worse rate with no revert, because the user had no way to express a
-floor. The virtual-shares offset defeats the first-depositor inflation attack, which is a different
-problem; it does nothing about price movement between submission and inclusion.
-
-Accepted because adding a minimum changes external signatures that the indexer ABI, the frontend,
-and the committed storage-layout baselines all track — an interface decision, not a hardening patch
-— and because no strategy is deployed, so today the price cannot move between submission and
-inclusion at all.
-
-**Trigger:** attaching any strategy on a chain where someone other than the operator holds shares.
-At that point the price moves for reasons outside a depositor's control and the bound is the only
-thing that lets them say no.
-
-### The UI covers the vault only — Medium
-
-`frontend/` implements v0.1's deposit, withdraw, and dashboard. There is no interface for oracle
-feeds, governance proposals and voting, or zk proofs, though the backend serves and end-to-end tests
-all three. `frontend/README.md` has tracked this accurately per version throughout; what was missing
-was any record of it in this register or in the release documents, which is now corrected.
-
-Not a spec violation — `docs/project-spec.md` §3.5 fixes the frontend stack and never assigns
-per-version frontend deliverables. It is still the largest gap between what the protocol does and
-what anyone can see it do.
-
-**Trigger:** none needed — this is roadmap step 3, targeted at `v1.1.0`. One ordering constraint is
-binding: the zk interface must not ship before the bearer-proof finding above is fixed. A UI is what
-first puts real proofs into a mempool, so shipping it against the current gate does not inherit that
-risk, it activates it.
-
 ### The root history window is fixed at deployment — Low
 
 `CommitmentTree` has no setter for `rootHistorySize`, so the value chosen at initialization is
@@ -224,6 +188,7 @@ apply` followed immediately by `terraform destroy` — it costs cents and conver
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| No slippage bound on vault deposit or withdraw (VLT-1) | Fixed after v1.1. `deposit` and `withdraw` take `minShares` / `minAssets` and revert below them, checked before any state is written. The signatures were replaced rather than overloaded: an overload leaves the unguarded path callable by anyone who does not know to avoid it. Zero still means no bound, and that is stated rather than enforced away — requiring a non-zero value is ceremony, since `1` satisfies it. |
 | A zk proof could be submitted by anyone who saw it (ZK-1) | Fixed after v1.0. The proof now carries a sixth public input naming its permitted submitter, and the gate reads that from `msg.sender`. Deliberately outside the nullifier: a nullifier that varied with the submitter would let one commitment be spent once per address. Proven by `ZkVerifier.t.sol` tampering with every public input in turn, by a stranger's submission being refused in `ZkVaultGate.t.sol`, and end to end against a real chain. |
 | The dashboard could not distinguish a failed read from an empty vault | Fixed after v1.0. Reads now resolve to loading, failed, or value; a failed vault read shows an alert saying the figures are unavailable rather than zero. Mutation-tested by restoring the original collapsed rendering, which fails four tests. |
 | The frontend has no tests | Fixed after v1.0. Vitest and React Testing Library, 18 tests over the dashboard's read states and the decimals handling, wired into Frontend CI before the build — a build proves compilation, not behaviour. Coverage is the vault surface only; new surfaces need their own. |

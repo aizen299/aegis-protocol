@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { formatUnits } from "viem";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 
 import { vaultEngineAbi } from "@/lib/abi";
 import { env } from "@/lib/env";
-import { parseAmount } from "@/lib/units";
+import { DEFAULT_TOLERANCE_BPS, formatTolerance, minimumOut } from "@/lib/slippage";
+import { formatAmount, parseAmount } from "@/lib/units";
 import { Panel } from "./Panel";
 import { TxButton, TxStatus } from "./TxButton";
 
@@ -17,11 +18,13 @@ export function WithdrawForm({
   shares,
   shareScale,
   symbol,
+  decimals,
 }: {
   disabled: boolean;
   shares: bigint | undefined;
   shareScale: number | undefined;
   symbol: string | undefined;
+  decimals: number | undefined;
 }) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
@@ -31,13 +34,24 @@ export function WithdrawForm({
   const parsed = parseAmount(amount, shareScale);
   const exceedsBalance = parsed !== null && shares !== undefined && parsed > shares;
 
+  const { data: expectedAssets } = useReadContract({
+    address: env.vaultAddress,
+    abi: vaultEngineAbi,
+    functionName: "convertToAssets",
+    args: parsed !== null ? [parsed] : undefined,
+    query: { enabled: parsed !== null },
+  });
+
+  const floor = minimumOut(expectedAssets, DEFAULT_TOLERANCE_BPS);
+  const floorText = formatAmount(floor, decimals, symbol);
+
   function submit() {
-    if (parsed === null || !address) return;
+    if (parsed === null || !address || floor === undefined) return;
     writeContract({
       address: env.vaultAddress,
       abi: vaultEngineAbi,
       functionName: "withdraw",
-      args: [parsed, address],
+      args: [parsed, address, floor],
     });
   }
 
@@ -63,8 +77,20 @@ export function WithdrawForm({
           Max
         </button>
       </div>
+      {parsed !== null && !exceedsBalance ? (
+        <p className="mb-3 text-xs text-zinc-500" data-testid="withdraw-floor">
+          {floorText === undefined ? (
+            "Cannot price this withdrawal yet — the transaction is disabled until it can."
+          ) : (
+            <>
+              Reverts below <span className="font-mono text-zinc-400">{floorText}</span>, a{" "}
+              {formatTolerance(DEFAULT_TOLERANCE_BPS)} tolerance on the current rate.
+            </>
+          )}
+        </p>
+      ) : null}
       <TxButton
-        disabled={disabled || parsed === null || exceedsBalance}
+        disabled={disabled || parsed === null || exceedsBalance || floor === undefined}
         pending={isPending || confirming}
         onClick={submit}
       >

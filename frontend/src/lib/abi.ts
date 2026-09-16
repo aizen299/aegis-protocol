@@ -8,6 +8,7 @@ export const vaultEngineAbi = [
     inputs: [
       { name: "assets", type: "uint256" },
       { name: "receiver", type: "address" },
+      { name: "minShares", type: "uint256" },
     ],
     outputs: [{ name: "shares", type: "uint256" }],
   },
@@ -18,6 +19,7 @@ export const vaultEngineAbi = [
     inputs: [
       { name: "shares", type: "uint256" },
       { name: "receiver", type: "address" },
+      { name: "minAssets", type: "uint256" },
     ],
     outputs: [{ name: "assets", type: "uint256" }],
   },
@@ -47,6 +49,13 @@ export const vaultEngineAbi = [
     name: "convertToAssets",
     stateMutability: "view",
     inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    stateMutability: "view",
+    inputs: [{ name: "assets", type: "uint256" }],
     outputs: [{ type: "uint256" }],
   },
 ] as const;

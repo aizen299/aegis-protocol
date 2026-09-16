@@ -12,7 +12,7 @@ func TestWithdrawFlowNetsAgainstDeposit(t *testing.T) {
 	ctx := context.Background()
 
 	depositOnce(t, s)
-	send(t, aliceKey, s.deployment.VaultProxy, "withdraw(uint256,address)", withdrawShares, aliceAddr)
+	send(t, aliceKey, s.deployment.VaultProxy, "withdraw(uint256,address,uint256)", withdrawShares, aliceAddr, "0")
 	s.indexToHead(t)
 
 	pos, err := s.store.VaultPosition(ctx, chainID, aliceAddr)
@@ -120,7 +120,7 @@ func TestTVLReflectsIndexedFlows(t *testing.T) {
 	ctx := context.Background()
 
 	depositOnce(t, s)
-	send(t, aliceKey, s.deployment.VaultProxy, "withdraw(uint256,address)", withdrawShares, aliceAddr)
+	send(t, aliceKey, s.deployment.VaultProxy, "withdraw(uint256,address,uint256)", withdrawShares, aliceAddr, "0")
 	s.indexToHead(t)
 
 	tvl, decimals, asset, err := s.store.VaultTVL(ctx, chainID, s.deployment.VaultProxy)

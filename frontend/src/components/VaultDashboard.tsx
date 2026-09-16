@@ -154,12 +154,14 @@ export function VaultDashboard() {
               decimals={decimals}
               symbol={symbol}
               assetAddress={assetAddress}
+              offset={offset}
             />
             <WithdrawForm
               disabled={Boolean(withdrawalsFrozen)}
               shares={shares}
               shareScale={shareScale}
               symbol={symbol}
+              decimals={decimals}
             />
           </div>
         </>

@@ -60,7 +60,7 @@ contract VaultEngineTest is VaultFixture {
         emit IVaultEngine.Deposited(alice, address(token), 100e18, 100e18 * 1e3);
 
         vm.prank(alice);
-        uint256 shares = vault.deposit(100e18, alice);
+        uint256 shares = vault.deposit(100e18, alice, 0);
 
         assertEq(shares, vault.sharesOf(alice));
         assertEq(vault.totalShares(), shares);
@@ -68,10 +68,97 @@ contract VaultEngineTest is VaultFixture {
         assertEq(vault.idleAssets(), 100e18);
     }
 
+    // --- VLT-1: the bound the caller sets ---
+
+    function test_deposit_honoursAMetBound() public {
+        _fund(alice, 100e18);
+        uint256 expected = vault.convertToShares(100e18);
+
+        vm.prank(alice);
+        uint256 shares = vault.deposit(100e18, alice, expected);
+
+        assertEq(shares, expected, "a met bound changed the fill");
+    }
+
+    function test_deposit_revertsWhenTheBoundIsNotMet() public {
+        _fund(alice, 100e18);
+        uint256 expected = vault.convertToShares(100e18);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IVaultEngine.SlippageExceeded.selector, expected, expected + 1)
+        );
+        vault.deposit(100e18, alice, expected + 1);
+    }
+
+    /// A rejected deposit must leave nothing behind — not the shares, not the assets, not the
+    /// transfer that precedes the check.
+    function test_deposit_rejectedByTheBoundWritesNothing() public {
+        _fund(alice, 100e18);
+        uint256 balanceBefore = token.balanceOf(alice);
+        uint256 expected = vault.convertToShares(100e18);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IVaultEngine.SlippageExceeded.selector, expected, expected + 1)
+        );
+        vault.deposit(100e18, alice, expected + 1);
+
+        assertEq(vault.sharesOf(alice), 0, "shares were credited");
+        assertEq(vault.totalShares(), 0, "total shares moved");
+        assertEq(vault.totalAssets(), 0, "assets stayed in the vault");
+        assertEq(token.balanceOf(alice), balanceBefore, "the caller's assets did not come back");
+    }
+
+    function test_withdraw_honoursAMetBound() public {
+        uint256 shares = _deposit(alice, 100e18);
+        uint256 expected = vault.convertToAssets(shares);
+
+        vm.prank(alice);
+        uint256 assets = vault.withdraw(shares, alice, expected);
+
+        assertEq(assets, expected, "a met bound changed the fill");
+    }
+
+    function test_withdraw_revertsWhenTheBoundIsNotMet() public {
+        uint256 shares = _deposit(alice, 100e18);
+        uint256 expected = vault.convertToAssets(shares);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IVaultEngine.SlippageExceeded.selector, expected, expected + 1)
+        );
+        vault.withdraw(shares, alice, expected + 1);
+    }
+
+    function test_withdraw_rejectedByTheBoundWritesNothing() public {
+        uint256 shares = _deposit(alice, 100e18);
+        uint256 expected = vault.convertToAssets(shares);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(IVaultEngine.SlippageExceeded.selector, expected, expected + 1)
+        );
+        vault.withdraw(shares, alice, expected + 1);
+
+        assertEq(vault.sharesOf(alice), shares, "shares were burned by a rejected withdrawal");
+        assertEq(vault.totalShares(), shares, "total shares moved");
+        assertEq(vault.totalAssets(), 100e18, "assets left the vault");
+    }
+
+    /// Zero is a documented choice, not a default the caller inherits — the parameter is what makes
+    /// it a choice. See docs/v1.2-vault-slippage-plan.md §2.3.
+    function test_aZeroBoundImposesNoFloor() public {
+        _fund(alice, 100e18);
+
+        vm.prank(alice);
+        assertGt(vault.deposit(100e18, alice, 0), 0, "a zero bound blocked a deposit");
+    }
+
     function test_deposit_creditsReceiverNotCaller() public {
         _fund(alice, 100e18);
         vm.prank(alice);
-        vault.deposit(100e18, bob);
+        vault.deposit(100e18, bob, 0);
 
         assertEq(vault.sharesOf(alice), 0);
         assertGt(vault.sharesOf(bob), 0);
@@ -90,21 +177,21 @@ contract VaultEngineTest is VaultFixture {
         vm.expectRevert(
             abi.encodeWithSelector(IVaultEngine.DepositBelowMinimum.selector, MIN_DEPOSIT - 1, MIN_DEPOSIT)
         );
-        vault.deposit(MIN_DEPOSIT - 1, alice);
+        vault.deposit(MIN_DEPOSIT - 1, alice, 0);
     }
 
     function test_deposit_revertsOnZeroAmount() public {
         _fund(alice, 1e18);
         vm.prank(alice);
         vm.expectRevert(IVaultEngine.ZeroAmount.selector);
-        vault.deposit(0, alice);
+        vault.deposit(0, alice, 0);
     }
 
     function test_deposit_revertsOnZeroReceiver() public {
         _fund(alice, 100e18);
         vm.prank(alice);
         vm.expectRevert(IVaultEngine.ZeroAddress.selector);
-        vault.deposit(100e18, address(0));
+        vault.deposit(100e18, address(0), 0);
     }
 
     function test_deposit_revertsAboveCap() public {
@@ -113,7 +200,7 @@ contract VaultEngineTest is VaultFixture {
         vm.expectRevert(
             abi.encodeWithSelector(IVaultEngine.DepositCapExceeded.selector, DEPOSIT_CAP + 1, DEPOSIT_CAP)
         );
-        vault.deposit(DEPOSIT_CAP + 1, alice);
+        vault.deposit(DEPOSIT_CAP + 1, alice, 0);
     }
 
     function test_deposit_revertsWhenPaused() public {
@@ -123,7 +210,7 @@ contract VaultEngineTest is VaultFixture {
         _fund(alice, 100e18);
         vm.prank(alice);
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
-        vault.deposit(100e18, alice);
+        vault.deposit(100e18, alice, 0);
     }
 
     function test_deposit_feeOnTransferCreditsReceivedOnly() public {
@@ -131,7 +218,7 @@ contract VaultEngineTest is VaultFixture {
         _fund(alice, 100e18);
 
         vm.prank(alice);
-        vault.deposit(100e18, alice);
+        vault.deposit(100e18, alice, 0);
 
         assertEq(vault.totalAssets(), 99e18);
         assertEq(vault.convertToAssets(vault.sharesOf(alice)), 99e18);
@@ -146,7 +233,7 @@ contract VaultEngineTest is VaultFixture {
         emit IVaultEngine.Withdrawn(alice, address(token), 100e18, shares);
 
         vm.prank(alice);
-        uint256 assets = vault.withdraw(shares, alice);
+        uint256 assets = vault.withdraw(shares, alice, 0);
 
         assertEq(assets, 100e18);
         assertEq(token.balanceOf(alice), 100e18);
@@ -158,7 +245,7 @@ contract VaultEngineTest is VaultFixture {
         uint256 shares = _deposit(alice, 100e18);
 
         vm.prank(alice);
-        vault.withdraw(shares / 2, alice);
+        vault.withdraw(shares / 2, alice, 0);
 
         assertEq(vault.sharesOf(alice), shares - shares / 2);
         assertApproxEqAbs(vault.totalAssets(), 50e18, 1);
@@ -168,7 +255,7 @@ contract VaultEngineTest is VaultFixture {
         uint256 shares = _deposit(alice, 100e18);
 
         vm.prank(alice);
-        vault.withdraw(shares, bob);
+        vault.withdraw(shares, bob, 0);
 
         assertEq(token.balanceOf(bob), 100e18);
         assertEq(token.balanceOf(alice), 0);
@@ -182,7 +269,7 @@ contract VaultEngineTest is VaultFixture {
 
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
 
         assertEq(token.balanceOf(alice), 100e18);
         assertEq(vault.allocatedAssets(), 0);
@@ -192,14 +279,14 @@ contract VaultEngineTest is VaultFixture {
         uint256 shares = _deposit(alice, 100e18);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IVaultEngine.InsufficientShares.selector, shares, shares + 1));
-        vault.withdraw(shares + 1, alice);
+        vault.withdraw(shares + 1, alice, 0);
     }
 
     function test_withdraw_revertsOnZeroShares() public {
         _deposit(alice, 100e18);
         vm.prank(alice);
         vm.expectRevert(IVaultEngine.ZeroAmount.selector);
-        vault.withdraw(0, alice);
+        vault.withdraw(0, alice, 0);
     }
 
     function test_withdraw_revertsWhenFrozen() public {
@@ -210,7 +297,7 @@ contract VaultEngineTest is VaultFixture {
 
         vm.prank(alice);
         vm.expectRevert(IVaultEngine.WithdrawalsFrozen.selector);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
     }
 
     function test_withdraw_openWhilePaused() public {
@@ -220,7 +307,7 @@ contract VaultEngineTest is VaultFixture {
         vault.pause();
 
         vm.prank(alice);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
         assertEq(token.balanceOf(alice), 100e18);
     }
 
@@ -231,7 +318,7 @@ contract VaultEngineTest is VaultFixture {
 
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
 
         // Loss is socialised: the holder receives what remains, not the nominal deposit.
         assertEq(token.balanceOf(alice), 20e18);
@@ -403,7 +490,7 @@ contract VaultEngineTest is VaultFixture {
 
         _fund(alice, DEPOSIT_CAP * 2);
         vm.prank(alice);
-        vault.deposit(DEPOSIT_CAP * 2, alice);
+        vault.deposit(DEPOSIT_CAP * 2, alice, 0);
         assertEq(vault.totalAssets(), DEPOSIT_CAP * 2);
     }
 

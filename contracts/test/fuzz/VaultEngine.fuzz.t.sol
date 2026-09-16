@@ -22,7 +22,7 @@ contract VaultEngineFuzzTest is VaultFixture {
         uint256 shares = _deposit(alice, amount);
 
         vm.prank(alice);
-        uint256 out = vault.withdraw(shares, alice);
+        uint256 out = vault.withdraw(shares, alice, 0);
 
         assertLe(out, amount);
         assertApproxEqAbs(out, amount, 1);
@@ -39,7 +39,7 @@ contract VaultEngineFuzzTest is VaultFixture {
         uint256 burn = (shares * pct) / 100;
 
         vm.prank(alice);
-        uint256 out = vault.withdraw(burn, alice);
+        uint256 out = vault.withdraw(burn, alice, 0);
 
         assertLe(out, (amount * pct) / 100);
         assertEq(vault.sharesOf(alice), shares - burn);
@@ -59,9 +59,9 @@ contract VaultEngineFuzzTest is VaultFixture {
         uint256 bobShares = vault.sharesOf(bob);
 
         vm.prank(alice);
-        uint256 aliceOut = vault.withdraw(aliceShares, alice);
+        uint256 aliceOut = vault.withdraw(aliceShares, alice, 0);
         vm.prank(bob);
-        uint256 bobOut = vault.withdraw(bobShares, bob);
+        uint256 bobOut = vault.withdraw(bobShares, bob, 0);
 
         assertLe(aliceOut, a);
         assertLe(bobOut, b);
@@ -81,10 +81,10 @@ contract VaultEngineFuzzTest is VaultFixture {
 
         _fund(bob, victimDeposit);
         vm.prank(bob);
-        uint256 victimShares = vault.deposit(victimDeposit, bob);
+        uint256 victimShares = vault.deposit(victimDeposit, bob, 0);
 
         vm.prank(bob);
-        uint256 out = vault.withdraw(victimShares, bob);
+        uint256 out = vault.withdraw(victimShares, bob, 0);
 
         assertGe(out, (victimDeposit * 9999) / 10_000);
     }

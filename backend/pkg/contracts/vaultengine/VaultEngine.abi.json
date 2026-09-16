@@ -133,6 +133,11 @@
         "name": "receiver",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "minShares",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
@@ -572,6 +577,11 @@
         "name": "receiver",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "minAssets",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
@@ -1102,6 +1112,22 @@
         "name": "token",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SlippageExceeded",
+    "inputs": [
+      {
+        "name": "got",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "wanted",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

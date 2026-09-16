@@ -8,6 +8,43 @@ import (
 	"testing"
 )
 
+// VLT-1, against a real chain: a bound the fill cannot meet stops the deposit, and stops it before
+// anything is written — the asset transfer that precedes the check is undone by the revert.
+func TestDepositRejectedByItsBoundLeavesNothingBehind(t *testing.T) {
+	s := setupStack(t)
+	ctx := context.Background()
+
+	send(t, deployerKey, s.deployment.Asset, "transfer(address,uint256)", aliceAddr, depositRaw)
+	send(t, aliceKey, s.deployment.Asset, "approve(address,uint256)", s.deployment.VaultProxy, depositRaw)
+
+	balanceBefore := call(t, s.deployment.Asset, "balanceOf(address)(uint256)", aliceAddr)
+
+	// More shares than any rate could produce for this deposit.
+	impossible := "100000000000000000000000000000000"
+	sendExpectingFailure(t, aliceKey, s.deployment.VaultProxy,
+		"deposit(uint256,address,uint256)", depositRaw, aliceAddr, impossible)
+
+	if got := call(t, s.deployment.VaultProxy, "sharesOf(address)(uint256)", aliceAddr); got != "0" {
+		t.Errorf("shares = %s, want 0 — a rejected deposit credited shares", got)
+	}
+	if got := call(t, s.deployment.VaultProxy, "totalAssets()(uint256)"); got != "0" {
+		t.Errorf("totalAssets = %s, want 0 — the assets stayed in the vault", got)
+	}
+	if got := call(t, s.deployment.Asset, "balanceOf(address)(uint256)", aliceAddr); got != balanceBefore {
+		t.Errorf("caller balance = %s, want %s — the transfer was not undone", got, balanceBefore)
+	}
+
+	s.indexToHead(t)
+
+	deposits, err := s.store.ListVaultDeposits(ctx, chainID, aliceAddr, 10, 0)
+	if err != nil {
+		t.Fatalf("list deposits: %v", err)
+	}
+	if len(deposits) != 0 {
+		t.Fatalf("indexed %d deposits from a reverted transaction", len(deposits))
+	}
+}
+
 // The whole point of the E2E: a six-decimal amount must survive the chain, the log decoder, the
 // indexer, Postgres, and the API without being rescaled. A hardcoded 18 anywhere in that path
 // shows up here as a factor of 10^12.
@@ -17,7 +54,7 @@ func TestDepositFlowPreservesRawSixDecimalAmount(t *testing.T) {
 
 	send(t, deployerKey, s.deployment.Asset, "transfer(address,uint256)", aliceAddr, depositRaw)
 	send(t, aliceKey, s.deployment.Asset, "approve(address,uint256)", s.deployment.VaultProxy, depositRaw)
-	send(t, aliceKey, s.deployment.VaultProxy, "deposit(uint256,address)", depositRaw, aliceAddr)
+	send(t, aliceKey, s.deployment.VaultProxy, "deposit(uint256,address,uint256)", depositRaw, aliceAddr, "0")
 
 	s.indexToHead(t)
 
@@ -138,5 +175,5 @@ func depositOnce(t *testing.T, s *stack) {
 	t.Helper()
 	send(t, deployerKey, s.deployment.Asset, "transfer(address,uint256)", aliceAddr, depositRaw)
 	send(t, aliceKey, s.deployment.Asset, "approve(address,uint256)", s.deployment.VaultProxy, depositRaw)
-	send(t, aliceKey, s.deployment.VaultProxy, "deposit(uint256,address)", depositRaw, aliceAddr)
+	send(t, aliceKey, s.deployment.VaultProxy, "deposit(uint256,address,uint256)", depositRaw, aliceAddr, "0")
 }

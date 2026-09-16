@@ -58,6 +58,6 @@ abstract contract VaultFixture is Test {
     ) internal returns (uint256 shares) {
         _fund(account, amount);
         vm.prank(account);
-        shares = vault.deposit(amount, account);
+        shares = vault.deposit(amount, account, 0);
     }
 }

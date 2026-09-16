@@ -26,7 +26,7 @@ contract StrategyFailureTest is VaultFixture {
 
         uint256 quarter = vault.sharesOf(alice) / 4;
         vm.prank(alice);
-        uint256 assets = vault.withdraw(quarter, alice);
+        uint256 assets = vault.withdraw(quarter, alice, 0);
 
         assertApproxEqAbs(assets, 25e18, 1);
         assertEq(token.balanceOf(alice), assets);
@@ -41,7 +41,7 @@ contract StrategyFailureTest is VaultFixture {
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
         vm.expectRevert(HostileStrategy.VenuePaused.selector);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
     }
 
     // --- totalAssets() reverting: the chokepoint ---
@@ -56,7 +56,7 @@ contract StrategyFailureTest is VaultFixture {
         uint256 dust = vault.sharesOf(alice) / 100;
         vm.prank(alice);
         vm.expectRevert(HostileStrategy.VenuePaused.selector);
-        vault.withdraw(dust, alice);
+        vault.withdraw(dust, alice, 0);
     }
 
     function test_revertingTotalAssets_haltsDeposits() public {
@@ -67,7 +67,7 @@ contract StrategyFailureTest is VaultFixture {
         _fund(bob, 10e18);
         vm.prank(bob);
         vm.expectRevert(HostileStrategy.VenuePaused.selector);
-        vault.deposit(10e18, bob);
+        vault.deposit(10e18, bob, 0);
     }
 
     /// The escape hatch is gated on the same call that is broken: setStrategy reads
@@ -115,7 +115,7 @@ contract StrategyFailureTest is VaultFixture {
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
         vm.expectRevert(HostileStrategy.VenuePaused.selector);
-        vault.withdraw(shares, alice);
+        vault.withdraw(shares, alice, 0);
     }
 
     // --- overstated holdings ---
@@ -132,7 +132,7 @@ contract StrategyFailureTest is VaultFixture {
 
         uint256 aliceShares = vault.sharesOf(alice);
         vm.prank(alice);
-        uint256 aliceOut = vault.withdraw(aliceShares, alice);
+        uint256 aliceOut = vault.withdraw(aliceShares, alice, 0);
 
         assertGt(aliceOut, 100e18, "alice exits at the inflated share price");
 
@@ -158,7 +158,7 @@ contract StrategyFailureTest is VaultFixture {
         // User deposits and withdrawals are untouched: nothing reached the venue.
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
-        assertApproxEqAbs(vault.withdraw(shares, alice), 100e18, 1);
+        assertApproxEqAbs(vault.withdraw(shares, alice, 0), 100e18, 1);
     }
 
     // --- recovery via detachStrategy ---
@@ -183,7 +183,7 @@ contract StrategyFailureTest is VaultFixture {
 
         uint256 shares = vault.sharesOf(alice);
         vm.prank(alice);
-        uint256 assets = vault.withdraw(shares, alice);
+        uint256 assets = vault.withdraw(shares, alice, 0);
 
         assertApproxEqAbs(assets, 50e18, 1, "alice recovers the idle half");
         assertEq(token.balanceOf(alice), assets);

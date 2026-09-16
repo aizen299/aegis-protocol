@@ -28,13 +28,23 @@ interface IVaultEngine {
     error AllocationCapExceeded(uint256 allocatedAfter, uint256 cap);
     error InvalidBps(uint256 bps);
 
+    /// @dev The caller's bound was not met. Carries both figures so a rejected call says by how
+    ///      much, not merely that it failed.
+    error SlippageExceeded(uint256 got, uint256 wanted);
+
+    /// @param minShares Revert unless at least this many shares are minted. Zero means no bound,
+    ///        which is a choice the caller makes rather than a default they inherit.
     function deposit(
         uint256 assets,
-        address receiver
+        address receiver,
+        uint256 minShares
     ) external returns (uint256 shares);
+
+    /// @param minAssets Revert unless at least this many assets are paid out. Zero means no bound.
     function withdraw(
         uint256 shares,
-        address receiver
+        address receiver,
+        uint256 minAssets
     ) external returns (uint256 assets);
 
     function asset() external view returns (address);

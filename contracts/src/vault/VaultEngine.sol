@@ -94,9 +94,14 @@ contract VaultEngine is
     /// @dev Shares are credited on assets actually received, so fee-on-transfer tokens do not
     ///      over-mint. The external transfer precedes the effects out of necessity; `nonReentrant`
     ///      is the reentrancy control here.
+    ///
+    ///      `minShares` is the caller's floor on the exchange rate. Share price moves with the
+    ///      strategy's reported holdings, and without a floor a deposit landing after a loss is
+    ///      filled at the worse rate with no recourse. See docs/v1.2-vault-slippage-plan.md.
     function deposit(
         uint256 assets,
-        address receiver
+        address receiver,
+        uint256 minShares
     ) external nonReentrant whenNotPaused returns (uint256 shares) {
         if (receiver == address(0)) revert ZeroAddress();
         if (assets == 0) revert ZeroAmount();
@@ -120,6 +125,10 @@ contract VaultEngine is
         // slither-disable-next-line incorrect-equality
         if (shares == 0) revert ZeroAmount();
 
+        // Checked before any state is written, so a rejected deposit leaves nothing behind. The
+        // transfer above is undone by the revert.
+        if (shares < minShares) revert SlippageExceeded(shares, minShares);
+
         _totalShares += shares;
         _sharesOf[receiver] += shares;
 
@@ -131,7 +140,8 @@ contract VaultEngine is
     ///      the idle balance is short.
     function withdraw(
         uint256 shares,
-        address receiver
+        address receiver,
+        uint256 minAssets
     ) external nonReentrant returns (uint256 assets) {
         if (_withdrawalsFrozen) revert WithdrawalsFrozen();
         if (receiver == address(0)) revert ZeroAddress();
@@ -143,6 +153,8 @@ contract VaultEngine is
         assets = _convertToAssets(shares, totalAssets(), Math.Rounding.Floor);
         // slither-disable-next-line incorrect-equality
         if (assets == 0) revert ZeroAmount();
+
+        if (assets < minAssets) revert SlippageExceeded(assets, minAssets);
 
         _sharesOf[msg.sender] = held - shares;
         _totalShares -= shares;

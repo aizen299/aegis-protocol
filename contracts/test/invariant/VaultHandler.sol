@@ -63,7 +63,7 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
         if (vault.convertToShares(amount) == 0) return;
 
         vm.prank(actor);
-        vault.deposit(amount, actor);
+        vault.deposit(amount, actor, 0);
         ghostDeposited += amount;
     }
 
@@ -79,7 +79,7 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
         if (vault.convertToAssets(shares) == 0) return;
 
         vm.prank(actor);
-        uint256 assets = vault.withdraw(shares, actor);
+        uint256 assets = vault.withdraw(shares, actor, 0);
         ghostWithdrawn += assets;
     }
 
