@@ -100,6 +100,17 @@ against a real local stack rather than by the review — which had omitted `fron
 
 ZK-1, the only High in this section, was **fixed after v1.0** and moved to the decided table below.
 
+### The outlier check sees at most 64 submissions per round — Low
+
+The aggregator loads a round's submissions through a listing capped at `MaxSubmissions`, default 64,
+and medianizes and checks for outliers over that set. In a round with more submissions, the rest are
+never checked: an outlier past the cap goes unpenalised, and the service's median is computed over a
+subset. This errs toward missed penalties rather than wrongful ones, which is why it was left alone
+when missed-round judgement — which reads the full submitter set — was built beside it.
+
+**Trigger:** `maxNodes` raised above 64, or any round observed with more than `MaxSubmissions`
+submissions.
+
 ### zk proofs are generated in the browser, not by the Rust service — deviation
 
 `docs/zk.md`'s architecture routes private inputs to the Rust proof service. v1.3 proves in the browser
