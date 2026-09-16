@@ -39,6 +39,10 @@ trap 'rm -rf "$work"; rm -f "$CIRCUIT/Prover.toml"' EXIT
 echo "==> compiling the circuit"
 (cd "$CIRCUIT" && nargo compile)
 
+# The browser proves with a committed copy of this artifact. If it differs, browser proofs are for a
+# different circuit than the one the verifier was generated from.
+python3 "$ROOT/scripts/circuit-artifact.py" check
+
 echo "==> building a witness"
 GATE="$GATE" SUBMITTER="$SUBMITTER" node "$ROOT/tools/poseidon/witness.cjs" > "$work/prover.toml"
 python3 - "$work/prover.toml" "$work/prover.json" <<'PY'

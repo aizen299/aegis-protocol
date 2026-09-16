@@ -12,6 +12,15 @@ const nextConfig = {
         resourceRegExp: /^(@x402\/|@react-native-async-storage\/async-storage$|pino-pretty$)/,
       }),
     );
+
+    // circomlibjs imports ffjavascript eagerly, which reaches web-worker's Node-only branch — a
+    // dynamic require the bundler cannot analyse. The browser never takes that branch: Poseidon runs
+    // in the page, verified by an end-to-end proof. Scoped to that one module, so any other warning
+    // still surfaces; a build that always warns teaches everyone to stop reading warnings.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /node_modules[\\/]web-worker[\\/]cjs[\\/]node\.js$/ },
+    ];
     return config;
   },
 };

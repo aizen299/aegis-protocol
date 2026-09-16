@@ -211,3 +211,42 @@ export const votesTokenAbi = [
     outputs: [{ type: "uint256" }],
   },
 ] as const;
+
+export const commitmentTreeAbi = [
+  {
+    type: "function",
+    name: "leafCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint32" }],
+  },
+  {
+    type: "function",
+    name: "isKnownRoot",
+    stateMutability: "view",
+    inputs: [{ name: "root", type: "bytes32" }],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
+
+export const zkGateAbi = [
+  {
+    type: "function",
+    name: "executePrivateAction",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "proof", type: "bytes" },
+      { name: "root", type: "bytes32" },
+      { name: "nullifier", type: "bytes32" },
+      { name: "actionId", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "isSpent",
+    stateMutability: "view",
+    inputs: [{ name: "nullifier", type: "bytes32" }],
+    outputs: [{ type: "bool" }],
+  },
+] as const;

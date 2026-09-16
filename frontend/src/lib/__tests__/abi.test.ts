@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { governorAbi, vaultEngineAbi } from "../abi";
+import { commitmentTreeAbi, governorAbi, vaultEngineAbi, zkGateAbi } from "../abi";
 
 // The frontend's ABIs are hand-written. The backend's are exported from the contracts and checked
 // against `forge inspect` in Backend CI, so comparing against those ties these to the contracts
@@ -70,5 +70,13 @@ describe("frontend ABIs mirror the contracts", () => {
 
   it("governorAbi", () => {
     assertMirrors(governorAbi, committed("governance/Governor.abi.json"), "governorAbi");
+  });
+
+  it("commitmentTreeAbi", () => {
+    assertMirrors(commitmentTreeAbi, committed("zk/CommitmentTree.abi.json"), "commitmentTreeAbi");
+  });
+
+  it("zkGateAbi", () => {
+    assertMirrors(zkGateAbi, committed("zk/ZkVaultGate.abi.json"), "zkGateAbi");
   });
 });

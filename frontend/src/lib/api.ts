@@ -220,6 +220,10 @@ export const api = {
   zkGate: () => get<ZkGateMetadata>("/v1/zk/gate"),
   anonymitySet: () => get<AnonymitySet>("/v1/zk/anonymity-set"),
   commitments: () => get<Paged<Commitment>>("/v1/zk/commitments"),
+  // Paged by limit and offset only. There is no lookup by commitment, deliberately: asking which leaf
+  // holds a commitment would tell the server which deposit is about to be spent.
+  commitmentsPage: (limit: number, offset: number) =>
+    get<Paged<Commitment>>(`/v1/zk/commitments?limit=${limit}&offset=${offset}`),
   zkActions: () => get<Paged<ZkAction>>("/v1/zk/actions"),
   privateActions: () => get<Paged<PrivateAction>>("/v1/zk/private-actions"),
   nullifierStatus: (nullifier: string) =>

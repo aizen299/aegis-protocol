@@ -4,10 +4,12 @@ on:
   push:
     branches: [main]
     paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "frontend/tools/**",
-            "frontend/package.json", "scripts/check-proving-versions.py", "Makefile", ".github/workflows/zk.yml"]
+            "frontend/package.json", "frontend/public/circuits/**", "scripts/check-proving-versions.py",
+            "scripts/circuit-artifact.py", "Makefile", ".github/workflows/zk.yml"]
   pull_request:
     paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "frontend/tools/**",
-            "frontend/package.json", "scripts/check-proving-versions.py", "Makefile", ".github/workflows/zk.yml"]
+            "frontend/package.json", "frontend/public/circuits/**", "scripts/check-proving-versions.py",
+            "scripts/circuit-artifact.py", "Makefile", ".github/workflows/zk.yml"]
 
 concurrency:
   group: zk-${{ github.ref }}

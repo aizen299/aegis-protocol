@@ -124,6 +124,22 @@ do not already bear the cost of a halted feed.
 a feed value to make a decision that moves funds. Either makes a free liveness attack worth
 mounting.
 
+### zk proofs are generated in the browser, not by the Rust service — deviation
+
+`docs/zk.md`'s architecture routes private inputs to the Rust proof service. v1.3 proves in the browser
+instead, deliberately. The circuit derives both a user's commitment and their nullifier from one
+secret, and `ProveRequest` carries the secret and the nullifier in one body — so a hosted prover
+receives exactly the link between a deposit and its spend that `migration 000008` refuses to store.
+The service handles its inputs carefully, but that is the operator behaving well, not a property of
+the system.
+
+The Rust service is kept. It is the reference the browser path is checked against, and the only place
+the CLI proving path is exercised under test. **It is not a user-facing prover and must not be offered
+as one** without stating, at the point of proving, that its operator can link deposits to spends.
+
+**Revisit if** proving must run somewhere a browser cannot — a mobile client without WASM, or a proof
+too large to generate in a page. The disclosure requirement comes with any such change.
+
 ### The root history window is fixed at deployment — Low
 
 `CommitmentTree` has no setter for `rootHistorySize`, so the value chosen at initialization is

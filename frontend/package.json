@@ -16,6 +16,7 @@
     "@noir-lang/noir_js": "1.0.0-beta.22",
     "@rainbow-me/rainbowkit": "^2.2.4",
     "@tanstack/react-query": "^5.66.0",
+    "circomlibjs": "0.1.7",
     "next": "^15.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
