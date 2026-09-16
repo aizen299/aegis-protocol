@@ -72,8 +72,17 @@ security: contracts-slither ## Run static analysis
 contracts-build:
 	cd contracts && forge build --sizes
 
+# BrowserProofTest verifies an artifact that `make zk-browser-proof-check` generates, so it cannot
+# run from a clean checkout. Excluded here and run there, rather than made to skip when the artifact
+# is missing — a test that passes when its subject is absent is worse than one that does not run.
+CONTRACTS_TEST_EXCLUDE ?= BrowserProofTest
+
 .PHONY: contracts-test
 contracts-test:
+	cd contracts && forge test -vvv --no-match-contract '$(CONTRACTS_TEST_EXCLUDE)'
+
+.PHONY: contracts-test-all
+contracts-test-all: ## Every suite, including those needing generated artifacts
 	cd contracts && forge test -vvv
 
 .PHONY: contracts-lint
@@ -167,6 +176,12 @@ zk-verifier-check: ## Fail if the committed verifier differs from a fresh genera
 		exit 1; \
 	fi
 
+# The browser proving path must agree with the CLI one: same circuit, same toolchain versions, one
+# committed verifier. A version bump on either side without the other must fail here.
+.PHONY: zk-browser-proof-check
+zk-browser-proof-check: ## Prove through noir_js/bb.js and verify against the committed verifier
+	./scripts/browser-proof-check.sh
+
 .PHONY: zk-proof-fixture
 zk-proof-fixture: ## Regenerate the committed proof the contract suite verifies (needs nargo, bb, Node)
 	./tools/gen-proof-fixture.sh
@@ -227,7 +242,7 @@ zk-toolchain-check: ## Fail if the installed Noir toolchain is not the pinned on
 # CREATE2 address. The zk suites deploy the gate at an address the committed proof binds as a public
 # input, so under instrumentation that address moves and no proof verifies. They are excluded here
 # and run in full under `forge test`; excluding them costs coverage numbers, not assertions.
-COVERAGE_EXCLUDE ?= ZkVaultGateTest|ZkProbeTest|ZkInvariantTest
+COVERAGE_EXCLUDE ?= ZkVaultGateTest|ZkProbeTest|ZkInvariantTest|BrowserProofTest
 
 .PHONY: contracts-coverage
 contracts-coverage: ## Coverage report, minus the suites whose addresses instrumentation moves

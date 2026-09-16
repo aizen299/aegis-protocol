@@ -3,9 +3,11 @@ name: zk CI
 on:
   push:
     branches: [main]
-    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "Makefile", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "frontend/tools/**",
+            "frontend/package.json", "scripts/check-proving-versions.py", "Makefile", ".github/workflows/zk.yml"]
   pull_request:
-    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "Makefile", ".github/workflows/zk.yml"]
+    paths: ["zk/**", "contracts/src/zk/**", "contracts/generated/**", "tools/**", "frontend/tools/**",
+            "frontend/package.json", "scripts/check-proving-versions.py", "Makefile", ".github/workflows/zk.yml"]
 
 concurrency:
   group: zk-${{ github.ref }}
@@ -65,6 +67,17 @@ jobs:
       # produces a proof, and it needs the toolchain this job installs.
       - name: Prove for real through the service
         run: make zk-service-e2e
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install the frontend's proving packages
+        run: npm ci --prefix frontend
+      # Two proving implementations, one verifier. The CLI path above generated it; the browser path
+      # has to satisfy it, and nothing makes them agree unless something checks.
+      - name: Prove through the browser path and verify against the committed verifier
+        run: make zk-browser-proof-check
 
   test:
     runs-on: ubuntu-latest
