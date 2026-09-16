@@ -16,6 +16,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v0.4 | zk Privacy Layer | **Released** — tagged `v0.4.0` |
 | v1.0 | Production Release | **Released** — tagged `v1.0.0` |
 | v1.1 | Protocol-wide UI | **Released** — tagged `v1.1.0` |
+| v1.2 | Vault slippage bounds | **Released** — tagged `v1.2.0` (breaking) |
 
 **v1.0 is production-ready and has never been deployed.** No AWS account exists for this project, so
 the staging deployment named in `docs/project-spec.md` §5 and the Arbitrum Sepolia target in §7 did
@@ -23,7 +24,9 @@ not happen — a recorded deviation, with the infrastructure defined and validat
 No external audit; the review in [`docs/v1.0-audit-simulation.md`](docs/v1.0-audit-simulation.md) is
 the authors reviewing their own work. No mainnet, no real funds, no custody of value.
 
-[`docs/v1.1-release-notes.md`](docs/v1.1-release-notes.md) states precisely what the current release
+[`docs/v1.2-release-notes.md`](docs/v1.2-release-notes.md) covers the current release, which changes
+the signatures of `deposit` and `withdraw`.
+[`docs/v1.1-release-notes.md`](docs/v1.1-release-notes.md) states precisely what the protocol
 is and is not. v1.1 closes the High-severity finding v1.0 shipped with — a zk proof could be
 submitted by anyone who saw it — and gives every module a read-only UI. It changes nothing about the
 deployment, audit, or custody position above.
