@@ -13,10 +13,9 @@ import (
 
 // Slash reason codes. Stored as text and passed on-chain as bytes32.
 //
-// docs/oracle.md lists four conditions; these are the two that are implemented. MISSED_ROUND and
-// CONSECUTIVE_MISSES are not, and their constants were removed rather than left declared — unused
-// Go constants do not fail a build, so keeping them made the gap read as implemented. The absent
-// liveness penalty is recorded in DEFERRED.md as ORC-1.
+// docs/oracle.md lists four conditions. These two are judged here, per submission. MISSED_ROUND and
+// CONSECUTIVE_MISSES are judged per eligible node rather than per submission, in missed.go — see
+// docs/v1.3-missed-round-slashing-plan.md.
 const (
 	ReasonOutlier          = "OUTLIER_SUBMISSION"
 	ReasonInvalidSignature = "INVALID_SIGNATURE"
