@@ -7,7 +7,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Aegis Protocol",
-  description: "Vault, oracle, and governance",
+  description: "Vault, oracle, governance, and zk privacy",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-12">
             <header>
               <h1 className="text-xl font-semibold text-zinc-100">Aegis Protocol</h1>
-              <p className="text-sm text-zinc-500">Vault &middot; Oracle &middot; Governance</p>
+              <p className="text-sm text-zinc-500">Vault &middot; Oracle &middot; Governance &middot; Privacy</p>
             </header>
             <Nav />
             {children}

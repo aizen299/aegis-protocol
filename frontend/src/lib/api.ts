@@ -120,6 +120,63 @@ export type Vote = {
   votedAt: string;
 };
 
+export type ZkGateMetadata = {
+  chainId: number;
+  address: string;
+  tree: string;
+  verifier: string;
+};
+
+// No owner field, and that is the design. The anonymity this module provides is the difficulty of
+// linking a commitment to the action that spends it, and a column joining the two would hand that
+// away — so the UI has nothing to join either.
+export type Commitment = {
+  chainId: number;
+  tree: string;
+  leafIndex: number;
+  commitment: string;
+  rootAfter: string;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  insertedAt: string;
+};
+
+export type ZkAction = {
+  chainId: number;
+  gate: string;
+  actionId: string;
+  name: string;
+  registered: boolean;
+  blockNumber: number;
+};
+
+export type PrivateAction = {
+  chainId: number;
+  gate: string;
+  nullifier: string;
+  actionId: string;
+  root: string;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  executedAt: string;
+};
+
+export type AnonymitySet = {
+  chainId: number;
+  tree: string;
+  leafCount: number;
+  currentRoot?: string;
+};
+
+export type NullifierStatus = {
+  chainId: number;
+  gate: string;
+  nullifier: string;
+  spent: boolean;
+};
+
 export type GovernorMetadata = {
   chainId: number;
   address: string;
@@ -159,4 +216,12 @@ export const api = {
   proposals: () => get<Paged<Proposal>>("/v1/governance/proposals"),
   proposal: (id: string) => get<Proposal>(`/v1/governance/proposals/${id}`),
   proposalVotes: (id: string) => get<Paged<Vote>>(`/v1/governance/proposals/${id}/votes`),
+
+  zkGate: () => get<ZkGateMetadata>("/v1/zk/gate"),
+  anonymitySet: () => get<AnonymitySet>("/v1/zk/anonymity-set"),
+  commitments: () => get<Paged<Commitment>>("/v1/zk/commitments"),
+  zkActions: () => get<Paged<ZkAction>>("/v1/zk/actions"),
+  privateActions: () => get<Paged<PrivateAction>>("/v1/zk/private-actions"),
+  nullifierStatus: (nullifier: string) =>
+    get<NullifierStatus>(`/v1/zk/nullifiers/${nullifier}`),
 };

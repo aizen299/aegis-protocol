@@ -83,6 +83,36 @@ export function useProposalVotes(id: string) {
   });
 }
 
+export function useZkGate() {
+  return useQuery({ queryKey: ["zk", "gate"], queryFn: api.zkGate, ...shared });
+}
+
+export function useAnonymitySet() {
+  return useQuery({ queryKey: ["zk", "anonymity"], queryFn: api.anonymitySet, ...shared });
+}
+
+export function useCommitments() {
+  return useQuery({ queryKey: ["zk", "commitments"], queryFn: api.commitments, ...shared });
+}
+
+export function useZkActions() {
+  return useQuery({ queryKey: ["zk", "actions"], queryFn: api.zkActions, ...shared });
+}
+
+export function usePrivateActions() {
+  return useQuery({ queryKey: ["zk", "private-actions"], queryFn: api.privateActions, ...shared });
+}
+
+export function useNullifierStatus(nullifier: string) {
+  return useQuery({
+    queryKey: ["zk", "nullifier", nullifier],
+    queryFn: () => api.nullifierStatus(nullifier),
+    ...shared,
+    enabled: /^0x[0-9a-f]{64}$/.test(nullifier),
+    retry: false,
+  });
+}
+
 export function useGovernor() {
   return useQuery({ queryKey: ["governance", "governor"], queryFn: api.governor, ...shared });
 }

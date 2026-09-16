@@ -8,6 +8,7 @@ const links = [
   { href: "/oracle", label: "Oracle" },
   { href: "/oracle/nodes", label: "Nodes" },
   { href: "/governance", label: "Governance" },
+  { href: "/zk", label: "Privacy" },
 ];
 
 export function Nav() {

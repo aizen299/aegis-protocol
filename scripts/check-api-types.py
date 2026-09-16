@@ -26,6 +26,11 @@ MIRRORED = {
     "Vote": "Vote",
     "GovernorMetadata": "GovernorMetadata",
     "ProposalAction": "ProposalAction",
+    "ZkGateMetadata": "ZkGateMetadata",
+    "Commitment": "Commitment",
+    "ZkAction": "ZkAction",
+    "PrivateAction": "PrivateAction",
+    "AnonymitySet": "AnonymitySet",
 }
 
 
