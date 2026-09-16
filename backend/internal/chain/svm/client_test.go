@@ -31,6 +31,10 @@ type fakeNode struct {
 	txs            map[string]fakeTx
 	accounts       map[string]accountInfo
 	calls          map[string]int
+
+	simulationErr  any
+	simulationLogs []string
+	sentTx         string
 }
 
 func (n *fakeNode) serve(t *testing.T) *httptest.Server {
@@ -87,6 +91,15 @@ func (n *fakeNode) serve(t *testing.T) *httptest.Server {
 			} else {
 				result = map[string]any{"value": nil}
 			}
+		case "getLatestBlockhash":
+			result = map[string]any{"value": map[string]any{"blockhash": Encode(pbtypes.Identity{1})}}
+		case "simulateTransaction":
+			_ = json.Unmarshal(req.Params[0], &n.sentTx)
+			result = map[string]any{"value": map[string]any{"err": n.simulationErr, "logs": n.simulationLogs}}
+		case "sendTransaction":
+			result = signature(77)
+		case "getSignatureStatuses":
+			result = map[string]any{"value": []any{map[string]any{"err": nil, "confirmationStatus": "finalized"}}}
 		default:
 			t.Errorf("unexpected method %s", req.Method)
 		}

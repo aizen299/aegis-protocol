@@ -154,9 +154,9 @@ func (o solanaOracle) settle(t *testing.T, round uint64) string {
 	})
 }
 
-// §12.8 and step 4b: nodes submit through the production Go adapter, the program verifies their
-// ed25519 attestations, and the round, its submissions, and the node set are indexed into the
-// existing oracle tables and served under the Solana chain.
+// §12.8, steps 4b and 4c: nodes submit through the production Go adapter, the program verifies their
+// ed25519 attestations, the rounds and node set are indexed and served under the Solana chain, and the
+// aggregator verifies the attestations off chain and slashes an outlier and a missed round.
 func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 	s := setupStack(t)
 	authority := requireSolana(t)
@@ -169,6 +169,9 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 	}
 	o := setupSolanaOracle(t, idl.Program, authority)
 	nodes := []solanaKey{o.registerNode(t), o.registerNode(t), o.registerNode(t)}
+	// Registered but never submits. Round 1 settles early, which excuses it; round 2 runs to its
+	// deadline, which does not.
+	silent := o.registerNode(t)
 	o.openRound(t, 0, 1)
 
 	client, err := svm.New(ctx, svm.Options{RPCURL: solanaRPC, ChainID: solanaChainID, Programs: []svm.Registration{{IDL: idl}}})
@@ -176,7 +179,8 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 		t.Fatal(err)
 	}
 	feedHex := "0x" + hex.EncodeToString(o.feed[:])
-	values := []int64{300_000_000_000, 100_000_000_000, 200_000_000_000}
+	// Within the outlier threshold of each other, so round 1 decides no penalty.
+	values := []int64{202_000_000_000, 200_000_000_000, 201_000_000_000}
 
 	for i, key := range nodes {
 		chain, err := svm.NewOracleNodeChain(client, key)
@@ -232,7 +236,7 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if round.State != pbtypes.RoundStateSettled || round.AggregatedValue.String() != "200000000000" || round.SubmissionCount != 3 || round.EligibleCount != 3 {
+	if round.State != pbtypes.RoundStateSettled || round.AggregatedValue.String() != "201000000000" || round.SubmissionCount != 3 || round.EligibleCount != 4 {
 		t.Fatalf("round = %+v", round)
 	}
 	if round.FeedID != feedHex || round.Decimals != 8 || round.FeedName != "ETH/USD" {
@@ -267,7 +271,7 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 		}
 	}
 
-	for _, key := range nodes {
+	for _, key := range append(nodes, silent) {
 		node, err := s.store.OracleNode(ctx, solanaChainID, svm.Encode(key.Identity()))
 		if err != nil {
 			t.Fatal(err)
@@ -280,8 +284,8 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(intervals) != 3 {
-		t.Errorf("%d nodes were in the set the round froze, want 3", len(intervals))
+	if len(intervals) != 4 {
+		t.Errorf("%d nodes were in the set the round froze, want 4", len(intervals))
 	}
 
 	srv := api.NewServer(s.cfg, zerolog.New(io.Discard), api.Deps{
@@ -293,11 +297,184 @@ func TestASolanaOracleRoundIsSubmittedFromGoAndIndexed(t *testing.T) {
 		},
 	}).Handler()
 	status, body := serve(t, srv, "/v1/oracle/rounds/1?chain=solana-localnet")
-	if status != http.StatusOK || body["aggregatedValue"] != "200000000000" || body["state"] != "settled" {
+	if status != http.StatusOK || body["aggregatedValue"] != "201000000000" || body["state"] != "settled" {
 		t.Errorf("round over the API: status %d, body %v", status, body)
 	}
 	status, body = serve(t, srv, "/v1/oracle/nodes/"+svm.Encode(nodes[0].Identity())+"?chain=solana-localnet")
 	if status != http.StatusOK || body["stakedAmount"] != "1000000" {
 		t.Errorf("node over the API: status %d, body %v", status, body)
+	}
+
+	solanaSlashingRound(t, s, o, idx, client, nodes, silent)
+}
+
+// solanaSlashingRound is step 4c: a round that runs to its deadline with one outlier and one silent
+// node, judged and executed by the real aggregator and executor with the Solana verifier and slasher.
+func solanaSlashingRound(t *testing.T, s *stack, o solanaOracle, idx *indexer.Indexer, client *svm.Client, nodes []solanaKey, silent solanaKey) {
+	t.Helper()
+	ctx := context.Background()
+	me := o.authority.Identity()
+
+	// Short enough to wait out, long enough for three submissions to confirm.
+	sendOK(t, o.authority, nil, "confirmed", instruction{
+		Program: o.program,
+		Data:    append(anchorDiscriminator("set_round_duration"), i64le(25)...),
+		Accounts: append([]accountMeta{
+			{Key: me, Signer: true},
+			{Key: o.pda([]byte("config")), Writable: true},
+		}, o.events()...),
+	})
+	o.openRound(t, 1, 2)
+
+	feedHex := "0x" + hex.EncodeToString(o.feed[:])
+	values := []int64{100_000_000_000, 101_000_000_000, 150_000_000_000}
+	var deadline time.Time
+	for i, key := range nodes {
+		chain, err := svm.NewOracleNodeChain(client, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, err := chain.CurrentRound(ctx, feedHex)
+		if err != nil || !view.Open || !view.Eligible {
+			t.Fatalf("node %d sees %+v, err %v", i, view, err)
+		}
+		deadline = view.Deadline
+		if _, err := chain.Submit(ctx, view.RoundID, feedHex, pbtypes.NewRaw(big.NewInt(values[i]))); err != nil {
+			t.Fatalf("node %d submit: %v", i, err)
+		}
+	}
+
+	// Settle only once the chain's clock is past the deadline: a round settled early excuses the
+	// silent node, and this round is meant to count its silence.
+	for waited := time.Now(); ; time.Sleep(time.Second) {
+		var slot uint64
+		if err := solanaCall(ctx, "getSlot", []any{map[string]any{"commitment": "confirmed"}}, &slot); err != nil {
+			t.Fatal(err)
+		}
+		var blockTime int64
+		if err := solanaCall(ctx, "getBlockTime", []any{slot}, &blockTime); err == nil && blockTime > deadline.Unix() {
+			break
+		}
+		if time.Since(waited) > 90*time.Second {
+			t.Fatal("the validator clock never passed the round deadline")
+		}
+	}
+	settled := o.settle(t, 2)
+	indexThrough(t, idx, transactionSlot(t, settled))
+
+	slashKey := o.authority
+	slasher, err := svm.NewSlasher(client, o.program, slashKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := zerolog.New(io.Discard)
+	aggregator := oraclesvc.NewAggregator(s.store, svm.NewSubmissionVerifier(o.program), log, oraclesvc.AggregatorOptions{ChainID: solanaChainID})
+	executor := oraclesvc.NewExecutor(s.store, slasher, log, oraclesvc.ExecutorOptions{ChainID: solanaChainID, MaxAttempts: 3})
+
+	for {
+		n, err := aggregator.Step(ctx)
+		if err != nil {
+			t.Fatalf("aggregate: %v", err)
+		}
+		if n == 0 {
+			break
+		}
+	}
+	for {
+		n, err := aggregator.JudgeMisses(ctx)
+		if err != nil {
+			t.Fatalf("judge misses: %v", err)
+		}
+		if n == 0 {
+			break
+		}
+	}
+
+	count := func(sql string, args ...any) int64 {
+		t.Helper()
+		var out int64
+		if err := s.store.QueryRowForTest(ctx, sql, args...).Scan(&out); err != nil {
+			t.Fatalf("query %q: %v", sql, err)
+		}
+		return out
+	}
+	invalid := count(`SELECT count(*) FROM oracle_submissions WHERE chain_id = $1 AND signature_valid = false`, solanaChainID)
+	if invalid != 0 {
+		t.Errorf("%d genuine Solana attestations failed off-chain verification", invalid)
+	}
+	decided := func(node solanaKey, reason string) int64 {
+		return count(`SELECT count(*) FROM oracle_slashings WHERE chain_id = $1 AND node_address = $2 AND round_id = 2 AND reason = $3`,
+			solanaChainID, svm.Encode(node.Identity()), reason)
+	}
+	if decided(nodes[2], oraclesvc.ReasonOutlier) != 1 {
+		t.Error("the outlier in round 2 was not decided")
+	}
+	if decided(silent, oraclesvc.ReasonMissedRound) != 1 {
+		t.Error("the node silent through round 2's deadline was not decided a miss")
+	}
+	if total := count(`SELECT count(*) FROM oracle_slashings WHERE chain_id = $1`, solanaChainID); total != 2 {
+		t.Errorf("%d slash decisions, want exactly the outlier and the miss", total)
+	}
+
+	if handled, err := executor.Step(ctx); err != nil || handled != 2 {
+		t.Fatalf("executor handled %d, err %v", handled, err)
+	}
+
+	// Executed means the chain confirmed it: the indexer marks a decision executed when it sees
+	// NodeSlashed.
+	for waited := time.Now(); count(`SELECT count(*) FROM oracle_slashings WHERE chain_id = $1 AND executed_at IS NOT NULL`, solanaChainID) < 2; {
+		if time.Since(waited) > 90*time.Second {
+			t.Fatal("the slashes were never indexed as executed")
+		}
+		time.Sleep(2 * time.Second)
+		if _, err := idx.Step(ctx); err != nil {
+			t.Fatalf("indexer step: %v", err)
+		}
+	}
+
+	for _, c := range []struct {
+		node solanaKey
+		want string
+	}{{nodes[2], "990000"}, {silent, "995000"}} {
+		row, err := s.store.OracleNode(ctx, solanaChainID, svm.Encode(c.node.Identity()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.StakedAmount.String() != c.want {
+			t.Errorf("%s: stake = %s, want %s after its penalty", svm.Encode(c.node.Identity()), row.StakedAmount, c.want)
+		}
+	}
+
+	// A retry after a lost confirmation: the chain already holds the slash record, which must close
+	// the decision rather than fail it.
+	var reset int64
+	if err := s.store.QueryRowForTest(ctx,
+		`UPDATE oracle_slashings SET submitted_at = NULL, tx_hash = NULL, executed_at = NULL, attempts = 0
+		 WHERE chain_id = $1 AND reason = $2 RETURNING 1`,
+		solanaChainID, oraclesvc.ReasonOutlier).Scan(&reset); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := executor.Step(ctx); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if count(`SELECT count(*) FROM oracle_slashings WHERE chain_id = $1 AND reason = $2 AND abandoned_at IS NOT NULL`, solanaChainID, oraclesvc.ReasonOutlier) != 1 {
+		t.Error("the retry did not close the decision the chain had already satisfied")
+	}
+	row, _ := s.store.OracleNode(ctx, solanaChainID, svm.Encode(nodes[2].Identity()))
+	if row.StakedAmount.String() != "990000" {
+		t.Errorf("the retry slashed again: stake = %s", row.StakedAmount)
+	}
+}
+
+func indexThrough(t *testing.T, idx *indexer.Indexer, slot uint64) {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for idx.Cursor() < slot {
+		if time.Now().After(deadline) {
+			t.Fatalf("indexer stalled at slot %d, want %d", idx.Cursor(), slot)
+		}
+		if _, err := idx.Step(context.Background()); err != nil {
+			t.Fatalf("indexer step: %v", err)
+		}
 	}
 }
