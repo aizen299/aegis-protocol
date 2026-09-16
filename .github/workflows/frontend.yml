@@ -3,13 +3,14 @@ name: Frontend CI
 on:
   push:
     branches: [main]
-    # backend/pkg/types is included because the frontend hand-mirrors those structs: a field
-    # renamed in Go must fail here, not at runtime as an undefined.
+    # backend/pkg/types and backend/pkg/contracts are included because the frontend hand-mirrors
+    # both — the API's structs and the contracts' ABIs. A change on the backend side must fail here,
+    # not at runtime as an undefined field or a transaction with the wrong selector.
     paths:
-      ["frontend/**", "backend/pkg/types/**", "scripts/check-api-types.py", ".github/workflows/frontend.yml"]
+      ["frontend/**", "backend/pkg/types/**", "backend/pkg/contracts/**", "scripts/check-api-types.py", ".github/workflows/frontend.yml"]
   pull_request:
     paths:
-      ["frontend/**", "backend/pkg/types/**", "scripts/check-api-types.py", ".github/workflows/frontend.yml"]
+      ["frontend/**", "backend/pkg/types/**", "backend/pkg/contracts/**", "scripts/check-api-types.py", ".github/workflows/frontend.yml"]
 
 concurrency:
   group: frontend-${{ github.ref }}

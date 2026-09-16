@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 
 import { erc20Abi, vaultEngineAbi } from "@/lib/abi";
 import { env } from "@/lib/env";
 import { DEFAULT_TOLERANCE_BPS, formatTolerance, minimumOut } from "@/lib/slippage";
 import { formatAmount, parseAmount, shareDecimals } from "@/lib/units";
+import { useTx } from "@/lib/tx";
 import { Panel } from "./Panel";
 import { TxButton, TxStatus } from "./TxButton";
 
@@ -25,8 +26,7 @@ export function DepositForm({
 }) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash });
+  const { phase, busy, writeContract } = useTx();
 
   const parsed = parseAmount(amount, decimals);
 
@@ -99,12 +99,12 @@ export function DepositForm({
       ) : null}
       <TxButton
         disabled={disabled || parsed === null || (!needsApproval && floor === undefined)}
-        pending={isPending || confirming}
+        pending={busy}
         onClick={submit}
       >
         {needsApproval ? "Approve" : "Deposit"}
       </TxButton>
-      <TxStatus error={error} hash={hash} />
+      <TxStatus phase={phase} />
     </Panel>
   );
 }

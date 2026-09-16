@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { formatUnits } from "viem";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 
 import { vaultEngineAbi } from "@/lib/abi";
 import { env } from "@/lib/env";
 import { DEFAULT_TOLERANCE_BPS, formatTolerance, minimumOut } from "@/lib/slippage";
 import { formatAmount, parseAmount } from "@/lib/units";
+import { useTx } from "@/lib/tx";
 import { Panel } from "./Panel";
 import { TxButton, TxStatus } from "./TxButton";
 
@@ -28,8 +29,7 @@ export function WithdrawForm({
 }) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
-  const { writeContract, data: hash, error, isPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash });
+  const { phase, busy, writeContract } = useTx();
 
   const parsed = parseAmount(amount, shareScale);
   const exceedsBalance = parsed !== null && shares !== undefined && parsed > shares;
@@ -91,12 +91,12 @@ export function WithdrawForm({
       ) : null}
       <TxButton
         disabled={disabled || parsed === null || exceedsBalance || floor === undefined}
-        pending={isPending || confirming}
+        pending={busy}
         onClick={submit}
       >
         {exceedsBalance ? "Exceeds balance" : `Withdraw${symbol ? ` (${symbol})` : ""}`}
       </TxButton>
-      <TxStatus error={error} hash={hash} />
+      <TxStatus phase={phase} />
     </Panel>
   );
 }

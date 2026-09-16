@@ -1,6 +1,7 @@
 "use client";
 
 import { Async } from "@/components/Async";
+import { ProposalActions } from "@/components/governance/ProposalActions";
 import { Panel, Stat } from "@/components/Panel";
 import { StateBadge } from "@/components/StateBadge";
 import { Cell, Row, Table } from "@/components/Table";
@@ -38,6 +39,12 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                 <Stat label="Voting opens" state={valueOf(formatUnixTime(data.voteStart))} />
                 <Stat label="Voting closes" state={valueOf(formatUnixTime(data.voteEnd))} />
               </Panel>
+
+              <ProposalActions
+                proposalId={proposalId}
+                voteStart={data.voteStart}
+                executableAt={data.executableAt}
+              />
 
               <Panel title="Tally">
                 <Stat label="For" state={tally(data.votesFor)} />
