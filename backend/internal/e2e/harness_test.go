@@ -31,6 +31,11 @@ const (
 	// Anvil's deterministic accounts. Public knowledge, worthless off a local chain.
 	deployerKey  = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	deployerAddr = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
+	// Anvil's second default account. Used where a test needs an account that is not the one a
+	// proof or a role was issued to.
+	strangerKey  = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+	strangerAddr = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
 	aliceKey     = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
 	aliceAddr    = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
 )

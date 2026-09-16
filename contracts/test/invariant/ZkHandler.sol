@@ -7,6 +7,7 @@ import {StdUtils} from "forge-std/StdUtils.sol";
 
 import {CommitmentTree} from "../../src/zk/CommitmentTree.sol";
 import {ZkVaultGate} from "../../src/zk/ZkVaultGate.sol";
+import {ProofFixture} from "../utils/ProofFixture.sol";
 
 /// @dev Every action returns early rather than reverting: `fail_on_revert = true` is on. The cases
 ///      that must be observed failing — a replay, a wrong root, an unregistered action — go through
@@ -39,6 +40,11 @@ contract ZkHandler is CommonBase, StdCheats, StdUtils {
     bool public ghostUnknownRootAccepted;
     bool public ghostUnregisteredActionAccepted;
     bool public ghostSpentBecameUnspent;
+
+    /// The proof names who may present it, so every call here comes from that account. A handler
+    /// submitting as itself would have every proof rejected and the whole suite would pass while
+    /// exercising nothing — which is what HandlerProbe caught when the binding landed.
+    address internal constant submitter = address(uint160(uint256(ProofFixture.SUBMITTER)));
 
     constructor(
         CommitmentTree tree_,
@@ -98,6 +104,7 @@ contract ZkHandler is CommonBase, StdCheats, StdUtils {
     function executeValidProof() external {
         bool alreadySpent = gate.isSpent(nullifier);
 
+        vm.prank(submitter);
         try gate.executePrivateAction(proof, root, nullifier, actionId) {
             if (alreadySpent) ghostDoubleSpend = true;
             ghostExecuteCount += 1;
@@ -112,6 +119,7 @@ contract ZkHandler is CommonBase, StdCheats, StdUtils {
         bytes32 invented = bytes32(uint256(keccak256(abi.encode("root", seed))) % FIELD_SIZE);
         if (tree.isKnownRoot(invented)) return;
 
+        vm.prank(submitter);
         try gate.executePrivateAction(proof, invented, nullifier, actionId) {
             ghostUnknownRootAccepted = true;
         } catch {
@@ -125,6 +133,7 @@ contract ZkHandler is CommonBase, StdCheats, StdUtils {
         bytes32 other = bytes32(uint256(keccak256(abi.encode("action", seed))) % FIELD_SIZE);
         if (gate.isActionRegistered(other)) return;
 
+        vm.prank(submitter);
         try gate.executePrivateAction(proof, root, nullifier, other) {
             ghostUnregisteredActionAccepted = true;
         } catch {

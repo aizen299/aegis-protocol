@@ -18,6 +18,9 @@ import {IZkVerifier} from "./verifier/IZkVerifier.sol";
 /// @title ZkVaultGate (v0.4)
 /// @notice Proves membership in the commitment tree and spends a nullifier, without revealing which
 ///         commitment was used.
+/// @dev A proof is bound to the account that may submit it. Before v1.1 it was not, and anyone who
+///      saw a proof could land it first and burn the prover's nullifier permanently — ZK-1 in
+///      DEFERRED.md. To have someone else submit, prove against their address.
 /// @dev The gate is where replay is actually rejected. The circuit cannot do it — it has no memory.
 ///      What the circuit guarantees is that the same secret and domain always produce the same
 ///      nullifier, which is precisely what lets this map see a repeat. See
@@ -92,12 +95,20 @@ contract ZkVaultGate is
         if (uint256(nullifier) >= FIELD_SIZE) revert NotAFieldElement(nullifier);
         if (_spent[block.chainid][nullifier]) revert NullifierAlreadySpent(nullifier);
 
-        bytes32[] memory publicInputs = new bytes32[](5);
+        // The submitter is the sixth public input, read from msg.sender rather than taken from the
+        // caller's calldata. A proof therefore names who may present it, and an observer who copies
+        // it out of the mempool presents it as themselves — which is a different public input, so
+        // the proof does not verify.
+        //
+        // Deliberately absent from the nullifier: a nullifier that varied with the submitter would
+        // let one commitment be spent once per address.
+        bytes32[] memory publicInputs = new bytes32[](6);
         publicInputs[0] = root;
         publicInputs[1] = nullifier;
         publicInputs[2] = actionId;
         publicInputs[3] = bytes32(block.chainid);
         publicInputs[4] = bytes32(uint256(uint160(address(this))));
+        publicInputs[5] = bytes32(uint256(uint160(msg.sender)));
 
         if (!_verifier.verify(proof, publicInputs)) revert InvalidProof();
 

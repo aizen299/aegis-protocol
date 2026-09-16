@@ -76,10 +76,6 @@ contracts-build:
 contracts-test:
 	cd contracts && forge test -vvv
 
-.PHONY: contracts-coverage
-contracts-coverage:
-	cd contracts && forge coverage --report lcov
-
 .PHONY: contracts-lint
 contracts-lint:
 	cd contracts && forge fmt --check
@@ -261,8 +257,11 @@ contracts-layout-check: ## Fail if any storage layout diverges from its released
 		(cd contracts && forge inspect $$contract storage-layout --json \
 			| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]') > /tmp/layout-current.json; \
 		jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]' "$$baseline" > /tmp/layout-baseline.json; \
-		if [ "$$(jq 'length' /tmp/layout-current.json)" = "0" ] || [ "$$(jq 'length' /tmp/layout-baseline.json)" = "0" ]; then \
-			echo "$$contract: empty storage layout — an unreadable layout must not read as a match. Run 'forge clean'."; \
+		current_len=$$(jq -e 'length' /tmp/layout-current.json 2>/dev/null || echo ""); \
+		baseline_len=$$(jq -e 'length' /tmp/layout-baseline.json 2>/dev/null || echo ""); \
+		if [ -z "$$current_len" ] || [ -z "$$baseline_len" ] || [ "$$current_len" = "0" ] || [ "$$baseline_len" = "0" ]; then \
+			echo "$$contract: storage layout could not be read (current='$$current_len' baseline='$$baseline_len')."; \
+			echo "  This is not a divergence. Run 'forge clean' and try again."; \
 			exit 1; \
 		fi; \
 		if diff -u /tmp/layout-baseline.json /tmp/layout-current.json > /tmp/layout-diff.txt; then \

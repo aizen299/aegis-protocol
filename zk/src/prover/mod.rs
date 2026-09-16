@@ -95,6 +95,7 @@ pub fn validate(request: &ProveRequest) -> Result<(), ProverError> {
         ("actionId", &public.action_id),
         ("chainId", &public.chain_id),
         ("gate", &public.gate),
+        ("submitter", &public.submitter),
     ] {
         validate_field_element(label, value)?;
     }
@@ -140,12 +141,13 @@ pub fn render_prover_toml(public: &PublicInputs, private: &PrivateInputs) -> Str
         .join(", ");
 
     format!(
-        "root = \"{}\"\nnullifier_hash = \"{}\"\naction_id = \"{}\"\nchain_id = \"{}\"\ngate = \"{}\"\nsecret = \"{}\"\npath_elements = [{}]\npath_indices = [{}]\n",
+        "root = \"{}\"\nnullifier_hash = \"{}\"\naction_id = \"{}\"\nchain_id = \"{}\"\ngate = \"{}\"\nsubmitter = \"{}\"\nsecret = \"{}\"\npath_elements = [{}]\npath_indices = [{}]\n",
         public.merkle_root,
         public.nullifier_hash,
         public.action_id,
         public.chain_id,
         public.gate,
+        public.submitter,
         private.secret,
         quoted(&private.path_elements),
         indices,
@@ -289,7 +291,7 @@ fn read_outputs(dir: &Path, public: &PublicInputs) -> Result<ProveResponse, Prov
     let inputs =
         std::fs::read(dir.join("public_inputs")).map_err(|_| ProverError::MalformedOutput)?;
 
-    if proof.is_empty() || inputs.len() != 5 * 32 {
+    if proof.is_empty() || inputs.len() != PublicInputs::COUNT * 32 {
         return Err(ProverError::MalformedOutput);
     }
 
@@ -358,6 +360,7 @@ mod tests {
             action_id: "7".into(),
             chain_id: "31337".into(),
             gate: "171".into(),
+            submitter: "205".into(),
         }
     }
 
@@ -437,6 +440,7 @@ mod tests {
             "action_id",
             "chain_id",
             "gate",
+            "submitter",
             "secret",
             "path_elements",
             "path_indices",

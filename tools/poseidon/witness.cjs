@@ -15,6 +15,9 @@ const SECRET = BigInt(process.env.SECRET || "424242");
 const ACTION = BigInt(process.env.ACTION_ID || "7");
 const CHAIN = BigInt(process.env.CHAIN_ID || "31337");
 const GATE = BigInt(process.env.GATE || "0xab");
+// The account permitted to submit the proof. Bound into the proof but never into the nullifier —
+// see ZK-1 in DEFERRED.md and the comment in the circuit.
+const SUBMITTER = BigInt(process.env.SUBMITTER || "0x1111111111111111111111111111111111111111");
 
 (async () => {
   const p = await buildPoseidon();
@@ -45,6 +48,7 @@ const GATE = BigInt(process.env.GATE || "0xab");
   console.log(`action_id = ${q(ACTION)}`);
   console.log(`chain_id = ${q(CHAIN)}`);
   console.log(`gate = ${q(GATE)}`);
+  console.log(`submitter = ${q(SUBMITTER)}`);
   console.log(`secret = ${q(SECRET)}`);
   console.log(`path_elements = [${zeros.map(q).join(", ")}]`);
   console.log(`path_indices = [${Array(DEPTH).fill(0).map(q).join(", ")}]`);

@@ -98,20 +98,7 @@ scenarios are there; this records the triggers.
 The three frontend entries are the exception: they were found after the tag, by running the UI
 against a real local stack rather than by the review — which had omitted `frontend/` from its scope.
 
-### A zk proof can be submitted by anyone who sees it — High
-
-Nothing binds a proof to a submitter. An observer can copy a proof out of the mempool and land it
-first, permanently burning the honest user's nullifier — their deposit is safe, their capability is
-destroyed. `test_aStrangerCanSubmitSomeoneElsesProof` is left passing as the record, and will fail
-the moment a binding is added.
-
-Accepted only because the gate confers no benefit today: it marks a nullifier spent and emits an
-event nothing consumes. The fix is a sixth public input for the permitted submitter, a regenerated
-verifier, and a regenerated fixture — v0.4 work, and shipping a freshly changed circuit under a
-hardening release would trade a known risk for an untested one.
-
-**Trigger — not a date.** Before any contract consumes `PrivateActionExecuted` or gates on
-`isSpent`. At that point a frontrunner receives what the gate confers and this becomes theft.
+ZK-1, the only High in this section, was **fixed after v1.0** and moved to the decided table below.
 
 ### No penalty for a node that never submits (ORC-1) — Medium
 
@@ -237,6 +224,7 @@ apply` followed immediately by `terraform destroy` — it costs cents and conver
 | Event identity | `(chain_id, tx_hash, log_index)`. `(chain_id, tx_hash)` silently drops events. |
 | Share scale in API responses | Served, resolved not assumed. The indexer reads `virtualSharesOffset()` and records it in `vaults`; the position query joins it. It was withheld for one release rather than guessed. |
 | API handler tests | Done in v0.2. `internal/api` covers validation, error mapping, pagination bounds, and scale serialisation against stubs; the end-to-end suite covers the same handlers over real indexed rows. |
+| A zk proof could be submitted by anyone who saw it (ZK-1) | Fixed after v1.0. The proof now carries a sixth public input naming its permitted submitter, and the gate reads that from `msg.sender`. Deliberately outside the nullifier: a nullifier that varied with the submitter would let one commitment be spent once per address. Proven by `ZkVerifier.t.sol` tampering with every public input in turn, by a stranger's submission being refused in `ZkVaultGate.t.sol`, and end to end against a real chain. |
 | The dashboard could not distinguish a failed read from an empty vault | Fixed after v1.0. Reads now resolve to loading, failed, or value; a failed vault read shows an alert saying the figures are unavailable rather than zero. Mutation-tested by restoring the original collapsed rendering, which fails four tests. |
 | The frontend has no tests | Fixed after v1.0. Vitest and React Testing Library, 18 tests over the dashboard's read states and the decimals handling, wired into Frontend CI before the build — a build proves compilation, not behaviour. Coverage is the vault surface only; new surfaces need their own. |
 | Indexer lag metric and its alarm | Done in v1.0. Emitted in seconds and blocks through CloudWatch EMF, with `indexer_lag_seconds` alarming on a stalled indexer rather than only a crashed one. Was deferred from v0.2. |

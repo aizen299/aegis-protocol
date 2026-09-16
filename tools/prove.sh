@@ -6,7 +6,9 @@
 # only ever proves against a hardcoded address has not been tested against the coupling that
 # actually bites.
 #
-# Usage: prove.sh <gate-address> <chain-id> <action-id> <secret> <out-dir>
+# Usage: prove.sh <gate-address> <chain-id> <action-id> <secret> <out-dir> [submitter]
+# The submitter is the only account the resulting proof can be presented from — the gate reads it
+# from msg.sender. See ZK-1 in DEFERRED.md.
 # Writes <out-dir>/proof.hex and <out-dir>/public_inputs.hex.
 set -euo pipefail
 
@@ -18,6 +20,7 @@ CHAIN_ID="${2:?chain id required}"
 ACTION_ID="${3:?action id required}"
 SECRET="${4:?secret required}"
 OUT="${5:?output directory required}"
+SUBMITTER="${6:?submitter address required}"
 
 for bin in nargo bb node; do
   command -v "$bin" >/dev/null || { echo "prove: $bin is not on PATH" >&2; exit 1; }
@@ -27,6 +30,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"; rm -f "$CIRCUIT/Prover.toml"' EXIT
 
 GATE="$GATE" CHAIN_ID="$CHAIN_ID" ACTION_ID="$ACTION_ID" SECRET="$SECRET" \
+SUBMITTER="$SUBMITTER" \
   node "$ROOT/tools/poseidon/witness.cjs" > "$CIRCUIT/Prover.toml"
 
 cd "$CIRCUIT"
@@ -42,7 +46,7 @@ import pathlib, sys
 proof = pathlib.Path(sys.argv[1]).read_bytes()
 inputs = pathlib.Path(sys.argv[2]).read_bytes()
 out = pathlib.Path(sys.argv[3])
-if not proof or len(inputs) != 5 * 32:
+if not proof or len(inputs) != 6 * 32:
     sys.exit(f"prove: malformed output (proof {len(proof)} bytes, inputs {len(inputs)} bytes)")
 (out / "proof.hex").write_text("0x" + proof.hex())
 (out / "public_inputs.hex").write_text("\n".join(

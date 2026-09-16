@@ -19,10 +19,12 @@ trap 'rm -rf "$work"; rm -f "$CIRCUIT/Prover.toml"' EXIT
 
 # The witness is built with circomlibjs rather than by reimplementing Poseidon here. That the
 # circuit accepts it is itself a check that the JS and Noir hashes agree.
-# GATE is the address the gate is deployed at; the proof binds it, so it is part of the fixture.
+# GATE is the address the gate is deployed at, and SUBMITTER the only account that may present the
+# proof; the proof binds both, so both are part of the fixture.
 # contracts/test/unit/ZkVaultGate.t.sol asserts the deployed address matches and names this target
 # if it does not.
 GATE="${GATE:-0x9c8e4255dd2e9f956281dfc2247b447995cd4e87}" \
+SUBMITTER="${SUBMITTER:-0x1111111111111111111111111111111111111111}" \
   node "$ROOT/tools/poseidon/witness.cjs" > "$CIRCUIT/Prover.toml"
 
 cd "$CIRCUIT"

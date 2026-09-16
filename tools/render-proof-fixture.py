@@ -12,10 +12,10 @@ if not proof or len(raw_inputs) % 32 != 0:
     sys.exit("render-proof-fixture: proof or public inputs are malformed")
 
 fields = [raw_inputs[i : i + 32].hex() for i in range(0, len(raw_inputs), 32)]
-if len(fields) != 5:
-    sys.exit(f"render-proof-fixture: expected 5 public inputs, got {len(fields)}")
+if len(fields) != 6:
+    sys.exit(f"render-proof-fixture: expected 6 public inputs, got {len(fields)}")
 
-names = ["ROOT", "NULLIFIER_HASH", "ACTION_ID", "CHAIN_ID", "GATE"]
+names = ["ROOT", "NULLIFIER_HASH", "ACTION_ID", "CHAIN_ID", "GATE", "SUBMITTER"]
 constants = "\n".join(
     f"    bytes32 internal constant {name} = bytes32(0x{value});"
     for name, value in zip(names, fields)
@@ -36,11 +36,12 @@ library ProofFixture {{
     // slither-disable-next-line too-many-digits
     bytes internal constant PROOF = hex"{proof.hex()}";
 
-    // The circuit's five public inputs, in declaration order.
+    // The circuit's six public inputs, in declaration order. SUBMITTER is the only account that
+    // can present this proof: the gate reads it from msg.sender.
 {constants}
 
     function publicInputs() internal pure returns (bytes32[] memory inputs) {{
-        inputs = new bytes32[](5);
+        inputs = new bytes32[](6);
 {assignments}
     }}
 }}

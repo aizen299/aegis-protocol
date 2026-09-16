@@ -48,6 +48,10 @@ fn config() -> ProverConfig {
     }
 }
 
+/// The submitter is outside both the commitment and the nullifier, so ROOT and NULLIFIER above are
+/// unaffected by it — which is the property that keeps one commitment to one spend.
+const SUBMITTER: &str = "205";
+
 fn request(gate: &str) -> ProveRequest {
     ProveRequest {
         public: PublicInputs {
@@ -56,6 +60,7 @@ fn request(gate: &str) -> ProveRequest {
             action_id: "7".into(),
             chain_id: "31337".into(),
             gate: gate.into(),
+            submitter: SUBMITTER.into(),
         },
         private: PrivateInputs {
             secret: "424242".into(),
@@ -73,7 +78,7 @@ fn the_service_produces_a_proof_with_the_requested_public_inputs() {
     assert_eq!(response.proof_type, "ultra_honk");
     assert!(response.proof.starts_with("0x"));
     assert!(response.proof.len() > 2, "the proof is empty");
-    assert_eq!(response.public_inputs.len(), 5);
+    assert_eq!(response.public_inputs.len(), 6);
 
     // Positional, because the verifier reads them positionally.
     assert_eq!(
@@ -85,6 +90,11 @@ fn the_service_produces_a_proof_with_the_requested_public_inputs() {
         response.public_inputs[4],
         "0x00000000000000000000000000000000000000000000000000000000000000ab",
         "gate is not the fourth public input"
+    );
+    assert_eq!(
+        response.public_inputs[5],
+        "0x00000000000000000000000000000000000000000000000000000000000000cd",
+        "submitter is not the fifth public input"
     );
 }
 
@@ -146,7 +156,7 @@ fn concurrent_proofs_do_not_clobber_each_other() {
     for handle in handles {
         let response = handle.join().expect("a proving thread panicked");
         let response = response.expect("a concurrent proof failed");
-        assert_eq!(response.public_inputs.len(), 5);
+        assert_eq!(response.public_inputs.len(), 6);
     }
 
     assert_eq!(

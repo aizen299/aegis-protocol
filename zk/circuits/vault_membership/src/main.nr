@@ -23,7 +23,7 @@ use poseidon::poseidon::bn254::{hash_1, hash_2};
 
 global TREE_DEPTH: u32 = 20;
 
-/// Public inputs are, in order: root, nullifier_hash, action_id, chain_id, gate.
+/// Public inputs are, in order: root, nullifier_hash, action_id, chain_id, gate, submitter.
 /// The verifier contract and the proof service must agree on this order.
 fn main(
     root: pub Field,
@@ -31,6 +31,7 @@ fn main(
     action_id: pub Field,
     chain_id: pub Field,
     gate: pub Field,
+    submitter: pub Field,
     secret: Field,
     path_elements: [Field; TREE_DEPTH],
     path_indices: [Field; TREE_DEPTH],
@@ -43,8 +44,22 @@ fn main(
     assert(computed_root == root, "membership: root mismatch");
 
     // §2.3, §2.5, §2.7: one nullifier per (secret, action, chain, gate).
+    //
+    // `submitter` is deliberately absent from this hash. Folding it in would make the nullifier
+    // vary with the submitting address, so the same commitment could be spent once per address —
+    // trading a frontrunning bug for a double-spend.
     let expected = nullifier_of(secret, action_id, chain_id, gate);
     assert(nullifier_hash == expected, "membership: nullifier mismatch");
+
+    // `submitter` is referenced by no constraint, and does not need to be. UltraHonk folds every
+    // public input into the verification transcript, so changing one invalidates the proof whether
+    // or not the circuit reads it. That is asserted, not assumed: ZkVerifier.t.sol tampers with
+    // each public input in turn and requires every one to break the proof.
+    //
+    // An earlier version added `assert(s * s == s * s)` to force it into the constraint system.
+    // That is a tautology the compiler eliminates — the generated verifier was byte-identical with
+    // and without it — so it was removed rather than left implying a guarantee it did not provide.
+    let _ = submitter;
 }
 
 /// The value inserted into the tree at deposit. The depositor keeps `secret`.
@@ -103,6 +118,7 @@ mod tests {
     global ACTION: Field = 7;
     global CHAIN: Field = 31337;
     global GATE: Field = 0x00000000000000000000000000000000000000ab;
+    global SUBMITTER: Field = 0x00000000000000000000000000000000000000cd;
 
     /// A valid path with distinct siblings and mixed left/right positions, so a bug that ignores
     /// either would not survive.
@@ -177,7 +193,7 @@ mod tests {
         let (root, elements, indices) = valid_path(commitment);
         let nullifier = nullifier_of(SECRET, ACTION, CHAIN, GATE);
 
-        main(root, nullifier, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     /// The path helper must actually depend on position. If it did not, every test above that
@@ -205,7 +221,7 @@ mod tests {
 
         // The path and root belong to SECRET's commitment; the prover knows a different secret.
         let nullifier = nullifier_of(OTHER_SECRET, ACTION, CHAIN, GATE);
-        main(root, nullifier, ACTION, CHAIN, GATE, OTHER_SECRET, elements, indices);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, OTHER_SECRET, elements, indices);
     }
 
     // --- wrong Merkle path ---
@@ -219,7 +235,7 @@ mod tests {
         let mut tampered = elements;
         tampered[3] = tampered[3] + 1;
 
-        main(root, nullifier, ACTION, CHAIN, GATE, SECRET, tampered, indices);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, tampered, indices);
     }
 
     #[test(should_fail_with = "membership: root mismatch")]
@@ -231,7 +247,7 @@ mod tests {
         let mut flipped = indices;
         flipped[0] = 1 - flipped[0];
 
-        main(root, nullifier, ACTION, CHAIN, GATE, SECRET, elements, flipped);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, flipped);
     }
 
     // --- commitment / path mismatch (§2.4) ---
@@ -253,6 +269,7 @@ mod tests {
             ACTION,
             CHAIN,
             GATE,
+            SUBMITTER,
             SECRET,
             victim_elements,
             victim_indices,
@@ -267,7 +284,7 @@ mod tests {
         let (root, elements, indices) = valid_path(commitment);
         let nullifier = nullifier_of(SECRET, ACTION, CHAIN, GATE);
 
-        main(root + 1, nullifier, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root + 1, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     // --- nullifier determinism, which is what makes on-chain replay rejection possible ---
@@ -275,6 +292,33 @@ mod tests {
     /// The circuit cannot reject a reused nullifier — it has no memory. What it must guarantee is
     /// that the same secret and domain always yield the same nullifier, so the gate's map sees a
     /// repeat. Rejection itself is asserted on chain in build-order step 3.
+    /// The submitter is bound to the proof but must never reach the nullifier. If it did, the same
+    /// commitment could be spent once per submitting address — a double-spend dressed as a fix.
+    #[test]
+    fn the_nullifier_does_not_depend_on_the_submitter() {
+        let one = nullifier_of(SECRET, ACTION, CHAIN, GATE);
+        let two = nullifier_of(SECRET, ACTION, CHAIN, GATE);
+        assert(one == two, "nullifier is not deterministic");
+
+        // Whatever the submitter, the same domain yields the same nullifier — which is what lets
+        // the gate reject a replay regardless of who presents it.
+        let (root, elements, indices) = valid_path(commitment_of(SECRET));
+        main(root, one, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
+        main(root, one, ACTION, CHAIN, GATE, 0x99, SECRET, elements, indices);
+    }
+
+    /// The circuit accepts any submitter — binding is what the *proof* does, and rejection is the
+    /// gate's job. This documents the division rather than implying the circuit enforces an
+    /// address it cannot know.
+    #[test]
+    fn the_circuit_accepts_any_submitter() {
+        let (root, elements, indices) = valid_path(commitment_of(SECRET));
+        let nullifier = nullifier_of(SECRET, ACTION, CHAIN, GATE);
+
+        main(root, nullifier, ACTION, CHAIN, GATE, 0, SECRET, elements, indices);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
+    }
+
     #[test]
     fn the_nullifier_is_deterministic_for_the_same_domain() {
         let first = nullifier_of(SECRET, ACTION, CHAIN, GATE);
@@ -291,7 +335,7 @@ mod tests {
         let (root, elements, indices) = valid_path(commitment);
 
         let real = nullifier_of(SECRET, ACTION, CHAIN, GATE);
-        main(root, real + 1, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root, real + 1, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     // --- wrong action domain (§2.3, §2.7) ---
@@ -303,7 +347,7 @@ mod tests {
 
         // A nullifier the prover legitimately holds — for a different action.
         let other_action = nullifier_of(SECRET, ACTION + 1, CHAIN, GATE);
-        main(root, other_action, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root, other_action, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     #[test]
@@ -322,7 +366,7 @@ mod tests {
         let (root, elements, indices) = valid_path(commitment);
 
         let other_chain = nullifier_of(SECRET, ACTION, CHAIN + 1, GATE);
-        main(root, other_chain, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root, other_chain, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     #[test(should_fail_with = "membership: nullifier mismatch")]
@@ -331,7 +375,7 @@ mod tests {
         let (root, elements, indices) = valid_path(commitment);
 
         let other_gate = nullifier_of(SECRET, ACTION, CHAIN, GATE + 1);
-        main(root, other_gate, ACTION, CHAIN, GATE, SECRET, elements, indices);
+        main(root, other_gate, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, indices);
     }
 
     #[test]
@@ -357,7 +401,7 @@ mod tests {
         let mut malformed = indices;
         malformed[5] = 2;
 
-        main(root, nullifier, ACTION, CHAIN, GATE, SECRET, elements, malformed);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, malformed);
     }
 
     #[test(should_fail_with = "membership: path index must be 0 or 1")]
@@ -369,6 +413,6 @@ mod tests {
         let mut malformed = indices;
         malformed[0] = 0 - 1;
 
-        main(root, nullifier, ACTION, CHAIN, GATE, SECRET, elements, malformed);
+        main(root, nullifier, ACTION, CHAIN, GATE, SUBMITTER, SECRET, elements, malformed);
     }
 }

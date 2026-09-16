@@ -18,6 +18,10 @@ import {ProofFixture} from "../utils/ProofFixture.sol";
 contract ZkVaultGateTest is CommitmentTreeFixture {
     address internal manager = makeAddr("manager");
 
+    /// The only account the committed proof permits to submit it. The proof binds it, so a test
+    /// that submitted as anyone else would fail on the submitter rather than on what it tests.
+    address internal prover = address(uint160(uint256(ProofFixture.SUBMITTER)));
+
     ZkVaultGate internal gate;
     bytes32 internal actionId;
 
@@ -65,6 +69,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
             ProofFixture.NULLIFIER_HASH, actionId, ProofFixture.ROOT, block.chainid
         );
 
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
@@ -72,24 +77,38 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
         assertTrue(gate.isSpent(ProofFixture.NULLIFIER_HASH), "the nullifier was not spent");
     }
 
-    /// FINDING (v1.0 step 6): a proof is a bearer instrument. Nothing binds it to a submitter, so
-    /// anyone who sees it — the mempool is the ordinary case — can submit it first.
-    function test_aStrangerCanSubmitSomeoneElsesProof() public {
+    /// ZK-1, closed in v1.1. A proof used to be a bearer instrument: anyone who saw one in the
+    /// mempool could land it first and burn the prover's nullifier permanently.
+    ///
+    /// The proof now names its submitter as a public input, and the gate reads that from
+    /// msg.sender — so a stranger presenting it presents different public inputs, and the proof
+    /// does not verify.
+    function test_aStrangerCannotSubmitSomeoneElsesProof() public {
         address stranger = makeAddr("stranger");
 
+        // The verifier reverts on a failed proof rather than returning false, so the gate's own
+        // InvalidProof never gets the chance to fire. The revert is what matters; asserting the
+        // verifier's internal error would pin this test to a Barretenberg implementation detail.
         vm.prank(stranger);
+        try gate.executePrivateAction(
+            ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
+        ) {
+            revert("a stranger submitted someone else's proof");
+        } catch {}
+
+        assertFalse(gate.isSpent(ProofFixture.NULLIFIER_HASH), "a rejected proof still burned the nullifier");
+
+        // And the account the proof names still can.
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
-
-        assertTrue(
-            gate.isSpent(ProofFixture.NULLIFIER_HASH),
-            "a stranger spent a nullifier they could not have proved"
-        );
+        assertTrue(gate.isSpent(ProofFixture.NULLIFIER_HASH), "the named submitter was refused");
     }
 
     /// The test the circuit could not provide.
     function test_aReplayedNullifierIsRejected() public {
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
@@ -97,6 +116,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
         vm.expectRevert(
             abi.encodeWithSelector(IZkVaultGate.NullifierAlreadySpent.selector, ProofFixture.NULLIFIER_HASH)
         );
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
@@ -105,11 +125,13 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     /// A replay must be refused before the proof is even checked, so a valid proof cannot be
     /// resubmitted by paying for verification twice.
     function test_aReplayIsRejectedBeforeVerification() public {
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
 
         uint256 gasBefore = gasleft();
+        vm.prank(prover);
         try gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         ) {
@@ -126,6 +148,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     function test_anUnregisteredActionIsRejected() public {
         bytes32 other = keccak256("some-other-action");
 
+        vm.prank(prover);
         vm.expectRevert(abi.encodeWithSelector(IZkVaultGate.UnknownAction.selector, other));
         gate.executePrivateAction(ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, other);
     }
@@ -139,6 +162,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
 
         // The verifier reverts with its own error rather than returning false on some paths, so the
         // assertion that matters is the state: nothing was spent and no action took effect.
+        vm.prank(prover);
         vm.expectRevert();
         gate.executePrivateAction(ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, other);
 
@@ -159,6 +183,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     function test_aNullifierOutsideTheFieldIsRejected() public {
         bytes32 tooLarge = bytes32(type(uint256).max);
 
+        vm.prank(prover);
         vm.expectRevert(abi.encodeWithSelector(IZkVaultGate.NotAFieldElement.selector, tooLarge));
         gate.executePrivateAction(ProofFixture.PROOF, ProofFixture.ROOT, tooLarge, actionId);
     }
@@ -174,6 +199,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     function test_aRootTheTreeNeverHeldIsRejected() public {
         bytes32 invented = bytes32(uint256(ProofFixture.ROOT) + 1);
 
+        vm.prank(prover);
         vm.expectRevert(abi.encodeWithSelector(IZkVaultGate.UnknownRoot.selector, invented));
         gate.executePrivateAction(ProofFixture.PROOF, invented, ProofFixture.NULLIFIER_HASH, actionId);
     }
@@ -186,6 +212,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
 
         assertTrue(tree.currentRoot() != ProofFixture.ROOT, "the tree did not move");
 
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
@@ -195,6 +222,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     function test_aForgedNullifierIsRejected() public {
         bytes32 forged = bytes32(uint256(ProofFixture.NULLIFIER_HASH) + 1);
 
+        vm.prank(prover);
         vm.expectRevert();
         gate.executePrivateAction(ProofFixture.PROOF, ProofFixture.ROOT, forged, actionId);
 
@@ -206,6 +234,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
         bytes memory tampered = ProofFixture.PROOF;
         tampered[128] = bytes1(uint8(tampered[128]) ^ 0xff);
 
+        vm.prank(prover);
         vm.expectRevert();
         gate.executePrivateAction(tampered, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId);
 
@@ -215,6 +244,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
     // --- action registry ---
 
     function test_deregisteringStopsNewProofsButKeepsNullifiersSpent() public {
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );
@@ -230,6 +260,7 @@ contract ZkVaultGateTest is CommitmentTreeFixture {
         vm.expectRevert(
             abi.encodeWithSelector(IZkVaultGate.NullifierAlreadySpent.selector, ProofFixture.NULLIFIER_HASH)
         );
+        vm.prank(prover);
         gate.executePrivateAction(
             ProofFixture.PROOF, ProofFixture.ROOT, ProofFixture.NULLIFIER_HASH, actionId
         );

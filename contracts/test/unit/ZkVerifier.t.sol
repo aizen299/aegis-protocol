@@ -31,7 +31,10 @@ contract ZkVerifierTest is Test {
     /// Every public input is bound. Changing any one must invalidate the proof, or that input is
     /// decoration and an attacker chooses it freely.
     function test_changingAnyPublicInputInvalidatesTheProof() public view {
-        for (uint256 i = 0; i < 5; i++) {
+        bytes32[] memory all = ProofFixture.publicInputs();
+        assertEq(all.length, 6, "the fixture lost a public input");
+
+        for (uint256 i = 0; i < all.length; i++) {
             bytes32[] memory tampered = ProofFixture.publicInputs();
             tampered[i] = bytes32(uint256(tampered[i]) + 1);
 
@@ -39,6 +42,8 @@ contract ZkVerifierTest is Test {
                 .staticcall(abi.encodeCall(IZkVerifier.verify, (ProofFixture.PROOF, tampered)));
             bool verified = ok && result.length == 32 && abi.decode(result, (bool));
 
+            // Index 5 is the submitter. If the circuit's binding constraint were optimised away,
+            // this is the iteration that would fail — and ZK-1 would still be open.
             assertFalse(verified, "a public input is not bound to the proof");
         }
     }
@@ -75,5 +80,10 @@ contract ZkVerifierTest is Test {
         assertEq(uint256(ProofFixture.CHAIN_ID), 31337, "fixture chain id changed");
         assertEq(uint256(ProofFixture.ACTION_ID), 7, "fixture action id changed");
         assertTrue(uint256(ProofFixture.GATE) != 0, "fixture carries no gate");
+        assertTrue(uint256(ProofFixture.SUBMITTER) != 0, "fixture carries no submitter");
+        assertTrue(
+            ProofFixture.SUBMITTER != ProofFixture.GATE,
+            "submitter and gate must be distinct, or the binding proves nothing"
+        );
     }
 }

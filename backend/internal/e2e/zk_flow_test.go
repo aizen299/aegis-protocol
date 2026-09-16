@@ -81,7 +81,7 @@ func prove(t *testing.T, gate string, chainID int64, actionID string) (string, [
 	root := repoRoot(t)
 
 	cmd := exec.Command(filepath.Join(root, "tools", "prove.sh"),
-		gate, fmt.Sprint(chainID), actionID, zkSecret, out)
+		gate, fmt.Sprint(chainID), actionID, zkSecret, out, deployerAddr)
 	cmd.Dir = root
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("proof generation failed: %v\n%s", err, combined)
@@ -97,8 +97,8 @@ func prove(t *testing.T, gate string, chainID int64, actionID string) (string, [
 	}
 
 	inputs := strings.Fields(strings.TrimSpace(string(inputsRaw)))
-	if len(inputs) != 5 {
-		t.Fatalf("expected 5 public inputs, got %d", len(inputs))
+	if len(inputs) != 6 {
+		t.Fatalf("expected 6 public inputs, got %d", len(inputs))
 	}
 	return strings.TrimSpace(string(proof)), inputs
 }
@@ -130,6 +130,16 @@ func TestZkPrivateActionExecutesAndCannotBeReplayed(t *testing.T) {
 
 	send(t, deployerKey, d.ZkVaultGate, "registerAction(bytes32,string)",
 		toBytes32(t, zkActionID), "vault-membership")
+
+	// ZK-1, against a real chain: the proof names the deployer as its submitter, so a stranger
+	// presenting the identical calldata presents a different public input and the proof fails. The
+	// nullifier must survive that attempt — a burned nullifier is unrecoverable.
+	sendExpectingFailure(t, strangerKey, d.ZkVaultGate, "executePrivateAction(bytes,bytes32,bytes32,bytes32)",
+		string(proof), inputs[0], inputs[1], toBytes32(t, zkActionID))
+
+	if spent := call(t, d.ZkVaultGate, "isSpent(bytes32)(bool)", inputs[1]); strings.HasPrefix(spent, "true") {
+		t.Fatal("a stranger's rejected submission still burned the nullifier")
+	}
 
 	send(t, deployerKey, d.ZkVaultGate, "executePrivateAction(bytes,bytes32,bytes32,bytes32)",
 		proof, root, nullifier, toBytes32(t, zkActionID))

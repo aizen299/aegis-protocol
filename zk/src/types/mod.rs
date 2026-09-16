@@ -9,9 +9,10 @@ pub const FIELD_SIZE: &str =
 
 /// Public half of a proof request. Safe to log.
 ///
-/// The five fields are the circuit's public inputs, in declaration order. `chainId` and `gate` are
-/// what bind a proof to one deployment: the gate reads them from the chain rather than from the
-/// caller, so a proof made for another gate cannot be presented here.
+/// The six fields are the circuit's public inputs, in declaration order. `chainId` and `gate` bind
+/// a proof to one deployment, and `submitter` binds it to one account: the gate reads all three
+/// from the chain and from msg.sender rather than from the caller, so a proof made for another
+/// gate — or for another submitter — cannot be presented here. See ZK-1 in DEFERRED.md.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicInputs {
@@ -20,16 +21,22 @@ pub struct PublicInputs {
     pub action_id: String,
     pub chain_id: String,
     pub gate: String,
+    pub submitter: String,
 }
 
 impl PublicInputs {
-    pub fn as_ordered(&self) -> [&str; 5] {
+    /// One place both the reader and the ordering agree on. Two independent literals drifted apart
+    /// the moment the circuit gained an input.
+    pub const COUNT: usize = 6;
+
+    pub fn as_ordered(&self) -> [&str; Self::COUNT] {
         [
             &self.merkle_root,
             &self.nullifier_hash,
             &self.action_id,
             &self.chain_id,
             &self.gate,
+            &self.submitter,
         ]
     }
 }
@@ -116,6 +123,7 @@ mod tests {
                 action_id: "7".into(),
                 chain_id: "31337".into(),
                 gate: "171".into(),
+                submitter: "205".into(),
             },
             private: sample_private(),
         };
@@ -153,10 +161,12 @@ mod tests {
             action_id: "3".into(),
             chain_id: "4".into(),
             gate: "5".into(),
+            submitter: "6".into(),
         };
 
         // The verifier reads these positionally; a reordering here is a proof that never verifies.
-        assert_eq!(public.as_ordered(), ["1", "2", "3", "4", "5"]);
+        // Submitter is last, matching the circuit's declaration order.
+        assert_eq!(public.as_ordered(), ["1", "2", "3", "4", "5", "6"]);
     }
 
     #[test]
@@ -167,6 +177,7 @@ mod tests {
             action_id: "0xcc".into(),
             chain_id: "31337".into(),
             gate: "0xdd".into(),
+            submitter: "238".into(),
         })
         .unwrap();
 

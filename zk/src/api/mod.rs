@@ -104,7 +104,7 @@ mod tests {
     fn body(secret: &str, gate: &str) -> String {
         format!(
             r#"{{"merkleRoot":"12345","nullifierHash":"67890","actionId":"7","chainId":"31337",
-                 "gate":"{gate}","secret":"{secret}","pathElements":["1000","1001"],
+                 "gate":"{gate}","submitter":"205","secret":"{secret}","pathElements":["1000","1001"],
                  "pathIndices":[0,1]}}"#
         )
     }
@@ -157,6 +157,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// A defaulted submitter would be zero, and a proof bound to the zero address is one the gate
+    /// can never accept — a silent failure at proving time rather than a loud one at the request.
+    #[tokio::test]
+    async fn a_request_without_a_submitter_is_refused() {
+        let without = r#"{"merkleRoot":"12345","nullifierHash":"67890","actionId":"7",
+                          "chainId":"31337","gate":"171","secret":"424242",
+                          "pathElements":["1000","1001"],"pathIndices":[0,1]}"#;
+
+        let (status, _) = post(config_without_a_circuit(), without.into()).await;
+        assert_ne!(
+            status,
+            StatusCode::OK,
+            "a request with no submitter was accepted"
+        );
     }
 
     #[tokio::test]
