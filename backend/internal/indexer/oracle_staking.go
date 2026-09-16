@@ -18,6 +18,8 @@ type OracleNodeStore interface {
 	SetOracleNodeUnstake(ctx context.Context, chainID int64, node string, pending types.Raw, claimableAt *time.Time, active bool) error
 	SetOracleNodeActive(ctx context.Context, chainID int64, node string, active bool) error
 	RecordOracleSlash(ctx context.Context, sl db.Slash) error
+	OpenOracleNodeInterval(ctx context.Context, chainID int64, node string, version types.Raw, at time.Time) error
+	CloseOracleNodeInterval(ctx context.Context, chainID int64, node string, version types.Raw, at time.Time, reason string) (bool, error)
 }
 
 // OracleStakingHandler turns OracleStaking events into node registry rows.
@@ -95,12 +97,38 @@ func (h *OracleStakingHandler) Handle(ctx context.Context, ev chain.Event) error
 	case eventNodeSlashed:
 		return h.handleSlashed(ctx, ev, address)
 	case eventNodeDeactivated:
-		return h.store.SetOracleNodeActive(ctx, ev.ChainID, address, false)
+		return h.handleDeactivated(ctx, ev, address)
 	case eventNodeReactivated:
+		version, err := rawField(ev, "nodeSetVersion")
+		if err != nil {
+			return err
+		}
+		if err := h.store.OpenOracleNodeInterval(ctx, ev.ChainID, address, version, blockTime(ev)); err != nil {
+			return err
+		}
 		return h.store.SetOracleNodeActive(ctx, ev.ChainID, address, true)
 	default:
 		return nil
 	}
+}
+
+// handleDeactivated closes the node's current interval. An unmatched deactivation — its activation was
+// never indexed, as happens when the indexer starts after the node joined — records nothing, so that
+// period has no interval and the node is never judged for it. Unknown eligibility must not become a
+// miss: that is the direction that slashes an honest node on incomplete data.
+func (h *OracleStakingHandler) handleDeactivated(ctx context.Context, ev chain.Event, address string) error {
+	version, err := rawField(ev, "nodeSetVersion")
+	if err != nil {
+		return err
+	}
+	reason, err := bytes32Field(ev, "reason")
+	if err != nil {
+		return err
+	}
+	if _, err := h.store.CloseOracleNodeInterval(ctx, ev.ChainID, address, version, blockTime(ev), trimBytes32(reason)); err != nil {
+		return err
+	}
+	return h.store.SetOracleNodeActive(ctx, ev.ChainID, address, false)
 }
 
 func (h *OracleStakingHandler) handleRegistered(ctx context.Context, ev chain.Event, address string) error {

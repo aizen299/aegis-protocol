@@ -35,6 +35,14 @@ type fakeOracleStore struct {
 	stakeUpdates map[string]types.Raw
 	activeFlags  map[string]bool
 	unstakes     map[string]types.Raw
+	intervals    []fakeInterval
+}
+
+type fakeInterval struct {
+	node        string
+	activated   string
+	deactivated string
+	reason      string
 }
 
 func newFakeOracleStore() *fakeOracleStore {
@@ -467,12 +475,17 @@ func TestNodeReactivationTogglesActiveFlag(t *testing.T) {
 	store := newFakeOracleStore()
 	h := newStakingHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}})
 
+	// The deactivation arrives with no indexed activation before it — the case of an indexer that
+	// started after the node joined. The active flag must still toggle; see handleDeactivated for why
+	// the missing interval is recorded as nothing rather than guessed.
 	deactivate := oracleEvent(t, roundsHex, eventNodeDeactivated, map[string]any{
-		"node":   mustID(t, nodeHex),
-		"reason": [32]byte{},
+		"node":           mustID(t, nodeHex),
+		"reason":         [32]byte{},
+		"nodeSetVersion": mustBigInt(t, "3"),
 	})
 	reactivate := oracleEvent(t, roundsHex, eventNodeReactivated, map[string]any{
-		"node": mustID(t, nodeHex),
+		"node":           mustID(t, nodeHex),
+		"nodeSetVersion": mustBigInt(t, "5"),
 	})
 
 	if err := h.Handle(context.Background(), deactivate); err != nil {
@@ -487,5 +500,100 @@ func TestNodeReactivationTogglesActiveFlag(t *testing.T) {
 	}
 	if !store.activeFlags[nodeHex] {
 		t.Fatal("node not active after reactivation")
+	}
+}
+
+func (s *fakeOracleStore) OpenOracleNodeInterval(_ context.Context, _ int64, node string, version types.Raw, _ time.Time) error {
+	for _, iv := range s.intervals {
+		if iv.node == node && iv.activated == version.String() {
+			return nil
+		}
+	}
+	s.intervals = append(s.intervals, fakeInterval{node: node, activated: version.String()})
+	return nil
+}
+
+// Mirrors the SQL's rule: close the latest interval that began before this version.
+func (s *fakeOracleStore) CloseOracleNodeInterval(_ context.Context, _ int64, node string, version types.Raw, _ time.Time, reason string) (bool, error) {
+	best := -1
+	for i, iv := range s.intervals {
+		if iv.node != node || rawLess(iv.activated, version.String()) == false {
+			continue
+		}
+		if best == -1 || rawLess(s.intervals[best].activated, iv.activated) {
+			best = i
+		}
+	}
+	if best == -1 {
+		return false, nil
+	}
+	if d := s.intervals[best].deactivated; d != "" && d != version.String() {
+		return false, nil
+	}
+	s.intervals[best].deactivated = version.String()
+	s.intervals[best].reason = reason
+	return true, nil
+}
+
+func rawLess(a, b string) bool {
+	x, _ := new(big.Int).SetString(a, 10)
+	y, _ := new(big.Int).SetString(b, 10)
+	return x.Cmp(y) < 0
+}
+
+// ORC-1: the version on each event is what lets a round's eligible set be rebuilt later. Join, leave
+// for a stated reason, and rejoin — two intervals, the first closed with its reason, the second open.
+func TestNodeIntervalsFollowTheEmittedVersions(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newStakingHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 6, Symbol: "aSTK"}})
+	ctx := context.Background()
+
+	var manual [32]byte
+	copy(manual[:], "MANUAL")
+
+	events := []chain.Event{
+		oracleEvent(t, roundsHex, eventNodeReactivated, map[string]any{
+			"node": mustID(t, nodeHex), "nodeSetVersion": mustBigInt(t, "2"),
+		}),
+		oracleEvent(t, roundsHex, eventNodeDeactivated, map[string]any{
+			"node": mustID(t, nodeHex), "reason": manual, "nodeSetVersion": mustBigInt(t, "4"),
+		}),
+		oracleEvent(t, roundsHex, eventNodeReactivated, map[string]any{
+			"node": mustID(t, nodeHex), "nodeSetVersion": mustBigInt(t, "6"),
+		}),
+	}
+	// Twice: the second pass is a re-index, and must change nothing.
+	for pass := 0; pass < 2; pass++ {
+		for _, ev := range events {
+			if err := h.Handle(ctx, ev); err != nil {
+				t.Fatalf("pass %d: %v", pass, err)
+			}
+		}
+	}
+
+	if len(store.intervals) != 2 {
+		t.Fatalf("intervals = %+v, want two", store.intervals)
+	}
+	first, second := store.intervals[0], store.intervals[1]
+	if first.activated != "2" || first.deactivated != "4" || first.reason != "MANUAL" {
+		t.Errorf("first interval = %+v, want [2,4) MANUAL", first)
+	}
+	if second.activated != "6" || second.deactivated != "" {
+		t.Errorf("second interval = %+v, want [6, open) — a replayed deactivation closed it", second)
+	}
+}
+
+// Without the version the event cannot be placed in history. Guessing would mean judging nodes
+// against the wrong set, so a malformed event must fail rather than be recorded.
+func TestANodeEventWithoutAVersionIsRejected(t *testing.T) {
+	store := newFakeOracleStore()
+	h := newStakingHandler(t, store, &fakeResolver{})
+
+	ev := oracleEvent(t, roundsHex, eventNodeReactivated, map[string]any{"node": mustID(t, nodeHex)})
+	if err := h.Handle(context.Background(), ev); err == nil {
+		t.Fatal("an activation without a version was accepted")
+	}
+	if len(store.intervals) != 0 {
+		t.Fatal("an interval was recorded without a version")
 	}
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {OracleStaking} from "../../src/oracle/OracleStaking.sol";
 import {IOracleStaking} from "../../src/oracle/interfaces/IOracleStaking.sol";
@@ -9,6 +10,108 @@ import {Roles} from "../../src/shared/access/Roles.sol";
 import {OracleFixture} from "../utils/OracleFixture.sol";
 
 contract OracleStakingTest is OracleFixture {
+    // --- the versions that let a node's silence be judged (ORC-1) ---
+
+    /// Registration emits the version the node entered at, which must be the version the contract
+    /// itself will use to judge the node's eligibility for later rounds.
+    function test_activationEmitsTheVersionTheNodeEnteredAt() public {
+        _fundNode(nodeA, MIN_STAKE);
+        uint256 expected = staking.nodeSetVersion() + 1;
+
+        vm.expectEmit(true, false, false, true, address(staking));
+        emit IOracleStaking.NodeReactivated(nodeA, expected);
+        vm.prank(nodeA);
+        staking.register(MIN_STAKE);
+
+        assertEq(staking.nodeSetVersion(), expected, "the emitted version is not the contract's");
+        assertEq(staking.nodeInfo(nodeA).activatedAtVersion, expected, "state and event disagree");
+    }
+
+    function test_deactivationEmitsTheVersionTheNodeLeftAt() public {
+        _registerNode(nodeA, MIN_STAKE);
+        uint256 expected = staking.nodeSetVersion() + 1;
+
+        vm.expectEmit(true, true, false, true, address(staking));
+        emit IOracleStaking.NodeDeactivated(nodeA, "MANUAL", expected);
+        vm.prank(admin);
+        staking.deactivate(nodeA, "MANUAL");
+
+        assertEq(staking.nodeSetVersion(), expected, "the emitted version is not the contract's");
+    }
+
+    /// The claim the backend relies on: a node was in the set a round froze at version v exactly when
+    /// v falls in [activated, deactivated), with both boundaries taken from emitted events.
+    ///
+    /// isEligibleAt reads current `active`, so it can only be asked at the moment a round would open —
+    /// after a node leaves, it reports every past version as ineligible, which is the whole reason the
+    /// events need the version. So eligibility is sampled at each such moment, across a join, a leave,
+    /// and a rejoin, and compared afterwards with what the recorded logs alone would conclude.
+    function test_eventIntervalsAgreeWithTheContractsEligibility() public {
+        _registerNode(nodeB, MIN_STAKE); // keeps the set non-empty and the version moving
+        _fundNode(nodeA, MIN_STAKE * 2);
+
+        uint256[] memory versions = new uint256[](6);
+        bool[] memory eligible = new bool[](6);
+        uint256 samples;
+
+        vm.recordLogs();
+
+        versions[samples] = staking.nodeSetVersion();
+        eligible[samples++] = staking.isEligibleAt(nodeA, staking.nodeSetVersion()); // before joining
+
+        vm.prank(nodeA);
+        staking.register(MIN_STAKE);
+        versions[samples] = staking.nodeSetVersion();
+        eligible[samples++] = staking.isEligibleAt(nodeA, staking.nodeSetVersion()); // active
+
+        vm.prank(admin);
+        staking.deactivate(nodeA, "BELOW_STAKE_FLOOR");
+        versions[samples] = staking.nodeSetVersion();
+        eligible[samples++] = staking.isEligibleAt(nodeA, staking.nodeSetVersion()); // just left
+
+        _registerNode(makeAddr("nodeC"), MIN_STAKE); // the version moves while nodeA is out
+        versions[samples] = staking.nodeSetVersion();
+        eligible[samples++] = staking.isEligibleAt(nodeA, staking.nodeSetVersion()); // still out
+
+        vm.prank(nodeA);
+        staking.stake(MIN_STAKE); // topping up reactivates
+        versions[samples] = staking.nodeSetVersion();
+        eligible[samples++] = staking.isEligibleAt(nodeA, staking.nodeSetVersion()); // back
+
+        // Rebuild nodeA's intervals from the logs alone, as the indexer will.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256[] memory opens = new uint256[](4);
+        uint256[] memory closes = new uint256[](4);
+        uint256 intervals;
+        bytes32 reactivated = keccak256("NodeReactivated(address,uint256)");
+        bytes32 deactivated = keccak256("NodeDeactivated(address,bytes32,uint256)");
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter != address(staking) || logs[i].topics.length < 2) continue;
+            if (address(uint160(uint256(logs[i].topics[1]))) != nodeA) continue;
+            if (logs[i].topics[0] == reactivated) {
+                opens[intervals] = abi.decode(logs[i].data, (uint256));
+                closes[intervals] = type(uint256).max;
+                intervals++;
+            } else if (logs[i].topics[0] == deactivated) {
+                closes[intervals - 1] = abi.decode(logs[i].data, (uint256));
+            }
+        }
+        assertEq(intervals, 2, "expected a join and a rejoin in the logs");
+
+        for (uint256 s = 0; s < samples; s++) {
+            bool derived;
+            for (uint256 k = 0; k < intervals; k++) {
+                if (opens[k] <= versions[s] && versions[s] < closes[k]) derived = true;
+            }
+            assertEq(derived, eligible[s], "the event intervals disagree with isEligibleAt");
+        }
+
+        // And the samples exercised both answers, so agreement is not agreement on a constant.
+        assertTrue(eligible[1] && eligible[4], "never sampled an eligible version");
+        assertTrue(!eligible[0] && !eligible[2] && !eligible[3], "never sampled an ineligible version");
+    }
+
     // --- the reason the unbonding period exists ---
 
     /// Slashing is decided off-chain after a round settles. If stake were released on request, a

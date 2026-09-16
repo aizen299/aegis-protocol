@@ -285,3 +285,42 @@ func (s *Store) RecordOracleSlash(ctx context.Context, sl Slash) error {
 
 	return tx.Commit(ctx)
 }
+
+// Re-indexing replays these, so both are idempotent.
+const qOpenNodeInterval = `
+	INSERT INTO oracle_node_intervals (chain_id, node, activated_version, activated_at)
+	VALUES ($1, $2, $3, $4)
+	ON CONFLICT (chain_id, node, activated_version) DO NOTHING
+`
+
+// Closes the interval that was open when this deactivation happened: the latest one that began before
+// it. "Close whichever interval is still open" would be wrong on a replay — after a node rejoins, an
+// old deactivation replayed would close the new interval.
+const qCloseNodeInterval = `
+	UPDATE oracle_node_intervals
+	SET deactivated_version = $3, deactivated_at = $4, deactivation_reason = $5
+	WHERE chain_id = $1 AND node = $2
+	  AND activated_version = (
+	      SELECT MAX(activated_version) FROM oracle_node_intervals
+	      WHERE chain_id = $1 AND node = $2 AND activated_version < $3
+	  )
+	  AND (deactivated_version IS NULL OR deactivated_version = $3)
+`
+
+func (s *Store) OpenOracleNodeInterval(ctx context.Context, chainID int64, node string, version types.Raw, at time.Time) error {
+	if _, err := s.pool.Exec(ctx, qOpenNodeInterval, chainID, node, version, at); err != nil {
+		return fmt.Errorf("open node interval: %w", err)
+	}
+	return nil
+}
+
+// CloseOracleNodeInterval reports whether an interval was found. False means the activation was never
+// indexed — typically an indexer started after the node joined — and that node's eligibility for
+// rounds in that period is unknown. The aggregator treats unknown as "do not judge", never as a miss.
+func (s *Store) CloseOracleNodeInterval(ctx context.Context, chainID int64, node string, version types.Raw, at time.Time, reason string) (bool, error) {
+	tag, err := s.pool.Exec(ctx, qCloseNodeInterval, chainID, node, version, at, reason)
+	if err != nil {
+		return false, fmt.Errorf("close node interval: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

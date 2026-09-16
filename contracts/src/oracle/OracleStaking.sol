@@ -374,7 +374,7 @@ contract OracleStaking is
         _activeNodeCount += 1;
         _nodeSetVersion += 1;
         node.activatedAtVersion = _nodeSetVersion;
-        emit NodeReactivated(node_);
+        emit NodeReactivated(node_, _nodeSetVersion);
     }
 
     function _deactivate(
@@ -385,7 +385,7 @@ contract OracleStaking is
         node.active = false;
         _activeNodeCount -= 1;
         _nodeSetVersion += 1;
-        emit NodeDeactivated(node_, reason);
+        emit NodeDeactivated(node_, reason, _nodeSetVersion);
     }
 
     function _authorizeUpgrade(

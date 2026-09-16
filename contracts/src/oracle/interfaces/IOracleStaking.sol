@@ -19,8 +19,13 @@ interface IOracleStaking {
         bytes32 indexed reason,
         uint256 remainingStake
     );
-    event NodeDeactivated(address indexed node, bytes32 indexed reason);
-    event NodeReactivated(address indexed node);
+    /// @dev `nodeSetVersion` is the version at which the node left, or entered, the active set. A
+    ///      round froze its eligible set as a version at open, so the two together are what let the
+    ///      backend say — after the fact — which nodes a round expected to hear from. The version was
+    ///      always tracked in state; without it on the event, a node's silence could not be judged.
+    ///      Emitted on every activation, including first registration.
+    event NodeDeactivated(address indexed node, bytes32 indexed reason, uint256 nodeSetVersion);
+    event NodeReactivated(address indexed node, uint256 nodeSetVersion);
 
     event MinimumStakeUpdated(uint256 previousValue, uint256 newValue);
     event MinStakeFloorUpdated(uint256 previousValue, uint256 newValue);
