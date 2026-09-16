@@ -18,6 +18,16 @@ for bin in nargo node python3; do
   command -v "$bin" >/dev/null || { echo "browser-proof-check: $bin is not on PATH" >&2; exit 1; }
 done
 
+# Named up front rather than left to a Node stack trace. This passed locally for a week because the
+# modules happened to be installed from earlier work, and failed on the first clean runner.
+for module in "$ROOT/tools/poseidon/node_modules/circomlibjs" "$ROOT/frontend/node_modules/@aztec/bb.js"; do
+  [ -d "$module" ] || {
+    echo "browser-proof-check: $module is not installed." >&2
+    echo "  Run: npm ci --prefix tools/poseidon && npm ci --prefix frontend" >&2
+    exit 1
+  }
+done
+
 python3 "$ROOT/scripts/check-proving-versions.py"
 
 work="$(mktemp -d)"
