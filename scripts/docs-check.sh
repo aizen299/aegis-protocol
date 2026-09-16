@@ -57,6 +57,16 @@ else
   fail "README claims $claimed_zk_service zk service tests, found $actual_zk_service"
 fi
 
+actual_solana=$(grep -rhoE '^\s*#\[test\]' solana/programs/*/src solana/programs/*/tests 2>/dev/null | wc -l | tr -d ' ')
+claimed_solana=$(claimed "Solana tests")
+if [ "$claimed_solana" = "missing" ]; then
+  pass "Solana tests: not claimed"
+elif [ "$claimed_solana" = "$actual_solana" ]; then
+  pass "Solana tests: $actual_solana"
+else
+  fail "README claims $claimed_solana Solana tests, found $actual_solana"
+fi
+
 # Counts it(...) cases, not describe(...) blocks: a suite's name is not a test.
 actual_frontend_tests=$(grep -rhoE '^\s*it\(' frontend/src --include='*.test.ts' --include='*.test.tsx' 2>/dev/null | wc -l | tr -d ' ')
 claimed_frontend_tests=$(claimed "frontend tests")

@@ -1,0 +1,67 @@
+name: Solana CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["solana/**", "scripts/check-solana-*.py", "Makefile", ".github/workflows/solana.yml"]
+  pull_request:
+    paths: ["solana/**", "scripts/check-solana-*.py", "Makefile", ".github/workflows/solana.yml"]
+
+concurrency:
+  group: solana-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOLANA_VERSION: "3.1.10"
+  ANCHOR_VERSION: "1.1.2"
+
+jobs:
+  programs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Host Rust comes from solana/rust-toolchain.toml; rustup installs it on first use.
+      - name: Rust toolchain
+        working-directory: solana
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: solana-cargo-${{ runner.os }}-${{ hashFiles('solana/Cargo.lock', 'solana/rust-toolchain.toml') }}
+
+      - uses: actions/cache@v4
+        id: tools
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cargo/bin/anchor
+          key: solana-tools-${{ runner.os }}-${{ env.SOLANA_VERSION }}-${{ env.ANCHOR_VERSION }}
+
+      # --fail so a missing release is a download error, not an installer script that runs a 404 page.
+      - name: Install Solana ${{ env.SOLANA_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: |
+          curl --fail -sSfL "https://release.anza.xyz/v${SOLANA_VERSION}/install" -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+
+      - name: Install Anchor ${{ env.ANCHOR_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: cargo install anchor-cli --version "${ANCHOR_VERSION}" --locked
+
+      - run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      # The workflow's env pins and Anchor.toml's must agree, or CI would test a toolchain the
+      # repo does not pin.
+      - name: Toolchain matches solana/Anchor.toml
+        run: make solana-toolchain-check
+
+      - run: make solana-lint
+      - run: make solana-test
+      - name: IDL matches the committed copy
+        run: make solana-idl-check
+      - name: Account layouts match the baseline
+        run: make solana-layout-check

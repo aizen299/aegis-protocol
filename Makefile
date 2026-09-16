@@ -43,7 +43,7 @@ logs: ## Follow service logs
 	$(COMPOSE) logs -f indexer api
 
 .PHONY: test
-test: contracts-test backend-test zk-test frontend-test ## Run every layer's test suite
+test: contracts-test backend-test zk-test solana-test frontend-test ## Run every layer's test suite
 
 .PHONY: e2e
 e2e: ## End-to-end smoke test: real chain, real database, real indexer and API
@@ -54,10 +54,10 @@ secrets-localstack: ## Exercise the real SSM secret path against LocalStack (nee
 	./scripts/secrets-localstack.sh
 
 .PHONY: build
-build: contracts-build backend-build zk-build frontend-build ## Build every layer
+build: contracts-build backend-build zk-build solana-build frontend-build ## Build every layer
 
 .PHONY: lint
-lint: contracts-lint backend-lint zk-lint frontend-lint docs-check ## Lint every layer
+lint: contracts-lint backend-lint zk-lint solana-lint frontend-lint docs-check ## Lint every layer
 
 .PHONY: docs-check
 docs-check: ## Verify the README's claims against the repository
@@ -387,6 +387,42 @@ zk-test:
 .PHONY: zk-lint
 zk-lint:
 	cd zk && cargo fmt --check && cargo clippy --all-targets -- -D warnings
+
+# --- solana ---
+
+SOLANA_PROGRAMS ?= aegis_vault
+
+.PHONY: solana-toolchain-check
+solana-toolchain-check: ## Fail if anchor or solana differ from the pins in solana/Anchor.toml
+	python3 scripts/check-solana-toolchain.py
+
+.PHONY: solana-build
+solana-build: solana-toolchain-check
+	cd solana && anchor build
+
+# The instruction tests load the program built above, so they run after it rather than alongside.
+.PHONY: solana-test
+solana-test: solana-build
+	cd solana && cargo test
+
+.PHONY: solana-lint
+solana-lint:
+	cd solana && cargo fmt --all --check && cargo clippy --all-targets -- -D warnings
+
+# The IDL is to the indexer what an ABI is: committed, and checked against a fresh build.
+.PHONY: solana-idl-check
+solana-idl-check: solana-build ## Fail if a committed IDL differs from a fresh build
+	@set -e; for p in $(SOLANA_PROGRAMS); do \
+		diff -u solana/idl/$$p.json solana/target/idl/$$p.json || \
+			{ echo "IDL DRIFT: $$p. Copy solana/target/idl/$$p.json to solana/idl/ if the change is intended."; exit 1; }; \
+		echo "$$p IDL matches"; \
+	done
+
+.PHONY: solana-layout-check
+solana-layout-check: solana-build ## Fail if an account layout changes other than by carving from `reserved`
+	@set -e; for p in $(SOLANA_PROGRAMS); do \
+		python3 scripts/check-solana-layouts.py solana/target/idl/$$p.json solana/layouts/$$p.json; \
+	done
 
 # --- frontend ---
 

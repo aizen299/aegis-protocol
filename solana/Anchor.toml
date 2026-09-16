@@ -1,0 +1,17 @@
+[toolchain]
+anchor_version = "1.1.2"
+solana_version = "3.1.10"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+aegis_vault = "h5VEwZjPpX6zug14r44i4QzpPzYBKeAHQYa5QZdzyGo"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"

@@ -153,6 +153,29 @@ reverts the later one and forces a re-sign. Replay protection is unaffected — 
 
 ---
 
+## Accepted for v2.0
+
+### The Solana vault has no yield strategy
+
+The Arbitrum vault has a strategy slot and no strategy ships. On Solana a strategy is a CPI into
+another protocol, and that protocol's account list is part of the interface: a hook designed with
+nothing to call would be guessed. The Solana vault holds idle assets only. See
+`docs/v2.0-solana-plan.md` §8.1.
+
+**Revisit when** a strategy is chosen for either chain. That choice names the protocol, and the
+protocol's accounts design the hook.
+
+### The zk gate exists on Arbitrum only
+
+Its verifier is generated for Solidity by the pinned Barretenberg toolchain, which generates nothing
+for Solana programs. Bringing it over means a different proof system or a hand-written verifier, and
+verifiers here are generated, never hand-written. Private actions are Arbitrum-only. See
+`docs/v2.0-solana-plan.md` §2.2.
+
+**Revisit when** the pinned proving toolchain can generate a verifier for Solana programs.
+
+---
+
 ## Deferred to a named version
 
 ### The AWS staging deployment

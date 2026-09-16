@@ -1,0 +1,152 @@
+{
+  "Position": {
+    "discriminator": [
+      170,
+      188,
+      143,
+      228,
+      122,
+      64,
+      247,
+      208
+    ],
+    "size": 122,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "vault",
+        "type": "pubkey",
+        "offset": 10,
+        "size": 32
+      },
+      {
+        "name": "owner",
+        "type": "pubkey",
+        "offset": 42,
+        "size": 32
+      },
+      {
+        "name": "shares",
+        "type": "u128",
+        "offset": 74,
+        "size": 16
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;32]",
+        "offset": 90,
+        "size": 32
+      }
+    ]
+  },
+  "Vault": {
+    "discriminator": [
+      211,
+      8,
+      232,
+      43,
+      2,
+      152,
+      117,
+      119
+    ],
+    "size": 333,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "tokens_bump",
+        "type": "u8",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "mint",
+        "type": "pubkey",
+        "offset": 11,
+        "size": 32
+      },
+      {
+        "name": "admin",
+        "type": "pubkey",
+        "offset": 43,
+        "size": 32
+      },
+      {
+        "name": "pending_admin",
+        "type": "pubkey",
+        "offset": 75,
+        "size": 32
+      },
+      {
+        "name": "manager",
+        "type": "pubkey",
+        "offset": 107,
+        "size": 32
+      },
+      {
+        "name": "pauser",
+        "type": "pubkey",
+        "offset": 139,
+        "size": 32
+      },
+      {
+        "name": "total_shares",
+        "type": "u128",
+        "offset": 171,
+        "size": 16
+      },
+      {
+        "name": "deposit_cap",
+        "type": "u64",
+        "offset": 187,
+        "size": 8
+      },
+      {
+        "name": "min_deposit",
+        "type": "u64",
+        "offset": 195,
+        "size": 8
+      },
+      {
+        "name": "paused",
+        "type": "bool",
+        "offset": 203,
+        "size": 1
+      },
+      {
+        "name": "withdrawals_frozen",
+        "type": "bool",
+        "offset": 204,
+        "size": 1
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;128]",
+        "offset": 205,
+        "size": 128
+      }
+    ]
+  }
+}
