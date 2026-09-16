@@ -79,6 +79,9 @@ jobs:
         run: npm ci --prefix frontend
       - name: Install the witness builder
         run: npm ci --prefix tools/poseidon
+      # The browser proof is verified by the committed Solidity verifier, which needs forge. This job
+      # otherwise never touches Solidity, so nothing else installed it.
+      - uses: foundry-rs/foundry-toolchain@v1
       # Two proving implementations, one verifier. The CLI path above generated it; the browser path
       # has to satisfy it, and nothing makes them agree unless something checks.
       - name: Prove through the browser path and verify against the committed verifier

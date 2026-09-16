@@ -14,7 +14,10 @@ ARTIFACTS="$ROOT/contracts/test/artifacts"
 GATE="${GATE:-0xa93bcdc55c1d7eb0801caaabe9525fa1857f3c35}"
 SUBMITTER="${SUBMITTER:-0x1111111111111111111111111111111111111111}"
 
-for bin in nargo node python3; do
+# Every binary the script reaches, not just the first few. forge was missing from this list, so a
+# runner without Foundry proved successfully and then failed at the last step with "command not
+# found" instead of stopping before doing the work.
+for bin in nargo node python3 forge; do
   command -v "$bin" >/dev/null || { echo "browser-proof-check: $bin is not on PATH" >&2; exit 1; }
 done
 
