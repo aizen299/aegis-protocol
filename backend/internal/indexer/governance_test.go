@@ -117,7 +117,7 @@ func governanceEvent(t *testing.T, name string, payload map[string]any) chain.Ev
 		ChainID:     testChainID,
 		BlockNumber: 99,
 		BlockTime:   1735689600,
-		TxHash:      [32]byte{0xbe, 0xef},
+		TxHash:      "0xbeef",
 		LogIndex:    2,
 		Contract:    mustID(t, governorHex),
 		Name:        name,

@@ -200,7 +200,7 @@ func (h *VaultHandler) row(ev chain.Event, asset types.Identity) (db.VaultEvent,
 		Vault:       h.encode(ev.Contract),
 		Amount:      amount,
 		Shares:      shares,
-		TxHash:      txHashHex(ev.TxHash),
+		TxHash:      ev.TxHash,
 		LogIndex:    ev.LogIndex,
 		BlockNumber: ev.BlockNumber,
 		At:          time.Unix(ev.BlockTime, 0).UTC(),
@@ -232,15 +232,4 @@ func rawField(ev chain.Event, key string) (types.Raw, error) {
 		return types.Raw{}, fmt.Errorf("event %s: field %q is negative", ev.Name, key)
 	}
 	return types.NewRaw(n), nil
-}
-
-func txHashHex(h [32]byte) string {
-	const hexDigits = "0123456789abcdef"
-	out := make([]byte, 2+len(h)*2)
-	out[0], out[1] = '0', 'x'
-	for i, b := range h {
-		out[2+i*2] = hexDigits[b>>4]
-		out[3+i*2] = hexDigits[b&0x0f]
-	}
-	return string(out)
 }

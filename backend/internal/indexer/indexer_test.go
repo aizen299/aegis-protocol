@@ -242,7 +242,7 @@ func TestRestoreCursorSeedsFromStartBlockWhenAbsent(t *testing.T) {
 func TestCursorNotAdvancedWhenHandlerFails(t *testing.T) {
 	client := &fakeClient{
 		head:   50,
-		events: map[uint64][]chain.Event{10: {{ChainID: testChainID, BlockNumber: 10, Name: "Deposited"}}},
+		events: map[uint64][]chain.Event{10: {{ChainID: testChainID, BlockNumber: 10, TxHash: "0x01", Name: "Deposited"}}},
 	}
 	cursors := &fakeCursors{}
 	handler := &recordingHandler{err: errors.New("write failed")}
@@ -261,7 +261,7 @@ func TestCursorNotAdvancedWhenHandlerFails(t *testing.T) {
 
 func TestReplayDeliversSameEventsAgain(t *testing.T) {
 	events := map[uint64][]chain.Event{
-		10: {{ChainID: testChainID, BlockNumber: 10, Name: "Deposited"}},
+		10: {{ChainID: testChainID, BlockNumber: 10, TxHash: "0x01", Name: "Deposited"}},
 	}
 	handler := &recordingHandler{}
 
@@ -386,4 +386,23 @@ func singleMetricLine(t *testing.T, out *bytes.Buffer) map[string]any {
 		t.Fatalf("metric line is not JSON: %v", err)
 	}
 	return line
+}
+
+// An event with no transaction identifier has no identity: (chain_id, tx_hash, log_index) would
+// collapse every such event in a transaction onto one row, and ON CONFLICT would drop the rest.
+func TestAnEventWithoutATransactionIdentifierIsRefused(t *testing.T) {
+	client := &fakeClient{
+		head:   50,
+		events: map[uint64][]chain.Event{10: {{ChainID: testChainID, BlockNumber: 10, Name: "Deposited"}}},
+	}
+	cursors := &fakeCursors{}
+	handler := &recordingHandler{}
+	idx := newTestIndexer(client, cursors, Options{}, handler)
+
+	if _, err := idx.Step(context.Background()); err == nil {
+		t.Fatal("an event with no transaction identifier was indexed")
+	}
+	if len(handler.seen) != 0 || len(cursors.saved()) != 0 {
+		t.Fatalf("handled %d events and saved %d cursors, want none", len(handler.seen), len(cursors.saved()))
+	}
 }

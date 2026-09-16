@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
 // unsetEnv removes a variable for the duration of the test and restores it afterwards.
@@ -74,6 +76,7 @@ func TestEnvironmentIsLoaded(t *testing.T) {
 
 func TestValidateAggregatorRequiresKeyReference(t *testing.T) {
 	cfg := &Config{}
+	cfg.Chain.ChainID = types.ChainIDAnvil
 	cfg.Contracts.OracleStaking = "0x0000000000000000000000000000000000000001"
 
 	if err := cfg.ValidateAggregator(); err == nil {
@@ -90,6 +93,7 @@ func TestValidateAggregatorRequiresKeyReference(t *testing.T) {
 // beats discovering it when a round is already open.
 func TestValidateNodeRejectsFewerSourcesThanTheFloor(t *testing.T) {
 	cfg := &Config{}
+	cfg.Chain.ChainID = types.ChainIDAnvil
 	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
 	cfg.Contracts.OracleRounds = "0x1"
 	cfg.Contracts.OracleStaking = "0x2"
@@ -107,6 +111,7 @@ func TestValidateNodeRejectsFewerSourcesThanTheFloor(t *testing.T) {
 // would otherwise read the wrong path from the wrong endpoint.
 func TestValidateNodeRejectsMismatchedSourcePaths(t *testing.T) {
 	cfg := &Config{}
+	cfg.Chain.ChainID = types.ChainIDAnvil
 	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
 	cfg.Contracts.OracleRounds = "0x1"
 	cfg.Contracts.OracleStaking = "0x2"
@@ -122,6 +127,7 @@ func TestValidateNodeRejectsMismatchedSourcePaths(t *testing.T) {
 
 func TestValidateNodeAcceptsACompleteConfiguration(t *testing.T) {
 	cfg := &Config{}
+	cfg.Chain.ChainID = types.ChainIDAnvil
 	cfg.Secrets.NodeKeyRef = "NODE_PRIVATE_KEY"
 	cfg.Contracts.OracleRounds = "0x1"
 	cfg.Contracts.OracleStaking = "0x2"
@@ -132,5 +138,26 @@ func TestValidateNodeAcceptsACompleteConfiguration(t *testing.T) {
 
 	if err := cfg.ValidateNode(); err != nil {
 		t.Fatalf("validate: %v", err)
+	}
+}
+
+// A mistyped CHAIN_ID would not fail on its own: it would index into rows no other service reads.
+func TestAnUnassignedChainIDIsRefused(t *testing.T) {
+	cfg := &Config{}
+	cfg.Secrets.SlasherKeyRef = "SLASHER_PRIVATE_KEY"
+	cfg.Contracts.OracleStaking = "0x1"
+
+	for _, id := range []int64{0, 31338, types.NonEVMChainIDBase} {
+		cfg.Chain.ChainID = id
+		if err := cfg.ValidateChain(); err == nil {
+			t.Errorf("chain ID %d validated", id)
+		}
+		if err := cfg.ValidateAggregator(); err == nil {
+			t.Errorf("aggregator validated with chain ID %d", id)
+		}
+	}
+	cfg.Chain.ChainID = types.ChainIDSolanaLocalnet
+	if err := cfg.ValidateChain(); err != nil {
+		t.Errorf("solana-localnet refused: %v", err)
 	}
 }

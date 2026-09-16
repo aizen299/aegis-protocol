@@ -131,7 +131,7 @@ func oracleEvent(t *testing.T, contract string, name string, payload map[string]
 		ChainID:     testChainID,
 		BlockNumber: 100,
 		BlockTime:   1735689600,
-		TxHash:      [32]byte{0x01, 0x02},
+		TxHash:      "0x0102",
 		LogIndex:    7,
 		Contract:    mustID(t, contract),
 		Name:        name,

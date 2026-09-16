@@ -216,6 +216,9 @@ func (idx *Indexer) emitLag(ctx context.Context, head, processed uint64) {
 }
 
 func (idx *Indexer) dispatch(ctx context.Context, ev chain.Event) error {
+	if ev.TxHash == "" {
+		return fmt.Errorf("%s at block %d has no transaction identifier; refusing to index it", ev.Name, ev.BlockNumber)
+	}
 	for _, h := range idx.handlers {
 		if err := h.Handle(ctx, ev); err != nil {
 			return fmt.Errorf("handle %s at block %d: %w", ev.Name, ev.BlockNumber, err)

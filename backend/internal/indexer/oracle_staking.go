@@ -189,7 +189,7 @@ func (h *OracleStakingHandler) handleSlashed(ctx context.Context, ev chain.Event
 		Amount:         amount,
 		RemainingStake: remaining,
 		Reason:         trimBytes32(reason),
-		TxHash:         txHashHex(ev.TxHash),
+		TxHash:         ev.TxHash,
 		LogIndex:       ev.LogIndex,
 		BlockNumber:    ev.BlockNumber,
 		At:             blockTime(ev),

@@ -243,7 +243,7 @@ func (c *Client) decode(lg types.Log) (chain.Event, bool, error) {
 	return chain.Event{
 		ChainID:     c.chainID,
 		BlockNumber: lg.BlockNumber,
-		TxHash:      [32]byte(lg.TxHash),
+		TxHash:      TxHashHex(lg.TxHash),
 		LogIndex:    lg.Index,
 		Contract:    pbtypes.IdentityFromEVM(lg.Address),
 		Name:        name,

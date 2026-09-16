@@ -120,7 +120,7 @@ func vaultEvent(t *testing.T, name string, amount, shares string) chain.Event {
 		ChainID:     testChainID,
 		BlockNumber: 42,
 		BlockTime:   1735689600,
-		TxHash:      [32]byte{0xde, 0xad, 0xbe, 0xef},
+		TxHash:      "0xdeadbeef",
 		LogIndex:    3,
 		Contract:    mustID(t, vaultHex),
 		Name:        name,
@@ -246,17 +246,21 @@ func TestVaultHandlerRoutesWithdrawn(t *testing.T) {
 	}
 }
 
-func TestVaultRowTxHashIsLowercaseHex(t *testing.T) {
+// The transaction identifier is the chain client's canonical form, stored as given. A Solana
+// signature is 64 bytes, twice an EVM hash, and must reach the row intact.
+func TestVaultRowKeepsTheChainsTransactionIdentifier(t *testing.T) {
+	const signature = "5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW"
+
 	store := &fakeVaultStore{}
 	h := newVaultHandler(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 18}})
 
-	if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1", "1000")); err != nil {
+	ev := vaultEvent(t, eventDeposited, "1", "1000")
+	ev.TxHash = signature
+	if err := h.Handle(context.Background(), ev); err != nil {
 		t.Fatalf("handle: %v", err)
 	}
-
-	want := "0xdeadbeef" + "00000000000000000000000000000000000000000000000000000000"
-	if got := store.deposits[0].TxHash; got != want {
-		t.Fatalf("tx_hash = %s, want %s", got, want)
+	if got := store.deposits[0].TxHash; got != signature {
+		t.Fatalf("tx_hash = %s, want %s", got, signature)
 	}
 }
 

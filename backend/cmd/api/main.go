@@ -31,6 +31,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := cfg.ValidateChain(); err != nil {
+		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+		os.Exit(1)
+	}
+
 	log := observability.NewLogger(serviceName, cfg.LogSvc).
 		With().Str("environment", cfg.Environment).Logger()
 

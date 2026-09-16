@@ -88,7 +88,7 @@ func zkEvent(t *testing.T, contract, name string, payload map[string]any) chain.
 		ChainID:     testChainID,
 		BlockNumber: 120,
 		BlockTime:   1735689600,
-		TxHash:      [32]byte{0xfe, 0xed},
+		TxHash:      "0xfeed",
 		LogIndex:    4,
 		Contract:    mustID(t, contract),
 		Name:        name,

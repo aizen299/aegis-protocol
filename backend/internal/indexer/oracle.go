@@ -172,7 +172,7 @@ func (h *OracleRoundsHandler) handleRoundStarted(ctx context.Context, ev chain.E
 		Deadline:       deadline,
 		EligibleCount:  int32(eligible.Big().Int64()),
 		NodeSetVersion: version,
-		TxHash:         txHashHex(ev.TxHash),
+		TxHash:         ev.TxHash,
 		LogIndex:       ev.LogIndex,
 		BlockNumber:    ev.BlockNumber,
 	})
@@ -248,7 +248,7 @@ func (h *OracleRoundsHandler) handleSubmission(ctx context.Context, ev chain.Eve
 		Value:       value,
 		Nonce:       nonce,
 		Signature:   signature,
-		TxHash:      txHashHex(ev.TxHash),
+		TxHash:      ev.TxHash,
 		LogIndex:    ev.LogIndex,
 		BlockNumber: ev.BlockNumber,
 		SubmittedAt: blockTime(ev),

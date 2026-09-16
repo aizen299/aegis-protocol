@@ -25,11 +25,13 @@ type Event struct {
 	ChainID     int64
 	BlockNumber uint64
 	BlockTime   int64
-	TxHash      [32]byte
-	LogIndex    uint
-	Contract    types.Identity
-	Name        string
-	Payload     map[string]any
+	// TxHash is the transaction identifier in the chain's canonical string form, as written to
+	// Postgres. Not fixed-width: an EVM hash is 32 bytes, a Solana signature 64.
+	TxHash   string
+	LogIndex uint
+	Contract types.Identity
+	Name     string
+	Payload  map[string]any
 }
 
 // TokenMeta is the on-chain metadata of a fungible token. Decimals are a property of the asset,

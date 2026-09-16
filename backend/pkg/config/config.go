@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+
+	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
 type Config struct {
@@ -111,9 +113,21 @@ func (c *Config) validateEnvironment() error {
 	}
 }
 
+// ValidateChain refuses a chain ID the protocol has not assigned. Every chain-derived row is keyed by
+// it, so a mistyped ID does not fail loudly on its own: it indexes into a chain of its own.
+func (c *Config) ValidateChain() error {
+	if _, ok := types.LookupChain(c.Chain.ChainID); !ok {
+		return fmt.Errorf("CHAIN_ID %d is not a known chain; assignments live in pkg/types/chain.go", c.Chain.ChainID)
+	}
+	return nil
+}
+
 // ValidateAggregator checks the fields the oracle aggregation service needs. The key itself is
 // resolved at startup by internal/secrets, which fails rather than falling back.
 func (c *Config) ValidateAggregator() error {
+	if err := c.ValidateChain(); err != nil {
+		return err
+	}
 	if c.Secrets.SlasherKeyRef == "" {
 		return fmt.Errorf("SLASHER_KEY_REF is required: it names the environment variable locally, or the SSM parameter path otherwise")
 	}
@@ -129,6 +143,9 @@ func (c *Config) ValidateAggregator() error {
 // fewer sources than its own minimum can never submit, and discovering that when a round is open is
 // discovering it too late.
 func (c *Config) ValidateNode() error {
+	if err := c.ValidateChain(); err != nil {
+		return err
+	}
 	if c.Secrets.NodeKeyRef == "" {
 		return fmt.Errorf("NODE_KEY_REF is required: it names the environment variable locally, or the SSM parameter path otherwise")
 	}
@@ -154,8 +171,8 @@ func (c *Config) ValidateIndexer() error {
 	if c.Chain.RPCURL == "" {
 		return fmt.Errorf("CHAIN_RPC_URL is required for the indexer")
 	}
-	if c.Chain.ChainID <= 0 {
-		return fmt.Errorf("CHAIN_ID must be a positive chain identifier, got %d", c.Chain.ChainID)
+	if err := c.ValidateChain(); err != nil {
+		return err
 	}
 	if c.Chain.BatchSize == 0 {
 		return fmt.Errorf("CHAIN_BATCH_SIZE must be greater than zero")

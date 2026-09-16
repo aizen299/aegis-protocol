@@ -207,7 +207,7 @@ func (h *GovernanceHandler) handleProposalCreated(ctx context.Context, ev chain.
 		Calldata:      payload,
 		VoteStart:     voteStart.Big().Int64(),
 		VoteEnd:       voteEnd.Big().Int64(),
-		TxHash:        txHashHex(ev.TxHash),
+		TxHash:        ev.TxHash,
 		LogIndex:      ev.LogIndex,
 		BlockNumber:   ev.BlockNumber,
 	})
@@ -242,7 +242,7 @@ func (h *GovernanceHandler) handleVoteCast(ctx context.Context, ev chain.Event) 
 		Support:     support,
 		Weight:      weight,
 		Reason:      reason,
-		TxHash:      txHashHex(ev.TxHash),
+		TxHash:      ev.TxHash,
 		LogIndex:    ev.LogIndex,
 		BlockNumber: ev.BlockNumber,
 		VotedAt:     blockTime(ev),
