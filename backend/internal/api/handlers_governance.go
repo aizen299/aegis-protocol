@@ -45,13 +45,13 @@ func (h *handlers) listProposals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proposals, err := h.governance.Proposals(r.Context(), state, limit, offset)
+	proposals, err := chainOf(r).Governance.Proposals(r.Context(), state, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("state", state).Msg("list proposals failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load proposals")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, proposals))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, proposals))
 }
 
 func (h *handlers) getProposal(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +61,7 @@ func (h *handlers) getProposal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proposal, err := h.governance.Proposal(r.Context(), proposalID)
+	proposal, err := chainOf(r).Governance.Proposal(r.Context(), proposalID)
 	if err != nil {
 		h.writeLookupError(w, err, "proposal")
 		return
@@ -81,17 +81,17 @@ func (h *handlers) listProposalVotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	votes, err := h.governance.ProposalVotes(r.Context(), proposalID, limit, offset)
+	votes, err := chainOf(r).Governance.ProposalVotes(r.Context(), proposalID, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("proposal", proposalID.String()).Msg("list proposal votes failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load votes")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, votes))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, votes))
 }
 
 func (h *handlers) listVoterVotes(w http.ResponseWriter, r *http.Request) {
-	voter, ok := h.canonicalAddress(chi.URLParam(r, "address"))
+	voter, ok := h.canonicalAddress(r, chi.URLParam(r, "address"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "INVALID_ADDRESS", "address is not valid for this chain")
 		return
@@ -102,19 +102,19 @@ func (h *handlers) listVoterVotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	votes, err := h.governance.VotesByVoter(r.Context(), voter, limit, offset)
+	votes, err := chainOf(r).Governance.VotesByVoter(r.Context(), voter, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("voter", voter).Msg("list voter votes failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load votes")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, votes))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, votes))
 }
 
 // The governor's own metadata, including the decimals every vote weight on this chain is
 // denominated in.
 func (h *handlers) getGovernor(w http.ResponseWriter, r *http.Request) {
-	governor, err := h.governance.Governor(r.Context())
+	governor, err := chainOf(r).Governance.Governor(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "governor")
 		return

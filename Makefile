@@ -366,6 +366,16 @@ backend-abi: ## Re-export contract ABIs consumed by the indexer
 	cd contracts && forge inspect ZkVaultGate abi --json \
 		> ../backend/pkg/contracts/zk/ZkVaultGate.abi.json
 
+.PHONY: backend-idl
+backend-idl: ## Copy Solana program IDLs consumed by the indexer
+	cp solana/idl/aegis_vault.json backend/pkg/contracts/solvault/aegis_vault.json
+
+.PHONY: backend-idl-check
+backend-idl-check: ## Fail if the indexer's embedded IDL differs from solana/idl
+	@diff -u solana/idl/aegis_vault.json backend/pkg/contracts/solvault/aegis_vault.json \
+		|| { echo "IDL DRIFT: backend/pkg/contracts/solvault is stale. Run 'make backend-idl'."; exit 1; }
+	@echo "backend IDL matches solana/idl"
+
 .PHONY: migrate-up
 migrate-up:
 	migrate -path backend/migrations -database "$(DB_DSN)" up

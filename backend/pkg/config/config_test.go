@@ -161,3 +161,31 @@ func TestAnUnassignedChainIDIsRefused(t *testing.T) {
 		t.Errorf("solana-localnet refused: %v", err)
 	}
 }
+
+func TestAPIChainsDefaultToTheConfiguredChain(t *testing.T) {
+	cfg := &Config{}
+	cfg.Chain.ChainID = types.ChainIDAnvil
+	chains, err := cfg.APIChains()
+	if err != nil || len(chains) != 1 || chains[0].ID != types.ChainIDAnvil {
+		t.Fatalf("chains = %v, err = %v", chains, err)
+	}
+
+	cfg.Chain.ChainID = 0
+	if _, err := cfg.APIChains(); err == nil {
+		t.Fatal("no API_CHAINS and no CHAIN_ID resolved to a chain")
+	}
+}
+
+func TestAPIChainsRefuseUnknownAndRepeatedNames(t *testing.T) {
+	cfg := &Config{}
+	cfg.API.Chains = []string{"anvil", "solana-localnet"}
+	if chains, err := cfg.APIChains(); err != nil || len(chains) != 2 {
+		t.Fatalf("chains = %v, err = %v", chains, err)
+	}
+	for _, names := range [][]string{{"anvil", "anvil"}, {"anvil", "solana"}, {""}} {
+		cfg.API.Chains = names
+		if _, err := cfg.APIChains(); err == nil {
+			t.Errorf("%v accepted", names)
+		}
+	}
+}

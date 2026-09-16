@@ -81,6 +81,9 @@ type Config struct {
 		// carries no cookies or credentials, but an allowlist that defaults to "anyone" is a habit
 		// worth not forming.
 		CORSOrigins []string `env:"API_CORS_ORIGINS" envSeparator:","`
+
+		// Registry names of every chain this API serves. Unset means the one chain CHAIN_ID names.
+		Chains []string `env:"API_CHAINS" envSeparator:","`
 	}
 }
 
@@ -120,6 +123,31 @@ func (c *Config) ValidateChain() error {
 		return fmt.Errorf("CHAIN_ID %d is not a known chain; assignments live in pkg/types/chain.go", c.Chain.ChainID)
 	}
 	return nil
+}
+
+// APIChains resolves the chains the API serves. Every name must be in the registry, and none twice.
+func (c *Config) APIChains() ([]types.Chain, error) {
+	if len(c.API.Chains) == 0 {
+		if err := c.ValidateChain(); err != nil {
+			return nil, err
+		}
+		chain, _ := types.LookupChain(c.Chain.ChainID)
+		return []types.Chain{chain}, nil
+	}
+	seen := make(map[int64]bool, len(c.API.Chains))
+	out := make([]types.Chain, 0, len(c.API.Chains))
+	for _, name := range c.API.Chains {
+		chain, ok := types.LookupChainByName(name)
+		if !ok {
+			return nil, fmt.Errorf("API_CHAINS names %q, which is not a known chain", name)
+		}
+		if seen[chain.ID] {
+			return nil, fmt.Errorf("API_CHAINS names %q twice", name)
+		}
+		seen[chain.ID] = true
+		out = append(out, chain)
+	}
+	return out, nil
 }
 
 // ValidateAggregator checks the fields the oracle aggregation service needs. The key itself is

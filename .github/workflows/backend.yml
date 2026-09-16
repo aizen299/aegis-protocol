@@ -5,9 +5,9 @@ on:
     branches: [main]
     # contracts/src is included because the committed ABI is generated from it: a contract change
     # that is not mirrored into backend/pkg/contracts must fail here, not at runtime.
-    paths: ["backend/**", "contracts/src/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "contracts/src/**", "solana/idl/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["backend/**", "contracts/src/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "contracts/src/**", "solana/idl/**", ".github/workflows/backend.yml"]
 
 concurrency:
   group: backend-${{ github.ref }}
@@ -119,6 +119,14 @@ jobs:
             echo "$missing"
             exit 1
           fi
+
+  # The indexer decodes Solana events from an embedded copy of the program's IDL. Solana CI checks
+  # solana/idl against a fresh build; this checks the copy against solana/idl.
+  idl-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make backend-idl-check
 
   abi-drift:
     runs-on: ubuntu-latest

@@ -30,12 +30,13 @@ type AssetResolver interface {
 	TokenMetadata(ctx context.Context, token types.Identity) (chain.TokenMeta, error)
 }
 
-// VaultMetadataReader reads a vault's asset and share offset.
+// VaultLocator says which vault an event belongs to, and reads that vault's asset and share offset.
 //
-// Narrow and separate from chain.Client on purpose: a share offset is a property of this protocol's
-// contract, not a chain-generic concept, so an SVM implementation would have nothing to implement.
-type VaultMetadataReader interface {
-	VaultMetadata(ctx context.Context, vault types.Identity) (types.Identity, uint8, error)
+// The emitter is not always the vault. On EVM each vault is its own contract; on Solana one program
+// holds a vault per asset. Separate from chain.Client because a share offset is a property of this
+// protocol's vault, not of a chain. See docs/v2.0-solana-plan.md §10.4.
+type VaultLocator interface {
+	LocateVault(ctx context.Context, emitter, asset types.Identity) (vault, vaultAsset types.Identity, shareOffset uint8, err error)
 }
 
 // VaultHandler turns VaultEngine events into rows. Writes use ON CONFLICT DO NOTHING keyed on
@@ -45,39 +46,40 @@ type VaultMetadataReader interface {
 // decimals and records them alongside, rather than scaling on ingest — scaling here would bake one
 // token's decimals into every row and misrepresent any asset that does not match.
 type VaultHandler struct {
-	vault     types.Identity
-	encode    func(types.Identity) string
-	resolver  AssetResolver
-	vaultMeta VaultMetadataReader
-	store     VaultStore
-	chainID   int64
+	contract types.Identity
+	encode   func(types.Identity) string
+	resolver AssetResolver
+	locator  VaultLocator
+	store    VaultStore
+	chainID  int64
 
-	mu       sync.Mutex
-	assets   map[types.Identity]types.AssetMetadata
-	vaultSet bool
+	mu     sync.Mutex
+	assets map[types.Identity]types.AssetMetadata
+	vaults map[types.Identity]types.Identity
 }
 
-func NewVaultHandler(store VaultStore, client chain.Client, vaultMeta VaultMetadataReader, vault types.Identity) *VaultHandler {
+func NewVaultHandler(store VaultStore, client chain.Client, locator VaultLocator, contract types.Identity) *VaultHandler {
 	return &VaultHandler{
-		vault:     vault,
-		encode:    client.EncodeIdentity,
-		resolver:  client,
-		vaultMeta: vaultMeta,
-		store:     store,
-		chainID:   client.ChainID(),
-		assets:    make(map[types.Identity]types.AssetMetadata),
+		contract: contract,
+		encode:   client.EncodeIdentity,
+		resolver: client,
+		locator:  locator,
+		store:    store,
+		chainID:  client.ChainID(),
+		assets:   make(map[types.Identity]types.AssetMetadata),
+		vaults:   make(map[types.Identity]types.Identity),
 	}
 }
 
 func (h *VaultHandler) Filters() []chain.Filter {
 	return []chain.Filter{{
-		Contract: h.vault,
+		Contract: h.contract,
 		Names:    []string{eventDeposited, eventWithdrawn},
 	}}
 }
 
 func (h *VaultHandler) Handle(ctx context.Context, ev chain.Event) error {
-	if ev.Contract != h.vault {
+	if ev.Contract != h.contract {
 		return nil
 	}
 	if ev.Name != eventDeposited && ev.Name != eventWithdrawn {
@@ -94,11 +96,12 @@ func (h *VaultHandler) Handle(ctx context.Context, ev chain.Event) error {
 	if err := h.ensureAsset(ctx, asset); err != nil {
 		return err
 	}
-	if err := h.ensureVault(ctx, asset); err != nil {
+	vault, err := h.ensureVault(ctx, ev.Contract, asset)
+	if err != nil {
 		return err
 	}
 
-	row, err := h.row(ev, asset)
+	row, err := h.row(ev, vault, asset)
 	if err != nil {
 		return err
 	}
@@ -142,44 +145,44 @@ func (h *VaultHandler) ensureAsset(ctx context.Context, asset types.Identity) er
 	return nil
 }
 
-// ensureVault resolves and persists the vault's share offset once per process. Like the asset
-// path, a vault that cannot be read fails the batch rather than being given a default — a guessed
-// offset misstates every share amount by a factor of ten to the guess.
-func (h *VaultHandler) ensureVault(ctx context.Context, asset types.Identity) error {
+// ensureVault locates the event's vault and persists its share offset once per asset per process.
+// Like the asset path, a vault that cannot be read fails the batch rather than being given a default
+// — a guessed offset misstates every share amount by a factor of ten to the guess.
+func (h *VaultHandler) ensureVault(ctx context.Context, emitter, asset types.Identity) (types.Identity, error) {
 	h.mu.Lock()
-	done := h.vaultSet
+	vault, done := h.vaults[asset]
 	h.mu.Unlock()
 	if done {
-		return nil
+		return vault, nil
 	}
 
-	readAsset, offset, err := h.vaultMeta.VaultMetadata(ctx, h.vault)
+	vault, readAsset, offset, err := h.locator.LocateVault(ctx, emitter, asset)
 	if err != nil {
-		return fmt.Errorf("resolve vault %s: %w", h.encode(h.vault), err)
+		return types.Identity{}, fmt.Errorf("resolve vault for %s: %w", h.encode(asset), err)
 	}
-	// The event and the contract must agree on the asset; if they do not, one of them is being
-	// read wrong and storing either would be a guess.
+	// The event and the vault must agree on the asset; if they do not, one of them is being read
+	// wrong and storing either would be a guess.
 	if readAsset != asset {
-		return fmt.Errorf("vault %s reports asset %s but emitted %s",
-			h.encode(h.vault), h.encode(readAsset), h.encode(asset))
+		return types.Identity{}, fmt.Errorf("vault %s reports asset %s but the event names %s",
+			h.encode(vault), h.encode(readAsset), h.encode(asset))
 	}
 
 	if err := h.store.UpsertVault(ctx, types.VaultMetadata{
 		ChainID:      h.chainID,
-		Address:      h.encode(h.vault),
+		Address:      h.encode(vault),
 		AssetAddress: h.encode(asset),
 		ShareOffset:  offset,
 	}); err != nil {
-		return err
+		return types.Identity{}, err
 	}
 
 	h.mu.Lock()
-	h.vaultSet = true
+	h.vaults[asset] = vault
 	h.mu.Unlock()
-	return nil
+	return vault, nil
 }
 
-func (h *VaultHandler) row(ev chain.Event, asset types.Identity) (db.VaultEvent, error) {
+func (h *VaultHandler) row(ev chain.Event, vault, asset types.Identity) (db.VaultEvent, error) {
 	user, err := identityField(ev, "user")
 	if err != nil {
 		return db.VaultEvent{}, err
@@ -197,7 +200,7 @@ func (h *VaultHandler) row(ev chain.Event, asset types.Identity) (db.VaultEvent,
 		ChainID:     ev.ChainID,
 		User:        h.encode(user),
 		Asset:       h.encode(asset),
-		Vault:       h.encode(ev.Contract),
+		Vault:       h.encode(vault),
 		Amount:      amount,
 		Shares:      shares,
 		TxHash:      ev.TxHash,

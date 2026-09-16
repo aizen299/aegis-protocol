@@ -100,11 +100,9 @@ func setupStack(t *testing.T) *stack {
 	}
 
 	srv := api.NewServer(cfg, log, api.Deps{
-		Store:   store,
-		Cache:   redis,
-		Vault:   vault.NewService(store, redis, log, chainID),
-		Chain:   client,
-		ChainID: chainID,
+		Store:  store,
+		Cache:  redis,
+		Chains: []api.ChainDeps{{ID: chainID, Codec: client, Vault: vault.NewService(store, redis, log, chainID)}},
 	})
 
 	return &stack{

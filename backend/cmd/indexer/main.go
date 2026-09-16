@@ -8,13 +8,18 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/rs/zerolog"
+
+	"github.com/aizen299/aegis-protocol/backend/internal/chain"
 	"github.com/aizen299/aegis-protocol/backend/internal/chain/evm"
+	"github.com/aizen299/aegis-protocol/backend/internal/chain/svm"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/indexer"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/governance"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
+	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/solvault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
 	zkcontracts "github.com/aizen299/aegis-protocol/backend/pkg/contracts/zk"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
@@ -47,6 +52,42 @@ func main() {
 	}
 	defer store.Close()
 
+	chainInfo, _ := types.LookupChain(cfg.Chain.ChainID)
+	var client chain.Client
+	var handlers []indexer.Handler
+	switch chainInfo.VM {
+	case types.VMSVM:
+		client, handlers = solanaHandlers(ctx, cfg, store, log)
+	default:
+		client, handlers = evmHandlers(ctx, cfg, store, log)
+	}
+	defer client.Close()
+
+	log.Info().
+		Bool("oracle", cfg.OracleEnabled()).
+		Bool("governance", cfg.GovernanceEnabled()).
+		Bool("zk", cfg.ZkEnabled()).
+		Int("handlers", len(handlers)).
+		Msg("handlers wired")
+
+	idx := indexer.New(client, store, log, indexer.Options{
+		ServiceName:  serviceName,
+		StartBlock:   cfg.Chain.StartBlock,
+		BatchSize:    cfg.Chain.BatchSize,
+		PollInterval: cfg.Chain.PollInterval,
+		Metrics:      observability.NewMetrics(serviceName, cfg.Environment),
+	}, handlers...)
+
+	if err := idx.Run(ctx); err != nil {
+		log.Error().Err(err).Msg("indexer stopped with error")
+		os.Exit(1)
+	}
+
+	log.Info().Uint64("cursor", idx.Cursor()).Msg("indexer stopped")
+}
+
+// evmHandlers builds the EVM client and every handler its configured contracts need.
+func evmHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log zerolog.Logger) (chain.Client, []indexer.Handler) {
 	vaultAddress, err := types.IdentityFromEVMHex(cfg.Contracts.VaultEngine)
 	if err != nil {
 		log.Fatal().Err(err).Str("value", cfg.Contracts.VaultEngine).Msg("invalid vault address")
@@ -105,8 +146,6 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("chain client unavailable")
 	}
-	defer client.Close()
-
 	handlers := []indexer.Handler{
 		indexer.NewVaultHandler(store, client, evm.NewVaultReader(client), vaultAddress),
 	}
@@ -125,27 +164,38 @@ func main() {
 			indexer.NewZkHandler(store, client, evm.NewZkReader(client), *zkTree, *zkGate))
 	}
 
-	log.Info().
-		Bool("oracle", cfg.OracleEnabled()).
-		Bool("governance", cfg.GovernanceEnabled()).
-		Bool("zk", cfg.ZkEnabled()).
-		Int("handlers", len(handlers)).
-		Msg("handlers wired")
+	return client, handlers
+}
 
-	idx := indexer.New(client, store, log, indexer.Options{
-		ServiceName:  serviceName,
-		StartBlock:   cfg.Chain.StartBlock,
-		BatchSize:    cfg.Chain.BatchSize,
-		PollInterval: cfg.Chain.PollInterval,
-		Metrics:      observability.NewMetrics(serviceName, cfg.Environment),
-	}, handlers...)
-
-	if err := idx.Run(ctx); err != nil {
-		log.Error().Err(err).Msg("indexer stopped with error")
-		os.Exit(1)
+// solanaHandlers builds the Solana client. Only the vault exists on Solana so far, so a configured
+// oracle, governance, or zk contract is refused rather than silently not indexed.
+func solanaHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log zerolog.Logger) (chain.Client, []indexer.Handler) {
+	if cfg.OracleEnabled() || cfg.GovernanceEnabled() || cfg.ZkEnabled() || cfg.Contracts.ZkTree != "" || cfg.Contracts.ZkGate != "" {
+		log.Fatal().Msg("only CONTRACT_VAULT_ENGINE is supported on Solana; unset the oracle, governance, and zk contracts")
+	}
+	program, err := svm.Decode(cfg.Contracts.VaultEngine)
+	if err != nil {
+		log.Fatal().Err(err).Str("value", cfg.Contracts.VaultEngine).Msg("invalid vault program id")
+	}
+	idl, err := svm.ParseIDL(solvault.IDL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("embedded vault idl is invalid")
+	}
+	// The IDL decodes by discriminator, so the wrong program's events would decode as ours.
+	if idl.Program != program {
+		log.Fatal().Str("configured", cfg.Contracts.VaultEngine).Str("idl", svm.Encode(idl.Program)).
+			Msg("CONTRACT_VAULT_ENGINE is not the program the embedded idl describes")
 	}
 
-	log.Info().Uint64("cursor", idx.Cursor()).Msg("indexer stopped")
+	client, err := svm.New(ctx, svm.Options{
+		RPCURL:   cfg.Chain.RPCURL,
+		ChainID:  cfg.Chain.ChainID,
+		Programs: []svm.Registration{{IDL: idl}},
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("chain client unavailable")
+	}
+	return client, []indexer.Handler{indexer.NewVaultHandler(store, client, svm.NewVaultLocator(client), program)}
 }
 
 // optionalAddress parses a contract address that may legitimately be unset.

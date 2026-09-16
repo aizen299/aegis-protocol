@@ -64,18 +64,23 @@ func (f *fakeResolver) TokenMetadata(context.Context, types.Identity) (chain.Tok
 
 type fakeVaultMeta struct {
 	asset  string
+	vault  string
 	offset uint8
 	err    error
 	calls  int
 }
 
-func (f *fakeVaultMeta) VaultMetadata(context.Context, types.Identity) (types.Identity, uint8, error) {
+func (f *fakeVaultMeta) LocateVault(_ context.Context, emitter, _ types.Identity) (types.Identity, types.Identity, uint8, error) {
 	f.calls++
 	if f.err != nil {
-		return types.Identity{}, 0, f.err
+		return types.Identity{}, types.Identity{}, 0, f.err
 	}
-	id, _ := types.IdentityFromEVMHex(f.asset)
-	return id, f.offset, nil
+	vault := emitter
+	if f.vault != "" {
+		vault, _ = types.IdentityFromEVMHex(f.vault)
+	}
+	asset, _ := types.IdentityFromEVMHex(f.asset)
+	return vault, asset, f.offset, nil
 }
 
 func mustID(t *testing.T, hex string) types.Identity {
@@ -101,16 +106,17 @@ func newVaultHandler(t *testing.T, store VaultStore, resolver AssetResolver) *Va
 	return newVaultHandlerWithMeta(t, store, resolver, &fakeVaultMeta{asset: assetHex, offset: 3})
 }
 
-func newVaultHandlerWithMeta(t *testing.T, store VaultStore, resolver AssetResolver, meta VaultMetadataReader) *VaultHandler {
+func newVaultHandlerWithMeta(t *testing.T, store VaultStore, resolver AssetResolver, meta VaultLocator) *VaultHandler {
 	t.Helper()
 	return &VaultHandler{
-		vault:     mustID(t, vaultHex),
-		encode:    func(id types.Identity) string { return id.EVMHex() },
-		resolver:  resolver,
-		vaultMeta: meta,
-		store:     store,
-		chainID:   testChainID,
-		assets:    make(map[types.Identity]types.AssetMetadata),
+		contract: mustID(t, vaultHex),
+		encode:   func(id types.Identity) string { return id.EVMHex() },
+		resolver: resolver,
+		locator:  meta,
+		store:    store,
+		chainID:  testChainID,
+		assets:   make(map[types.Identity]types.AssetMetadata),
+		vaults:   make(map[types.Identity]types.Identity),
 	}
 }
 
@@ -363,5 +369,21 @@ func TestVaultHandlerFailsWhenVaultUnreadable(t *testing.T) {
 	}
 	if len(store.deposits) != 0 {
 		t.Fatal("a share amount was stored without a known scale")
+	}
+}
+
+// On Solana one program holds a vault per asset, so the emitter is not the vault. Rows and vault
+// metadata must carry the vault the locator found, never the emitter.
+func TestVaultRowsCarryTheLocatedVaultNotTheEmitter(t *testing.T) {
+	const located = "0x00000000000000000000000000000000000000aa"
+	store := &fakeVaultStore{}
+	meta := &fakeVaultMeta{asset: assetHex, vault: located, offset: 3}
+	h := newVaultHandlerWithMeta(t, store, &fakeResolver{meta: chain.TokenMeta{Decimals: 6}}, meta)
+
+	if err := h.Handle(context.Background(), vaultEvent(t, eventDeposited, "1", "1000")); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+	if store.deposits[0].Vault != located || store.vaults[0].Address != located {
+		t.Fatalf("row vault = %s, metadata vault = %s, want %s", store.deposits[0].Vault, store.vaults[0].Address, located)
 	}
 }

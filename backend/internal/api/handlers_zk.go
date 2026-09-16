@@ -25,7 +25,7 @@ type ZkService interface {
 }
 
 func (h *handlers) getZkGate(w http.ResponseWriter, r *http.Request) {
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
@@ -37,13 +37,13 @@ func (h *handlers) getZkGate(w http.ResponseWriter, r *http.Request) {
 // membership proof is only as private as the number of members, and at one member it is not
 // private at all. See docs/v0.4-zk-plan.md §4.
 func (h *handlers) getAnonymitySet(w http.ResponseWriter, r *http.Request) {
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
 	}
 
-	set, err := h.zk.AnonymitySet(r.Context(), gate.TreeAddress)
+	set, err := chainOf(r).Zk.AnonymitySet(r.Context(), gate.TreeAddress)
 	if err != nil {
 		h.log.Error().Err(err).Msg("anonymity set lookup failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load the anonymity set")
@@ -61,19 +61,19 @@ func (h *handlers) listCommitments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
 	}
 
-	commitments, err := h.zk.Commitments(r.Context(), gate.TreeAddress, limit, offset)
+	commitments, err := chainOf(r).Zk.Commitments(r.Context(), gate.TreeAddress, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Msg("list commitments failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load commitments")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, commitments))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, commitments))
 }
 
 func (h *handlers) listPrivateActions(w http.ResponseWriter, r *http.Request) {
@@ -83,19 +83,19 @@ func (h *handlers) listPrivateActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
 	}
 
-	actions, err := h.zk.PrivateActions(r.Context(), gate.Address, limit, offset)
+	actions, err := chainOf(r).Zk.PrivateActions(r.Context(), gate.Address, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Msg("list private actions failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load private actions")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, actions))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, actions))
 }
 
 // Answers the one question worth asking before paying to generate a proof.
@@ -107,13 +107,13 @@ func (h *handlers) getNullifierStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
 	}
 
-	spent, err := h.zk.NullifierSpent(r.Context(), gate.Address, nullifier)
+	spent, err := chainOf(r).Zk.NullifierSpent(r.Context(), gate.Address, nullifier)
 	if err != nil {
 		h.log.Error().Err(err).Msg("nullifier lookup failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load the nullifier")
@@ -121,7 +121,7 @@ func (h *handlers) getNullifierStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"chainId":   h.chainID,
+		"chainId":   chainOf(r).ID,
 		"gate":      gate.Address,
 		"nullifier": nullifier,
 		"spent":     spent,
@@ -135,17 +135,17 @@ func (h *handlers) listZkActions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gate, err := h.zk.Gate(r.Context())
+	gate, err := chainOf(r).Zk.Gate(r.Context())
 	if err != nil {
 		h.writeLookupError(w, err, "zk gate")
 		return
 	}
 
-	actions, err := h.zk.Actions(r.Context(), gate.Address, limit, offset)
+	actions, err := chainOf(r).Zk.Actions(r.Context(), gate.Address, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Msg("list zk actions failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load actions")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, actions))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, actions))
 }

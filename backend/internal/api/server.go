@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
-	"github.com/aizen299/aegis-protocol/backend/internal/chain"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
@@ -26,15 +25,21 @@ type Server struct {
 	cfg  *config.Config
 }
 
-type Deps struct {
-	Store      *db.Store
-	Cache      *cache.Client
+// ChainDeps is everything the API serves for one chain. A module the chain does not have is nil,
+// and its routes answer 404 for that chain rather than an empty result.
+type ChainDeps struct {
+	ID         int64
+	Codec      IdentityCodec
 	Vault      *vault.Service
 	Oracle     OracleService
 	Governance GovernanceService
 	Zk         ZkService
-	Chain      chain.Client
-	ChainID    int64
+}
+
+type Deps struct {
+	Store  *db.Store
+	Cache  *cache.Client
+	Chains []ChainDeps
 
 	// Metrics is optional. Nil disables emission, which is what handler tests use.
 	Metrics *observability.Metrics
@@ -42,15 +47,10 @@ type Deps struct {
 
 func NewServer(cfg *config.Config, log zerolog.Logger, deps Deps) *Server {
 	h := &handlers{
-		vault:       deps.Vault,
-		oracle:      deps.Oracle,
-		governance:  deps.Governance,
-		zk:          deps.Zk,
+		chains:      chainMap(deps.Chains),
 		metrics:     deps.Metrics,
 		store:       deps.Store,
 		cache:       deps.Cache,
-		chainClient: deps.Chain,
-		chainID:     deps.ChainID,
 		maxPageSize: cfg.API.MaxPageSize,
 		log:         log,
 	}
@@ -83,30 +83,44 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 	r.Get("/ready", h.ready)
 
 	r.Route("/v1", func(r chi.Router) {
-		r.Get("/vault/{vaultAddress}/tvl", h.getVaultTVL)
-		r.Get("/vault/positions/{address}", h.getVaultPosition)
-		r.Get("/vault/positions/{address}/deposits", h.listVaultDeposits)
+		r.Use(h.resolveChain)
 
-		r.Get("/oracle/feeds", h.listOracleFeeds)
-		r.Get("/oracle/feeds/{feedId}", h.getOracleFeed)
-		r.Get("/oracle/feeds/{feedId}/rounds", h.listOracleRounds)
-		r.Get("/oracle/rounds/{roundId}", h.getOracleRound)
-		r.Get("/oracle/rounds/{roundId}/submissions", h.listOracleSubmissions)
-		r.Get("/oracle/nodes", h.listOracleNodes)
-		r.Get("/oracle/nodes/{address}", h.getOracleNode)
+		r.Group(func(r chi.Router) {
+			r.Use(requireModule("vault", func(c *ChainDeps) bool { return c.Vault != nil }))
+			r.Get("/vault/{vaultAddress}/tvl", h.getVaultTVL)
+			r.Get("/vault/positions/{address}", h.getVaultPosition)
+			r.Get("/vault/positions/{address}/deposits", h.listVaultDeposits)
+		})
 
-		r.Get("/governance/governor", h.getGovernor)
-		r.Get("/governance/proposals", h.listProposals)
-		r.Get("/governance/proposals/{proposalId}", h.getProposal)
-		r.Get("/governance/proposals/{proposalId}/votes", h.listProposalVotes)
-		r.Get("/governance/voters/{address}/votes", h.listVoterVotes)
+		r.Group(func(r chi.Router) {
+			r.Use(requireModule("oracle", func(c *ChainDeps) bool { return c.Oracle != nil }))
+			r.Get("/oracle/feeds", h.listOracleFeeds)
+			r.Get("/oracle/feeds/{feedId}", h.getOracleFeed)
+			r.Get("/oracle/feeds/{feedId}/rounds", h.listOracleRounds)
+			r.Get("/oracle/rounds/{roundId}", h.getOracleRound)
+			r.Get("/oracle/rounds/{roundId}/submissions", h.listOracleSubmissions)
+			r.Get("/oracle/nodes", h.listOracleNodes)
+			r.Get("/oracle/nodes/{address}", h.getOracleNode)
+		})
 
-		r.Get("/zk/gate", h.getZkGate)
-		r.Get("/zk/anonymity-set", h.getAnonymitySet)
-		r.Get("/zk/commitments", h.listCommitments)
-		r.Get("/zk/actions", h.listZkActions)
-		r.Get("/zk/private-actions", h.listPrivateActions)
-		r.Get("/zk/nullifiers/{nullifier}", h.getNullifierStatus)
+		r.Group(func(r chi.Router) {
+			r.Use(requireModule("governance", func(c *ChainDeps) bool { return c.Governance != nil }))
+			r.Get("/governance/governor", h.getGovernor)
+			r.Get("/governance/proposals", h.listProposals)
+			r.Get("/governance/proposals/{proposalId}", h.getProposal)
+			r.Get("/governance/proposals/{proposalId}/votes", h.listProposalVotes)
+			r.Get("/governance/voters/{address}/votes", h.listVoterVotes)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(requireModule("zk", func(c *ChainDeps) bool { return c.Zk != nil }))
+			r.Get("/zk/gate", h.getZkGate)
+			r.Get("/zk/anonymity-set", h.getAnonymitySet)
+			r.Get("/zk/commitments", h.listCommitments)
+			r.Get("/zk/actions", h.listZkActions)
+			r.Get("/zk/private-actions", h.listPrivateActions)
+			r.Get("/zk/nullifiers/{nullifier}", h.getNullifierStatus)
+		})
 	})
 
 	return r

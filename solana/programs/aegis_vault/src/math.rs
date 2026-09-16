@@ -1,5 +1,5 @@
 pub const VIRTUAL_SHARES_OFFSET: u8 = 3;
-pub const VIRTUAL_SHARES: u128 = 1_000;
+pub const VIRTUAL_SHARES: u128 = 10u128.pow(VIRTUAL_SHARES_OFFSET as u32);
 pub const VIRTUAL_ASSETS: u128 = 1;
 
 // Floor in both directions: a depositor never receives a share the vault did not get paid for, and a

@@ -91,9 +91,7 @@ func newTestServer(t *testing.T, stub *stubOracle) http.Handler {
 	cfg.Chain.ChainID = testChainID
 
 	h := &handlers{
-		oracle:      stub,
-		chainClient: chainStub{},
-		chainID:     testChainID,
+		chains:      chainMap([]ChainDeps{{ID: testChainID, Codec: chainStub{}, Oracle: stub}}),
 		maxPageSize: cfg.API.MaxPageSize,
 		log:         zerolog.New(io.Discard),
 	}

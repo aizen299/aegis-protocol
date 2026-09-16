@@ -72,6 +72,12 @@ func (r *VaultReader) VaultMetadata(ctx context.Context, vault pbtypes.Identity)
 	return pbtypes.IdentityFromEVM(asset), offset, nil
 }
 
+// LocateVault: on EVM every vault is its own contract, so the emitter is the vault.
+func (r *VaultReader) LocateVault(ctx context.Context, emitter, _ pbtypes.Identity) (pbtypes.Identity, pbtypes.Identity, uint8, error) {
+	asset, offset, err := r.VaultMetadata(ctx, emitter)
+	return emitter, asset, offset, err
+}
+
 func (r *VaultReader) call(ctx context.Context, addr common.Address, method string) ([]any, error) {
 	input, err := vaultABI.Pack(method)
 	if err != nil {

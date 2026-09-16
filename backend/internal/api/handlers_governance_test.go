@@ -63,9 +63,7 @@ func newGovernanceServer(t *testing.T, stub *stubGovernance) http.Handler {
 	cfg.Chain.ChainID = testChainID
 
 	h := &handlers{
-		governance:  stub,
-		chainClient: chainStub{},
-		chainID:     testChainID,
+		chains:      chainMap([]ChainDeps{{ID: testChainID, Codec: chainStub{}, Governance: stub}}),
 		maxPageSize: cfg.API.MaxPageSize,
 		log:         zerolog.New(io.Discard),
 	}

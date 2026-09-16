@@ -26,7 +26,9 @@ pub struct Vault {
     pub min_deposit: u64,
     pub paused: bool,
     pub withdrawals_frozen: bool,
-    pub reserved: [u8; 128],
+    // Read by the indexer to scale shares; Solana has no view call to ask the program.
+    pub share_offset: u8,
+    pub reserved: [u8; 127],
 }
 
 #[account]

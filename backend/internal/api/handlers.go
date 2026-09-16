@@ -12,7 +12,6 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
-	"github.com/aizen299/aegis-protocol/backend/internal/vault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
@@ -41,15 +40,10 @@ type OracleService interface {
 }
 
 type handlers struct {
-	vault       *vault.Service
-	oracle      OracleService
-	governance  GovernanceService
-	zk          ZkService
+	chains      map[int64]*ChainDeps
 	metrics     *observability.Metrics
 	store       *db.Store
 	cache       *cache.Client
-	chainClient IdentityCodec
-	chainID     int64
 	maxPageSize int
 	log         zerolog.Logger
 }
@@ -88,22 +82,23 @@ func (h *handlers) ready(w http.ResponseWriter, r *http.Request) {
 
 // canonicalAddress validates the path parameter against the chain's own encoding and returns the
 // canonical form. Identity encodings are chain-specific, so this cannot be a hex regex.
-func (h *handlers) canonicalAddress(raw string) (string, bool) {
-	id, err := h.chainClient.DecodeIdentity(raw)
+func (h *handlers) canonicalAddress(r *http.Request, raw string) (string, bool) {
+	codec := chainOf(r).Codec
+	id, err := codec.DecodeIdentity(raw)
 	if err != nil {
 		return "", false
 	}
-	return h.chainClient.EncodeIdentity(id), true
+	return codec.EncodeIdentity(id), true
 }
 
 func (h *handlers) getVaultPosition(w http.ResponseWriter, r *http.Request) {
-	address, ok := h.canonicalAddress(chi.URLParam(r, "address"))
+	address, ok := h.canonicalAddress(r, chi.URLParam(r, "address"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "INVALID_ADDRESS", "address is not valid for this chain")
 		return
 	}
 
-	pos, err := h.vault.Position(r.Context(), address)
+	pos, err := chainOf(r).Vault.Position(r.Context(), address)
 	if err != nil {
 		h.log.Error().Err(err).Str("address", address).Msg("vault position lookup failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load position")
@@ -113,13 +108,13 @@ func (h *handlers) getVaultPosition(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handlers) getVaultTVL(w http.ResponseWriter, r *http.Request) {
-	vaultAddress, ok := h.canonicalAddress(chi.URLParam(r, "vaultAddress"))
+	vaultAddress, ok := h.canonicalAddress(r, chi.URLParam(r, "vaultAddress"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "INVALID_ADDRESS", "vault address is not valid for this chain")
 		return
 	}
 
-	tvl, err := h.vault.TVL(r.Context(), vaultAddress)
+	tvl, err := chainOf(r).Vault.TVL(r.Context(), vaultAddress)
 	if err != nil {
 		h.log.Error().Err(err).Str("vault", vaultAddress).Msg("vault tvl lookup failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load tvl")
@@ -127,13 +122,13 @@ func (h *handlers) getVaultTVL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"chainId": h.chainID,
+		"chainId": chainOf(r).ID,
 		"tvl":     tvl,
 	})
 }
 
 func (h *handlers) listVaultDeposits(w http.ResponseWriter, r *http.Request) {
-	address, ok := h.canonicalAddress(chi.URLParam(r, "address"))
+	address, ok := h.canonicalAddress(r, chi.URLParam(r, "address"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "INVALID_ADDRESS", "address is not valid for this chain")
 		return
@@ -145,7 +140,7 @@ func (h *handlers) listVaultDeposits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deposits, err := h.vault.Deposits(r.Context(), address, limit, offset)
+	deposits, err := chainOf(r).Vault.Deposits(r.Context(), address, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("address", address).Msg("vault deposits lookup failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load deposits")
@@ -153,7 +148,7 @@ func (h *handlers) listVaultDeposits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"chainId": h.chainID,
+		"chainId": chainOf(r).ID,
 		"limit":   limit,
 		"offset":  offset,
 		"items":   deposits,

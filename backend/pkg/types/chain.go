@@ -50,6 +50,15 @@ func KnownChains() []Chain {
 	return append([]Chain(nil), knownChains...)
 }
 
+func LookupChainByName(name string) (Chain, bool) {
+	for _, c := range knownChains {
+		if c.Name == name {
+			return c, true
+		}
+	}
+	return Chain{}, false
+}
+
 func LookupChain(id int64) (Chain, bool) {
 	for _, c := range knownChains {
 		if c.ID == id {

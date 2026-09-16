@@ -25,9 +25,7 @@ func newMeteredServer(t *testing.T, out *bytes.Buffer, stub *stubOracle) http.Ha
 	cfg.Chain.ChainID = testChainID
 
 	h := &handlers{
-		oracle:      stub,
-		chainClient: chainStub{},
-		chainID:     testChainID,
+		chains:      chainMap([]ChainDeps{{ID: testChainID, Codec: chainStub{}, Oracle: stub}}),
 		maxPageSize: cfg.API.MaxPageSize,
 		log:         zerolog.New(io.Discard),
 		metrics:     observability.NewMetricsTo(out, "api", "staging"),

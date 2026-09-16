@@ -142,10 +142,16 @@
         "size": 1
       },
       {
-        "name": "reserved",
-        "type": "[u8;128]",
+        "name": "share_offset",
+        "type": "u8",
         "offset": 205,
-        "size": 128
+        "size": 1
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;127]",
+        "offset": 206,
+        "size": 127
       }
     ]
   }

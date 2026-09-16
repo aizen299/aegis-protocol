@@ -78,9 +78,7 @@ func newZkServer(t *testing.T, stub *stubZk) http.Handler {
 	cfg.Chain.ChainID = testChainID
 
 	h := &handlers{
-		zk:          stub,
-		chainClient: chainStub{},
-		chainID:     testChainID,
+		chains:      chainMap([]ChainDeps{{ID: testChainID, Codec: chainStub{}, Zk: stub}}),
 		maxPageSize: cfg.API.MaxPageSize,
 		log:         zerolog.New(io.Discard),
 	}

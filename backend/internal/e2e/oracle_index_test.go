@@ -396,10 +396,8 @@ func (s *oracleStack) apiHandler(t *testing.T) http.Handler {
 
 	log := zerolog.New(io.Discard)
 	srv := api.NewServer(cfg, log, api.Deps{
-		Store:   s.store,
-		Oracle:  oraclesvc.NewService(s.store, nil, log, chainID),
-		Chain:   s.client,
-		ChainID: chainID,
+		Store:  s.store,
+		Chains: []api.ChainDeps{{ID: chainID, Codec: s.client, Oracle: oraclesvc.NewService(s.store, nil, log, chainID)}},
 	})
 	return srv.Handler()
 }

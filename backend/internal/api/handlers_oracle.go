@@ -22,13 +22,13 @@ func (h *handlers) listOracleFeeds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feeds, err := h.oracle.Feeds(r.Context(), limit, offset)
+	feeds, err := chainOf(r).Oracle.Feeds(r.Context(), limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Msg("list feeds failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load feeds")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, feeds))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, feeds))
 }
 
 func (h *handlers) getOracleFeed(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func (h *handlers) getOracleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feed, err := h.oracle.Feed(r.Context(), feedID)
+	feed, err := chainOf(r).Oracle.Feed(r.Context(), feedID)
 	if err != nil {
 		h.writeLookupError(w, err, "feed")
 		return
@@ -58,13 +58,13 @@ func (h *handlers) listOracleRounds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rounds, err := h.oracle.Rounds(r.Context(), feedID, limit, offset)
+	rounds, err := chainOf(r).Oracle.Rounds(r.Context(), feedID, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("feed", feedID).Msg("list rounds failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load rounds")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, rounds))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, rounds))
 }
 
 func (h *handlers) getOracleRound(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +74,7 @@ func (h *handlers) getOracleRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	round, err := h.oracle.Round(r.Context(), roundID)
+	round, err := chainOf(r).Oracle.Round(r.Context(), roundID)
 	if err != nil {
 		h.writeLookupError(w, err, "round")
 		return
@@ -94,13 +94,13 @@ func (h *handlers) listOracleSubmissions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	submissions, err := h.oracle.Submissions(r.Context(), roundID, limit, offset)
+	submissions, err := chainOf(r).Oracle.Submissions(r.Context(), roundID, limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Str("round", roundID.String()).Msg("list submissions failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load submissions")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, submissions))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, submissions))
 }
 
 func (h *handlers) listOracleNodes(w http.ResponseWriter, r *http.Request) {
@@ -110,23 +110,23 @@ func (h *handlers) listOracleNodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := h.oracle.Nodes(r.Context(), limit, offset)
+	nodes, err := chainOf(r).Oracle.Nodes(r.Context(), limit, offset)
 	if err != nil {
 		h.log.Error().Err(err).Msg("list nodes failed")
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load nodes")
 		return
 	}
-	writeJSON(w, http.StatusOK, page(h.chainID, limit, offset, nodes))
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, nodes))
 }
 
 func (h *handlers) getOracleNode(w http.ResponseWriter, r *http.Request) {
-	address, ok := h.canonicalAddress(chi.URLParam(r, "address"))
+	address, ok := h.canonicalAddress(r, chi.URLParam(r, "address"))
 	if !ok {
 		writeError(w, http.StatusBadRequest, "INVALID_ADDRESS", "address is not valid for this chain")
 		return
 	}
 
-	node, err := h.oracle.Node(r.Context(), address)
+	node, err := chainOf(r).Oracle.Node(r.Context(), address)
 	if err != nil {
 		h.writeLookupError(w, err, "node")
 		return

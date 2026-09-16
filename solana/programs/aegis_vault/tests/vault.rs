@@ -354,6 +354,7 @@ fn the_upgrade_authority_creates_a_vault() {
 
     let v = vault(&env);
     assert_eq!(v.version, VAULT_VERSION);
+    assert_eq!(v.share_offset, aegis_vault::math::VIRTUAL_SHARES_OFFSET);
     assert_eq!(v.mint, env.mint);
     assert_eq!(v.admin, env.admin.pubkey());
     assert_eq!(v.manager, env.manager.pubkey());

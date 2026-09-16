@@ -9,6 +9,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PG_NAME=aegis-e2e-pg
 REDIS_NAME=aegis-e2e-redis
 ANVIL_PID=""
+SOLANA_DIR=""
 
 APP_ENV="${APP_ENV:-local}"
 export APP_ENV
@@ -19,13 +20,18 @@ export DB_DSN REDIS_ADDR
 
 cleanup() {
   [ -n "$ANVIL_PID" ] && kill "$ANVIL_PID" 2>/dev/null || true
+  # Read from the pid file, not a variable: a validator that never became healthy still started.
+  if [ -n "$SOLANA_DIR" ]; then
+    [ -f "$SOLANA_DIR/validator.pid" ] && kill "$(cat "$SOLANA_DIR/validator.pid")" 2>/dev/null || true
+    rm -rf "$SOLANA_DIR"
+  fi
   if [ "${E2E_KEEP:-0}" != "1" ]; then
     docker rm -f "$PG_NAME" "$REDIS_NAME" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
 
-for bin in docker forge cast anvil go; do
+for bin in docker forge cast anvil go solana-test-validator solana-keygen python3 curl; do
   command -v "$bin" >/dev/null || { echo "e2e: $bin is not on PATH" >&2; exit 1; }
 done
 
@@ -57,10 +63,15 @@ for _ in $(seq 1 30); do
 done
 cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null
 
+echo "==> starting solana-test-validator"
+SOLANA_DIR=$(mktemp -d)
+"$ROOT/scripts/solana-validator.sh" "$SOLANA_DIR"
+export SOLANA_E2E=1 SOLANA_E2E_AUTHORITY="$SOLANA_DIR/authority.json"
+
 echo "==> running end-to-end tests"
 cd "$ROOT/backend"
 # Go's test timeout defaults to 10 minutes. This suite measures around four, so it is not close
 # today — but it grows with every proof-generating test, and a suite that crosses the default fails
 # with a message that reads like a test failure rather than a timeout. Set explicitly so the
 # margin is visible and deliberate rather than inherited.
-go test -tags e2e ./internal/e2e/... -count=1 -timeout 25m -v
+go test -tags e2e ./internal/e2e/... -count=1 -timeout 25m -v ${E2E_RUN:+-run "$E2E_RUN"}

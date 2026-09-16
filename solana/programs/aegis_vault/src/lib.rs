@@ -39,6 +39,7 @@ pub mod aegis_vault {
         vault.min_deposit = min_deposit;
         vault.paused = false;
         vault.withdrawals_frozen = false;
+        vault.share_offset = math::VIRTUAL_SHARES_OFFSET;
 
         emit_cpi!(VaultInitialized {
             vault: vault.key(),

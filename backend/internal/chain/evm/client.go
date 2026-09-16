@@ -278,3 +278,11 @@ func indexedArgs(inputs abi.Arguments) abi.Arguments {
 func TxHashHex(h [32]byte) string {
 	return "0x" + strings.ToLower(hex.EncodeToString(h[:]))
 }
+
+// Codec is the EVM identity encoding with no RPC connection, for callers that only format and parse
+// addresses.
+type Codec struct{}
+
+func (Codec) EncodeIdentity(id pbtypes.Identity) string { return id.EVMHex() }
+
+func (Codec) DecodeIdentity(s string) (pbtypes.Identity, error) { return pbtypes.IdentityFromEVMHex(s) }

@@ -3,9 +3,9 @@ name: End-to-End
 on:
   push:
     branches: [main]
-    paths: ["backend/**", "contracts/**", "zk/**", "tools/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+    paths: ["backend/**", "contracts/**", "zk/**", "solana/**", "tools/**", "scripts/e2e.sh", "scripts/solana-validator.sh", ".github/workflows/e2e.yml"]
   pull_request:
-    paths: ["backend/**", "contracts/**", "zk/**", "tools/**", "scripts/e2e.sh", ".github/workflows/e2e.yml"]
+    paths: ["backend/**", "contracts/**", "zk/**", "solana/**", "tools/**", "scripts/e2e.sh", "scripts/solana-validator.sh", ".github/workflows/e2e.yml"]
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -70,6 +70,30 @@ jobs:
       - name: Install the witness generator's dependencies
         run: cd tools/poseidon && npm ci --no-audit --no-fund
 
+      # The Solana vault end-to-end needs the program built and a validator running. Tool versions and
+      # cache key match Solana CI, so a run there fills the cache this job reads.
+      - uses: actions/cache@v4
+        id: solana-tools
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cargo/bin/anchor
+          key: solana-tools-${{ runner.os }}-3.1.10-1.1.2
+      - name: Install Solana and Anchor
+        if: steps.solana-tools.outputs.cache-hit != 'true'
+        run: |
+          curl --fail -sSfL "https://release.anza.xyz/v3.1.10/install" -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+          cargo install anchor-cli --version 1.1.2 --locked
+      - run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Build the Solana vault program
+        run: make solana-build
+      - name: Start solana-test-validator
+        run: |
+          scripts/solana-validator.sh "$RUNNER_TEMP/solana"
+          echo "SOLANA_E2E=1" >> "$GITHUB_ENV"
+          echo "SOLANA_E2E_AUTHORITY=$RUNNER_TEMP/solana/authority.json" >> "$GITHUB_ENV"
+
       - name: Start anvil
         run: |
           anvil --port 8545 --chain-id 31337 --silent &
@@ -111,7 +135,8 @@ jobs:
             TestZkAPIServesIndexedRows \
             TestServedZkRowsCarryNoSender \
             TestZkReindexingIsIdempotent \
-            TestTheAnonymitySetTracksTheTree; do
+            TestTheAnonymitySetTracksTheTree \
+            TestASolanaDepositIsIndexedAndServedBesideAnArbitrumOne; do
             grep -q -- "--- PASS: $required" /tmp/e2e.log || {
               echo "::error::$required did not run."
               exit 1

@@ -11,6 +11,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/api"
 	"github.com/aizen299/aegis-protocol/backend/internal/cache"
 	"github.com/aizen299/aegis-protocol/backend/internal/chain/evm"
+	"github.com/aizen299/aegis-protocol/backend/internal/chain/svm"
 	"github.com/aizen299/aegis-protocol/backend/internal/db"
 	"github.com/aizen299/aegis-protocol/backend/internal/governance"
 	"github.com/aizen299/aegis-protocol/backend/internal/observability"
@@ -18,6 +19,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/internal/vault"
 	"github.com/aizen299/aegis-protocol/backend/internal/zk"
 	"github.com/aizen299/aegis-protocol/backend/pkg/config"
+	"github.com/aizen299/aegis-protocol/backend/pkg/types"
 )
 
 const serviceName = "api"
@@ -31,7 +33,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := cfg.ValidateChain(); err != nil {
+	chains, err := cfg.APIChains()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 		os.Exit(1)
 	}
@@ -54,27 +57,29 @@ func main() {
 	}
 	defer redis.Close()
 
-	// The API reads no chain state; it uses the client purely for this chain's identity encoding.
-	client, err := evm.New(ctx, evm.Options{
-		RPCURL:            cfg.Chain.RPCURL,
-		ChainID:           cfg.Chain.ChainID,
-		ConfirmationDepth: cfg.Chain.ConfirmBlocks,
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("chain client unavailable")
+	// The API reads no chain state, so it opens no RPC connection: an address needs only its chain's
+	// encoding. Modules not yet on Solana are left nil and answer 404 there. §10.8.
+	deps := make([]api.ChainDeps, 0, len(chains))
+	for _, c := range chains {
+		d := api.ChainDeps{ID: c.ID, Vault: vault.NewService(store, redis, log, c.ID)}
+		switch c.VM {
+		case types.VMSVM:
+			d.Codec = svm.Codec{}
+		default:
+			d.Codec = evm.Codec{}
+			d.Oracle = oracle.NewService(store, redis, log, c.ID)
+			d.Governance = governance.NewService(store, redis, log, c.ID)
+			d.Zk = zk.NewService(store, redis, log, c.ID)
+		}
+		deps = append(deps, d)
+		log.Info().Str("chain", c.Name).Int64("chain_id", c.ID).Msg("serving chain")
 	}
-	defer client.Close()
 
 	srv := api.NewServer(cfg, log, api.Deps{
-		Store:      store,
-		Cache:      redis,
-		Vault:      vault.NewService(store, redis, log, cfg.Chain.ChainID),
-		Oracle:     oracle.NewService(store, redis, log, cfg.Chain.ChainID),
-		Governance: governance.NewService(store, redis, log, cfg.Chain.ChainID),
-		Zk:         zk.NewService(store, redis, log, cfg.Chain.ChainID),
-		Chain:      client,
-		ChainID:    cfg.Chain.ChainID,
-		Metrics:    observability.NewMetrics(serviceName, cfg.Environment),
+		Store:   store,
+		Cache:   redis,
+		Chains:  deps,
+		Metrics: observability.NewMetrics(serviceName, cfg.Environment),
 	})
 
 	errCh := make(chan error, 1)
