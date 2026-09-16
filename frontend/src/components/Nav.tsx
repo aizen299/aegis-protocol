@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { TestWalletButton } from "./TestWalletButton";
+
 const links = [
   { href: "/", label: "Vault" },
   { href: "/oracle", label: "Oracle" },
@@ -15,7 +17,7 @@ export function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-4 border-b border-edge pb-3 text-sm">
+    <nav className="flex items-center gap-4 border-b border-edge pb-3 text-sm">
       {links.map((link) => {
         const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
         return (
@@ -29,6 +31,9 @@ export function Nav() {
           </Link>
         );
       })}
+      <span className="ml-auto">
+        <TestWalletButton />
+      </span>
     </nav>
   );
 }

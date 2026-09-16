@@ -129,8 +129,10 @@ export function queueAvailability(input: { connected: boolean; state?: number })
 export function executeAvailability(input: {
   connected: boolean;
   state?: number;
-  executableAt?: string;
-  // Milliseconds of chain time. Supply the latest block's timestamp; see below.
+  // Both in seconds of chain time, both read from the chain. executableAt comes from the Governor's
+  // own proposal record, not the API: the indexer lags, and "can I act now" is a present-tense
+  // question. §2.3.
+  executableAt?: number;
   now?: number;
 }): Availability {
   if (!input.connected) return { allowed: false, reason: "Connect a wallet to execute." };
@@ -142,20 +144,21 @@ export function executeAvailability(input: {
     };
   }
 
-  // The timelock enforces the delay; this only avoids offering a transaction that must revert.
-  //
-  // `executableAt` is chain time, so `now` must be too — the latest block's timestamp, not the
-  // browser's clock. They agree on a live network and diverge by days on a local chain that has been
-  // time-warped, which is how every governance test in this repository reaches its timelock.
-  if (input.executableAt) {
-    const at = new Date(input.executableAt).getTime();
-    const now = input.now ?? Date.now();
-    if (!Number.isNaN(at) && now < at) {
-      return {
-        allowed: false,
-        reason: `The timelock delay has not elapsed. Executable ${new Date(at).toLocaleString()}.`,
-      };
-    }
+  // An unknown time refuses; it never permits. This was previously the reverse: an executable time
+  // not yet indexed skipped the check entirely, and a missing block time fell back to the browser's
+  // clock. Against a local chain eight days ahead of the wall clock, Execute was offered two days
+  // before the timelock would accept it.
+  if (input.executableAt === undefined || input.now === undefined) {
+    return { allowed: false, reason: "Reading the timelock…" };
+  }
+  if (!Number.isFinite(input.executableAt) || !Number.isFinite(input.now) || input.executableAt <= 0) {
+    return { allowed: false, reason: "The timelock's executable time could not be read." };
+  }
+  if (input.now < input.executableAt) {
+    return {
+      allowed: false,
+      reason: `The timelock delay has not elapsed. Executable ${new Date(input.executableAt * 1000).toLocaleString()}.`,
+    };
   }
   return { allowed: true };
 }

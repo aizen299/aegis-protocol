@@ -100,6 +100,21 @@ describe("ProposalActions", () => {
     for (const button of voteButtons()) expect(button).toBeDisabled();
   });
 
+  // The live defect, at the component: queued, delay not elapsed, and Execute must stay off.
+  it("keeps Execute disabled while the timelock delay has not elapsed in chain time", () => {
+    const executableAt = Math.floor(Date.now() / 1000) + 2 * 86_400;
+    mocks.reads = { state: ProposalState.QUEUED, proposalOf: { executableAt } };
+    renderActive();
+    expect(screen.getByRole("button", { name: "Execute" })).toBeDisabled();
+    expect(screen.getByText(/timelock delay has not elapsed/i)).toBeInTheDocument();
+  });
+
+  it("keeps Execute disabled while the executable time has not been read", () => {
+    mocks.reads = { state: ProposalState.QUEUED };
+    renderActive();
+    expect(screen.getByRole("button", { name: "Execute" })).toBeDisabled();
+  });
+
   it("offers queue only for a succeeded proposal", () => {
     mocks.reads = { state: ProposalState.SUCCEEDED };
     renderActive();

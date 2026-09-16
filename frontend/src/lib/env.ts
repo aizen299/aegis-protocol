@@ -10,6 +10,8 @@ export const env = {
   vaultAddress: (process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? "") as `0x${string}`,
   assetAddress: (process.env.NEXT_PUBLIC_ASSET_ADDRESS ?? "") as `0x${string}`,
   walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
+  // "anvil" enables a keyless test wallet, and only on chain 31337. See lib/testWallet.ts.
+  testWallet: process.env.NEXT_PUBLIC_TEST_WALLET,
 };
 
 export function requireVaultAddress(): `0x${string}` {

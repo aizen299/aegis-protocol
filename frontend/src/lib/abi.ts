@@ -129,6 +129,38 @@ export const governorAbi = [
   },
   {
     type: "function",
+    name: "proposalOf",
+    stateMutability: "view",
+    inputs: [{ name: "proposalId", type: "uint256" }],
+    outputs: [
+      {
+        type: "tuple",
+        components: [
+          { name: "proposer", type: "address" },
+          { name: "voteStart", type: "uint48" },
+          { name: "voteEnd", type: "uint48" },
+          { name: "executableAt", type: "uint48" },
+          { name: "state", type: "uint8" },
+          { name: "operationId", type: "uint256" },
+          { name: "forVotes", type: "uint256" },
+          { name: "againstVotes", type: "uint256" },
+          { name: "abstainVotes", type: "uint256" },
+          {
+            name: "action",
+            type: "tuple",
+            components: [
+              { name: "targetChainId", type: "uint256" },
+              { name: "target", type: "bytes32" },
+              { name: "value", type: "uint256" },
+              { name: "payload", type: "bytes" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
     name: "hasVoted",
     stateMutability: "view",
     inputs: [

@@ -109,30 +109,40 @@ describe("queueAvailability", () => {
 });
 
 describe("executeAvailability", () => {
-  const executableAt = "2026-09-20T00:00:00Z";
-  const at = Date.parse(executableAt);
+  const executableAt = 1_790_000_000;
+  const queued = { connected: true, state: ProposalState.QUEUED, executableAt };
 
   it("refuses before the timelock delay elapses", () => {
-    const e = executeAvailability({
-      connected: true,
-      state: ProposalState.QUEUED,
-      executableAt,
-      now: at - 1,
-    });
-    expect(e.allowed).toBe(false);
+    expect(executeAvailability({ ...queued, now: executableAt - 1 }).allowed).toBe(false);
   });
 
   it("allows execution at the executable time", () => {
-    expect(
-      executeAvailability({ connected: true, state: ProposalState.QUEUED, executableAt, now: at })
-        .allowed,
-    ).toBe(true);
+    expect(executeAvailability({ ...queued, now: executableAt }).allowed).toBe(true);
   });
 
   it("refuses anything that is not queued", () => {
     expect(
-      executeAvailability({ connected: true, state: ProposalState.SUCCEEDED, executableAt, now: at })
-        .allowed,
+      executeAvailability({ ...queued, state: ProposalState.SUCCEEDED, now: executableAt }).allowed,
     ).toBe(false);
+  });
+
+  // Found live: the queue event was not yet indexed, the check was skipped, and Execute was offered
+  // against a local chain two days before the timelock would accept it. An unknown time refuses.
+  it("refuses when the executable time is unknown", () => {
+    expect(executeAvailability({ ...queued, executableAt: undefined, now: executableAt }).allowed).toBe(
+      false,
+    );
+  });
+
+  it("refuses when chain time is unknown, rather than falling back to the browser's clock", () => {
+    expect(executeAvailability({ ...queued, now: undefined }).allowed).toBe(false);
+  });
+
+  it("refuses an unreadable executable time", () => {
+    for (const bad of [Number.NaN, 0, -1]) {
+      expect(executeAvailability({ ...queued, executableAt: bad, now: executableAt }).allowed).toBe(
+        false,
+      );
+    }
   });
 });

@@ -14,13 +14,22 @@ import { governorAbi, vaultEngineAbi } from "../abi";
 // check that would have noticed a frontend that kept the old one.
 
 // Readonly throughout: the ABIs are declared `as const`, so their nested arrays are readonly too.
+type Param = { readonly type: string; readonly components?: readonly Param[] };
+
 type Entry = {
   readonly type: string;
   readonly name?: string;
   readonly stateMutability?: string;
-  readonly inputs?: readonly { readonly type: string }[];
-  readonly outputs?: readonly { readonly type: string }[];
+  readonly inputs?: readonly Param[];
+  readonly outputs?: readonly Param[];
 };
+
+// A struct's type is just "tuple". Comparing that alone would pass a reordered or retyped field —
+// which, for a struct decoded by position, silently reads the wrong value. So the shape is compared
+// all the way down.
+function shape(p: Param): string {
+  return p.components ? `(${p.components.map(shape).join(",")})` : p.type;
+}
 
 function committed(relative: string): Entry[] {
   const path = resolve(__dirname, "../../../../backend/pkg/contracts", relative);
@@ -31,7 +40,7 @@ function committed(relative: string): Entry[] {
 }
 
 function signature(entry: Entry): string {
-  return `${entry.name}(${(entry.inputs ?? []).map((i) => i.type).join(",")})`;
+  return `${entry.name}(${(entry.inputs ?? []).map(shape).join(",")})`;
 }
 
 function assertMirrors(frontend: readonly Entry[], source: Entry[], label: string) {
@@ -48,9 +57,9 @@ function assertMirrors(frontend: readonly Entry[], source: Entry[], label: strin
     expect(match, `${label}: ${sig} does not exist on the contract`).toBeDefined();
     expect(entry.stateMutability, `${label}: ${sig} mutability`).toBe(match?.stateMutability);
     expect(
-      (entry.outputs ?? []).map((o) => o.type),
+      (entry.outputs ?? []).map(shape),
       `${label}: ${sig} outputs`,
-    ).toEqual((match?.outputs ?? []).map((o) => o.type));
+    ).toEqual((match?.outputs ?? []).map(shape));
   }
 }
 

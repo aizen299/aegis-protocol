@@ -40,11 +40,7 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                 <Stat label="Voting closes" state={valueOf(formatUnixTime(data.voteEnd))} />
               </Panel>
 
-              <ProposalActions
-                proposalId={proposalId}
-                voteStart={data.voteStart}
-                executableAt={data.executableAt}
-              />
+              <ProposalActions proposalId={proposalId} voteStart={data.voteStart} />
 
               <Panel title="Tally">
                 <Stat label="For" state={tally(data.votesFor)} />

@@ -23,11 +23,9 @@ type Address = `0x${string}`;
 export function ProposalActions({
   proposalId,
   voteStart,
-  executableAt,
 }: {
   proposalId: string;
   voteStart: number;
-  executableAt?: string;
 }) {
   const governor = useGovernor();
   const governorAddress = governor.data?.address as Address | undefined;
@@ -44,6 +42,18 @@ export function ProposalActions({
     args: [id],
     query: { enabled: Boolean(governorAddress), refetchInterval: 5_000 },
   });
+
+  // The executable time is read from the Governor's own record, not the API. The indexer lags by
+  // its confirmation depth and more, and a missing time must never read as an elapsed one.
+  const { data: onChainProposal } = useReadContract({
+    address: governorAddress,
+    abi: governorAbi,
+    functionName: "proposalOf",
+    args: [id],
+    query: { enabled: Boolean(governorAddress), refetchInterval: 5_000 },
+  });
+  const executableAt =
+    onChainProposal && onChainProposal.executableAt > 0 ? onChainProposal.executableAt : undefined;
 
   const { data: hasVoted } = useReadContract({
     address: governorAddress,
@@ -90,7 +100,7 @@ export function ProposalActions({
 
   // Chain time, not the browser's clock — the timelock compares against block timestamps.
   const { data: block } = useBlock({ query: { refetchInterval: 5_000 } });
-  const chainNowMs = block ? Number(block.timestamp) * 1000 : undefined;
+  const chainNow = block ? Number(block.timestamp) : undefined;
 
   const vote = voteEligibility({
     connected: isConnected,
@@ -108,7 +118,7 @@ export function ProposalActions({
     connected: isConnected,
     state,
     executableAt,
-    now: chainNowMs,
+    now: chainNow,
   });
 
   const tx = useTx();
