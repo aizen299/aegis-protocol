@@ -13,12 +13,13 @@ import { governorAbi, vaultEngineAbi } from "../abi";
 // transaction that encodes the wrong selector. v1.2 changed deposit's signature, and this is the
 // check that would have noticed a frontend that kept the old one.
 
+// Readonly throughout: the ABIs are declared `as const`, so their nested arrays are readonly too.
 type Entry = {
-  type: string;
-  name?: string;
-  stateMutability?: string;
-  inputs?: { type: string }[];
-  outputs?: { type: string }[];
+  readonly type: string;
+  readonly name?: string;
+  readonly stateMutability?: string;
+  readonly inputs?: readonly { readonly type: string }[];
+  readonly outputs?: readonly { readonly type: string }[];
 };
 
 function committed(relative: string): Entry[] {
