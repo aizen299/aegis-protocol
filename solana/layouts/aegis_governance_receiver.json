@@ -1,0 +1,365 @@
+{
+  "Allowed": {
+    "discriminator": [
+      222,
+      158,
+      208,
+      204,
+      168,
+      6,
+      209,
+      71
+    ],
+    "size": 75,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "allowed",
+        "type": "bool",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "program",
+        "type": "pubkey",
+        "offset": 11,
+        "size": 32
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;32]",
+        "offset": 43,
+        "size": 32
+      }
+    ]
+  },
+  "Config": {
+    "discriminator": [
+      155,
+      12,
+      170,
+      224,
+      30,
+      250,
+      204,
+      130
+    ],
+    "size": 264,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "authority_bump",
+        "type": "u8",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "paused",
+        "type": "bool",
+        "offset": 11,
+        "size": 1
+      },
+      {
+        "name": "bootstrapping",
+        "type": "bool",
+        "offset": 12,
+        "size": 1
+      },
+      {
+        "name": "bootstrap_admin",
+        "type": "pubkey",
+        "offset": 13,
+        "size": 32
+      },
+      {
+        "name": "guardian",
+        "type": "pubkey",
+        "offset": 45,
+        "size": 32
+      },
+      {
+        "name": "chain_id",
+        "type": "u64",
+        "offset": 77,
+        "size": 8
+      },
+      {
+        "name": "emitter_chain",
+        "type": "u16",
+        "offset": 85,
+        "size": 2
+      },
+      {
+        "name": "emitter_address",
+        "type": "[u8;32]",
+        "offset": 87,
+        "size": 32
+      },
+      {
+        "name": "delay",
+        "type": "i64",
+        "offset": 119,
+        "size": 8
+      },
+      {
+        "name": "window",
+        "type": "i64",
+        "offset": 127,
+        "size": 8
+      },
+      {
+        "name": "treasury_count",
+        "type": "u8",
+        "offset": 135,
+        "size": 1
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;128]",
+        "offset": 136,
+        "size": 128
+      }
+    ]
+  },
+  "InboundMessage": {
+    "discriminator": [
+      138,
+      179,
+      145,
+      234,
+      135,
+      133,
+      83,
+      61
+    ],
+    "size": 703,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "state",
+        "type": "u8",
+        "offset": 10,
+        "size": 1
+      },
+      {
+        "name": "emitter_chain",
+        "type": "u16",
+        "offset": 11,
+        "size": 2
+      },
+      {
+        "name": "sequence",
+        "type": "u64",
+        "offset": 13,
+        "size": 8
+      },
+      {
+        "name": "source_chain_id",
+        "type": "u64",
+        "offset": 21,
+        "size": 8
+      },
+      {
+        "name": "operation_id",
+        "type": "u64",
+        "offset": 29,
+        "size": 8
+      },
+      {
+        "name": "target",
+        "type": "pubkey",
+        "offset": 37,
+        "size": 32
+      },
+      {
+        "name": "declared_value",
+        "type": "[u8;32]",
+        "offset": 69,
+        "size": 32
+      },
+      {
+        "name": "accounts_hash",
+        "type": "[u8;32]",
+        "offset": 101,
+        "size": 32
+      },
+      {
+        "name": "received_at",
+        "type": "i64",
+        "offset": 133,
+        "size": 8
+      },
+      {
+        "name": "executable_at",
+        "type": "i64",
+        "offset": 141,
+        "size": 8
+      },
+      {
+        "name": "closed_at",
+        "type": "i64",
+        "offset": 149,
+        "size": 8
+      },
+      {
+        "name": "data_len",
+        "type": "u16",
+        "offset": 157,
+        "size": 2
+      },
+      {
+        "name": "data",
+        "type": "[u8;512]",
+        "offset": 159,
+        "size": 512
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;32]",
+        "offset": 671,
+        "size": 32
+      }
+    ]
+  },
+  "Treasury": {
+    "discriminator": [
+      238,
+      239,
+      123,
+      238,
+      89,
+      1,
+      168,
+      253
+    ],
+    "size": 154,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "mint",
+        "type": "pubkey",
+        "offset": 10,
+        "size": 32
+      },
+      {
+        "name": "account",
+        "type": "pubkey",
+        "offset": 42,
+        "size": 32
+      },
+      {
+        "name": "per_message_cap",
+        "type": "u64",
+        "offset": 74,
+        "size": 8
+      },
+      {
+        "name": "rolling_cap",
+        "type": "u64",
+        "offset": 82,
+        "size": 8
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;64]",
+        "offset": 90,
+        "size": 64
+      }
+    ]
+  },
+  "Window": {
+    "discriminator": [
+      66,
+      77,
+      66,
+      242,
+      153,
+      13,
+      1,
+      69
+    ],
+    "size": 330,
+    "fields": [
+      {
+        "name": "version",
+        "type": "u8",
+        "offset": 8,
+        "size": 1
+      },
+      {
+        "name": "bump",
+        "type": "u8",
+        "offset": 9,
+        "size": 1
+      },
+      {
+        "name": "mint",
+        "type": "pubkey",
+        "offset": 10,
+        "size": 32
+      },
+      {
+        "name": "times",
+        "type": "[i64;16]",
+        "offset": 42,
+        "size": 128
+      },
+      {
+        "name": "amounts",
+        "type": "[u64;16]",
+        "offset": 170,
+        "size": 128
+      },
+      {
+        "name": "reserved",
+        "type": "[u8;32]",
+        "offset": 298,
+        "size": 32
+      }
+    ]
+  }
+}

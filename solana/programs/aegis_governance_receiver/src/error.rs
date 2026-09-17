@@ -1,0 +1,32 @@
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum ReceiverError {
+    ZeroAddress,
+    Unauthorized,
+    NotUpgradeAuthority,
+    BootstrapFinished,
+    Paused,
+    NotPaused,
+    DelayTooShort,
+    InvalidParameter,
+    MalformedVaa,
+    MalformedMessage,
+    UnsupportedVersion,
+    InstructionDataTooLong,
+    VaaMismatch,
+    UnknownEmitter,
+    WrongTargetChain,
+    MessageNotPending,
+    DelayNotElapsed,
+    ProgramNotAllowed,
+    AccountsMismatch,
+    NotTopLevel,
+    TreasuryListIncomplete,
+    TreasuryMismatch,
+    InvalidTreasuryAccount,
+    TreasuryDelegated,
+    PerMessageCapExceeded,
+    RollingCapExceeded,
+    WindowFull,
+}

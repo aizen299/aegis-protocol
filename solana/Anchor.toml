@@ -8,6 +8,7 @@ skip-lint = false
 
 [programs.localnet]
 aegis_vault = "h5VEwZjPpX6zug14r44i4QzpPzYBKeAHQYa5QZdzyGo"
+aegis_governance_receiver = "GJB8hFodVCW6cBWiiaYurMdKJk98Q4SkM3AbrC3GNZL5"
 aegis_oracle = "6GcRqNzxauK3JLP1EUMMTTQ9ja8qcgHVAznS1nKZjnc7"
 
 [provider]

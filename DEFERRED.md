@@ -174,6 +174,40 @@ removes what a replay could check against. See `docs/v2.0-solana-plan.md` §12.9
 
 **Revisit at** the first deployment of the oracle program to any cluster, where rent is real.
 
+### Governance messages to Solana are relayed by hand
+
+A dispatched proposal reaches Solana only when someone posts the guardians' signatures and calls
+`receive_message`, and later `execute`. Anyone can, and nothing depends on who does, but no service
+does it. Until one exists, a passed proposal can sit unrelayed. See `docs/v2.0-solana-plan.md` §18.7.
+
+**Revisit when** the receiver is deployed to any cluster: an automatic relayer is then what makes a
+vote take effect without an operator.
+
+### Tokens outside a registered treasury are not capped
+
+The receiver caps what leaves the accounts registered as the authority's treasury. Tokens the
+authority holds anywhere else are measured by nothing, so a forged message that waited out the delay
+could move them freely. The runbook rule is to hold the authority's tokens only in registered
+treasuries. See `docs/v2.0-solana-plan.md` §18.1.
+
+**Revisit when** the authority is to hold more than a few mints, where registering each becomes the
+error-prone step.
+
+### Received governance messages are never closed
+
+Each received message is a rent-paying account, paid by its relayer, and is kept forever: its
+existence is what refuses a replay of the same VAA. See `docs/v2.0-solana-plan.md` §18.2.
+
+**Revisit at** the first deployment of the receiver, together with the oracle's retention rule above.
+
+### The receiver is built for Wormhole's mainnet program addresses
+
+The verify-VAA shim and core bridge addresses are constants matching the mainnet binaries loaded into
+local tests. A devnet deployment needs Wormhole's devnet addresses, chosen by a build feature. See
+`docs/v2.0-solana-plan.md` §6.
+
+**Revisit at** the first deployment of the receiver to devnet.
+
 ---
 
 ## Deferred to a named version

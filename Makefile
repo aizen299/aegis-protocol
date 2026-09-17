@@ -412,7 +412,7 @@ zk-lint:
 
 # --- solana ---
 
-SOLANA_PROGRAMS ?= aegis_vault aegis_oracle
+SOLANA_PROGRAMS ?= aegis_vault aegis_oracle aegis_governance_receiver
 
 .PHONY: solana-toolchain-check
 solana-toolchain-check: ## Fail if anchor or solana differ from the pins in solana/Anchor.toml
@@ -426,6 +426,10 @@ solana-build: solana-toolchain-check
 .PHONY: solana-test
 solana-test: solana-build
 	cd solana && cargo test
+
+.PHONY: solana-external-check
+solana-external-check: ## Fail if the committed Wormhole Solana binaries differ from their pinned hashes
+	cd solana/external && shasum -a 256 -c SHA256SUMS
 
 .PHONY: solana-lint
 solana-lint:

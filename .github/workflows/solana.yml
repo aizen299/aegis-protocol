@@ -59,6 +59,8 @@ jobs:
       - name: Toolchain matches solana/Anchor.toml
         run: make solana-toolchain-check
 
+      - name: Wormhole binaries match their pinned hashes
+        run: make solana-external-check
       - run: make solana-lint
       - run: make solana-test
       - name: IDL matches the committed copy

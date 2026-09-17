@@ -1,0 +1,2141 @@
+{
+  "address": "GJB8hFodVCW6cBWiiaYurMdKJk98Q4SkM3AbrC3GNZL5",
+  "metadata": {
+    "name": "aegis_governance_receiver",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "cancel",
+      "docs": [
+        "Stops a pending message for good. The guardian can, so a forged message waiting out its delay",
+        "in public can be stopped rather than only delayed."
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "message",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  115,
+                  115,
+                  97,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "message.emitter_chain",
+                "account": "InboundMessage"
+              },
+              {
+                "kind": "account",
+                "path": "message.sequence",
+                "account": "InboundMessage"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deregister_treasury",
+      "discriminator": [
+        55,
+        36,
+        245,
+        177,
+        58,
+        63,
+        9,
+        57
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury.mint",
+                "account": "Treasury"
+              }
+            ]
+          }
+        },
+        {
+          "name": "window",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury.mint",
+                "account": "Treasury"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute",
+      "docs": [
+        "Performs a message's instruction as the authority, once its delay has passed.",
+        "",
+        "Remaining accounts: for each registered treasury, in increasing mint order, its Treasury,",
+        "Window, and watched account; then the instruction's accounts, exactly as voted."
+      ],
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "message",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  115,
+                  115,
+                  97,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "message.emitter_chain",
+                "account": "InboundMessage"
+              },
+              {
+                "kind": "account",
+                "path": "message.sequence",
+                "account": "InboundMessage"
+              }
+            ]
+          }
+        },
+        {
+          "name": "allowed",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "message.target",
+                "account": "InboundMessage"
+              }
+            ]
+          }
+        },
+        {
+          "name": "target_program"
+        },
+        {
+          "name": "authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finish_bootstrap",
+      "docs": [
+        "Ends the upgrade authority's setup powers, for good. From here only governance messages change",
+        "the receiver."
+      ],
+      "discriminator": [
+        182,
+        155,
+        223,
+        190,
+        43,
+        141,
+        122,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "this_program",
+          "address": "GJB8hFodVCW6cBWiiaYurMdKJk98Q4SkM3AbrC3GNZL5"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "receive_message",
+      "docs": [
+        "Stores a governance message after Wormhole's guardians have signed it. The message account's",
+        "address is derived from the emitter chain and sequence, so the same VAA cannot be stored twice."
+      ],
+      "discriminator": [
+        38,
+        144,
+        127,
+        225,
+        31,
+        225,
+        238,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "message",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  115,
+                  115,
+                  97,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "emitter_chain"
+              },
+              {
+                "kind": "arg",
+                "path": "sequence"
+              }
+            ]
+          }
+        },
+        {
+          "name": "guardian_set"
+        },
+        {
+          "name": "guardian_signatures"
+        },
+        {
+          "name": "verify_vaa_shim",
+          "address": "EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "emitter_chain",
+          "type": "u16"
+        },
+        {
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "name": "guardian_set_bump",
+          "type": "u8"
+        },
+        {
+          "name": "body",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "register_treasury",
+      "docs": [
+        "Registers the account whose outflow is measured for a mint: a token account the authority",
+        "owns, or, for LAMPORTS_MINT, the authority itself."
+      ],
+      "discriminator": [
+        92,
+        138,
+        83,
+        179,
+        120,
+        40,
+        252,
+        157
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "window",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "account"
+        },
+        {
+          "name": "authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "per_message_cap",
+          "type": "u64"
+        },
+        {
+          "name": "rolling_cap",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_allowed",
+      "discriminator": [
+        172,
+        134,
+        133,
+        128,
+        12,
+        254,
+        134,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "allowed",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "target"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "target",
+          "type": "pubkey"
+        },
+        {
+          "name": "allowed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_delay",
+      "discriminator": [
+        252,
+        122,
+        2,
+        67,
+        127,
+        181,
+        249,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "delay",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "set_emitter",
+      "discriminator": [
+        175,
+        125,
+        41,
+        248,
+        217,
+        46,
+        172,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "emitter_chain",
+          "type": "u16"
+        },
+        {
+          "name": "emitter_address",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_guardian",
+      "discriminator": [
+        147,
+        243,
+        50,
+        121,
+        154,
+        164,
+        50,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "guardian",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_treasury_caps",
+      "discriminator": [
+        196,
+        77,
+        133,
+        85,
+        224,
+        225,
+        242,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury.mint",
+                "account": "Treasury"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "per_message_cap",
+          "type": "u64"
+        },
+        {
+          "name": "rolling_cap",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_window",
+      "discriminator": [
+        225,
+        198,
+        141,
+        11,
+        166,
+        215,
+        219,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "window",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [
+        169,
+        144,
+        4,
+        38,
+        10,
+        141,
+        188,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "controller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Allowed",
+      "discriminator": [
+        222,
+        158,
+        208,
+        204,
+        168,
+        6,
+        209,
+        71
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "InboundMessage",
+      "discriminator": [
+        138,
+        179,
+        145,
+        234,
+        135,
+        133,
+        83,
+        61
+      ]
+    },
+    {
+      "name": "Treasury",
+      "discriminator": [
+        238,
+        239,
+        123,
+        238,
+        89,
+        1,
+        168,
+        253
+      ]
+    },
+    {
+      "name": "Window",
+      "discriminator": [
+        66,
+        77,
+        66,
+        242,
+        153,
+        13,
+        1,
+        69
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BootstrapEnded",
+      "discriminator": [
+        51,
+        154,
+        71,
+        242,
+        103,
+        59,
+        135,
+        142
+      ]
+    },
+    {
+      "name": "DelayUpdated",
+      "discriminator": [
+        233,
+        5,
+        196,
+        236,
+        158,
+        119,
+        26,
+        239
+      ]
+    },
+    {
+      "name": "EmitterUpdated",
+      "discriminator": [
+        30,
+        32,
+        152,
+        193,
+        217,
+        60,
+        100,
+        69
+      ]
+    },
+    {
+      "name": "GuardianUpdated",
+      "discriminator": [
+        31,
+        95,
+        81,
+        24,
+        90,
+        9,
+        246,
+        32
+      ]
+    },
+    {
+      "name": "MessageCancelled",
+      "discriminator": [
+        236,
+        253,
+        93,
+        157,
+        3,
+        167,
+        153,
+        245
+      ]
+    },
+    {
+      "name": "MessageExecuted",
+      "discriminator": [
+        214,
+        203,
+        124,
+        241,
+        94,
+        227,
+        41,
+        59
+      ]
+    },
+    {
+      "name": "MessageReceived",
+      "discriminator": [
+        231,
+        68,
+        47,
+        77,
+        173,
+        241,
+        157,
+        166
+      ]
+    },
+    {
+      "name": "PausedSet",
+      "discriminator": [
+        171,
+        125,
+        127,
+        156,
+        233,
+        81,
+        68,
+        66
+      ]
+    },
+    {
+      "name": "ProgramAllowed",
+      "discriminator": [
+        95,
+        220,
+        238,
+        13,
+        131,
+        35,
+        253,
+        120
+      ]
+    },
+    {
+      "name": "ReceiverInitialized",
+      "discriminator": [
+        237,
+        24,
+        23,
+        23,
+        78,
+        35,
+        102,
+        162
+      ]
+    },
+    {
+      "name": "TreasuryDeregistered",
+      "discriminator": [
+        80,
+        177,
+        72,
+        182,
+        22,
+        124,
+        14,
+        49
+      ]
+    },
+    {
+      "name": "TreasuryOutflow",
+      "discriminator": [
+        235,
+        221,
+        179,
+        205,
+        72,
+        206,
+        95,
+        168
+      ]
+    },
+    {
+      "name": "TreasuryRegistered",
+      "discriminator": [
+        185,
+        37,
+        253,
+        131,
+        113,
+        81,
+        106,
+        9
+      ]
+    },
+    {
+      "name": "WindowUpdated",
+      "discriminator": [
+        251,
+        68,
+        183,
+        79,
+        215,
+        215,
+        18,
+        153
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ZeroAddress"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized"
+    },
+    {
+      "code": 6002,
+      "name": "NotUpgradeAuthority"
+    },
+    {
+      "code": 6003,
+      "name": "BootstrapFinished"
+    },
+    {
+      "code": 6004,
+      "name": "Paused"
+    },
+    {
+      "code": 6005,
+      "name": "NotPaused"
+    },
+    {
+      "code": 6006,
+      "name": "DelayTooShort"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidParameter"
+    },
+    {
+      "code": 6008,
+      "name": "MalformedVaa"
+    },
+    {
+      "code": 6009,
+      "name": "MalformedMessage"
+    },
+    {
+      "code": 6010,
+      "name": "UnsupportedVersion"
+    },
+    {
+      "code": 6011,
+      "name": "InstructionDataTooLong"
+    },
+    {
+      "code": 6012,
+      "name": "VaaMismatch"
+    },
+    {
+      "code": 6013,
+      "name": "UnknownEmitter"
+    },
+    {
+      "code": 6014,
+      "name": "WrongTargetChain"
+    },
+    {
+      "code": 6015,
+      "name": "MessageNotPending"
+    },
+    {
+      "code": 6016,
+      "name": "DelayNotElapsed"
+    },
+    {
+      "code": 6017,
+      "name": "ProgramNotAllowed"
+    },
+    {
+      "code": 6018,
+      "name": "AccountsMismatch"
+    },
+    {
+      "code": 6019,
+      "name": "NotTopLevel"
+    },
+    {
+      "code": 6020,
+      "name": "TreasuryListIncomplete"
+    },
+    {
+      "code": 6021,
+      "name": "TreasuryMismatch"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidTreasuryAccount"
+    },
+    {
+      "code": 6023,
+      "name": "TreasuryDelegated"
+    },
+    {
+      "code": 6024,
+      "name": "PerMessageCapExceeded"
+    },
+    {
+      "code": 6025,
+      "name": "RollingCapExceeded"
+    },
+    {
+      "code": 6026,
+      "name": "WindowFull"
+    }
+  ],
+  "types": [
+    {
+      "name": "Allowed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "allowed",
+            "type": "bool"
+          },
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BootstrapEnded",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "authority_bump",
+            "type": "u8"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bootstrapping",
+            "type": "bool"
+          },
+          {
+            "name": "bootstrap_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "emitter_address",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "delay",
+            "type": "i64"
+          },
+          {
+            "name": "window",
+            "type": "i64"
+          },
+          {
+            "name": "treasury_count",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelayUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "delay",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmitterUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "emitter_address",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "guardian",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InboundMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "operation_id",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "pubkey"
+          },
+          {
+            "name": "declared_value",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "received_at",
+            "type": "i64"
+          },
+          {
+            "name": "executable_at",
+            "type": "i64"
+          },
+          {
+            "name": "closed_at",
+            "type": "i64"
+          },
+          {
+            "name": "data_len",
+            "type": "u16"
+          },
+          {
+            "name": "data",
+            "type": {
+              "array": [
+                "u8",
+                512
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "emitter_address",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "delay",
+            "type": "i64"
+          },
+          {
+            "name": "window",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "operation_id",
+            "type": "u64"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "operation_id",
+            "type": "u64"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MessageReceived",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "operation_id",
+            "type": "u64"
+          },
+          {
+            "name": "target",
+            "type": "pubkey"
+          },
+          {
+            "name": "declared_value",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "accounts_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "executable_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PausedSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramAllowed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "allowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReceiverInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_id",
+            "type": "u64"
+          },
+          {
+            "name": "emitter_chain",
+            "type": "u16"
+          },
+          {
+            "name": "emitter_address",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "delay",
+            "type": "i64"
+          },
+          {
+            "name": "window",
+            "type": "i64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Treasury",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "per_message_cap",
+            "type": "u64"
+          },
+          {
+            "name": "rolling_cap",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryDeregistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryOutflow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "per_message_cap",
+            "type": "u64"
+          },
+          {
+            "name": "rolling_cap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Window",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "times",
+            "type": {
+              "array": [
+                "i64",
+                16
+              ]
+            }
+          },
+          {
+            "name": "amounts",
+            "type": {
+              "array": [
+                "u64",
+                16
+              ]
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WindowUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "window",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

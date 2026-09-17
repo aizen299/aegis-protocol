@@ -13,6 +13,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aegis_governance_receiver"
+version = "0.1.0"
+dependencies = [
+ "aegis_vault",
+ "anchor-lang",
+ "anchor-spl",
+ "k256",
+ "litesvm",
+ "solana-account",
+ "solana-clock",
+ "solana-keccak-hasher",
+ "solana-keypair",
+ "solana-message",
+ "solana-program-pack",
+ "solana-sha256-hasher",
+ "solana-signer",
+ "solana-transaction",
+]
+
+[[package]]
 name = "aegis_oracle"
 version = "0.1.0"
 dependencies = [
