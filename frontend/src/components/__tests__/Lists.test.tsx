@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -44,8 +44,9 @@ describe("NodeList", () => {
     mocks.useOracleNodes.mockReturnValue(ok([node]));
     render(<NodeList />);
 
-    expect(screen.getByText("5,000")).toBeInTheDocument();
-    expect(screen.getByText("50")).toBeInTheDocument();
+    const grid = within(screen.getByRole("grid"));
+    expect(grid.getByText("5,000")).toBeInTheDocument();
+    expect(grid.getByText("50")).toBeInTheDocument();
   });
 
   // The page states the penalty rules an operator is held to, and never again the claim it shipped
@@ -54,7 +55,7 @@ describe("NodeList", () => {
     mocks.useOracleNodes.mockReturnValue(ok([node]));
     render(<NodeList />);
 
-    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(within(screen.getByRole("grid")).getByText("12")).toBeInTheDocument();
 
     const rules = screen.getByTestId("missed-round-rules");
     expect(rules).toHaveTextContent(/0\.5%/);

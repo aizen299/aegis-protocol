@@ -17,6 +17,33 @@ export type Tvl = {
   tvl: { vault: string; asset?: string; amount: string; decimals: number };
 };
 
+// Mirrors backend/pkg/types.VaultPosition: indexed totals, raw integers as strings.
+export type VaultPosition = {
+  chainId: number;
+  user: string;
+  asset?: string;
+  shares: string;
+  depositedTotal: string;
+  withdrawnTotal: string;
+  decimals: number;
+  shareDecimals: number;
+  lastDepositAt?: string;
+};
+
+export type VaultDeposit = {
+  chainId: number;
+  user: string;
+  asset: string;
+  vault: string;
+  amount: string;
+  shares: string;
+  decimals: number;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  depositedAt: string;
+};
+
 // Mirrors backend/pkg/types.OracleFeed exactly. A feed carries no latest value — that lives on its
 // most recent settled round, which is a separate fetch.
 export type OracleFeed = {
@@ -237,6 +264,8 @@ export const api = {
   },
 
   tvl: (c: C, vault: string) => get<Tvl>(c, `/v1/vault/${vault}/tvl`),
+  vaultPosition: (c: C, owner: string) => get<VaultPosition>(c, `/v1/vault/positions/${owner}`),
+  vaultDeposits: (c: C, owner: string) => get<Omit<Paged<VaultDeposit>, "count">>(c, `/v1/vault/positions/${owner}/deposits`),
 
   oracleFeeds: (c: C) => get<Paged<OracleFeed>>(c, "/v1/oracle/feeds"),
   oracleFeed: (c: C, feedId: string) => get<OracleFeed>(c, `/v1/oracle/feeds/${feedId}`),

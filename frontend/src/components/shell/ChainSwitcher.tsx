@@ -24,8 +24,8 @@ export function ChainSwitcher() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="h-9 min-w-0 gap-2 px-2.5 font-medium sm:px-3" aria-label={`Chain: ${chain.label}. Switch chain`}>
           <ChainMark family={chain.family} />
-          <span className="max-w-[7.5rem] truncate sm:max-w-none">{chain.label}</span>
-          <ChevronsUpDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="hidden sm:inline">{chain.label}</span>
+          <ChevronsUpDown className="hidden size-3.5 text-muted-foreground sm:block" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">

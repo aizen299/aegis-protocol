@@ -23,7 +23,7 @@ export function ReadValue({ state }: { state: ReadState }) {
   }
 
   return (
-    <span className="font-mono text-sm text-foreground" data-testid="stat-value">
+    <span className="min-w-0 break-all text-right font-mono text-sm text-foreground" data-testid="stat-value">
       {state.text}
     </span>
   );

@@ -9,6 +9,9 @@ export const env = {
   apiUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8090",
   // Registry names of the chains this deployment serves, the first being the default.
   chains: process.env.NEXT_PUBLIC_CHAINS,
+  solanaRpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "http://127.0.0.1:8899",
+  // The SPL mint whose vault the Solana dashboard shows; the vault itself is derived from it.
+  solanaVaultMint: process.env.NEXT_PUBLIC_SOLANA_VAULT_MINT ?? "",
   vaultAddress: (process.env.NEXT_PUBLIC_VAULT_ADDRESS ?? "") as `0x${string}`,
   assetAddress: (process.env.NEXT_PUBLIC_ASSET_ADDRESS ?? "") as `0x${string}`,
   walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",

@@ -12,6 +12,7 @@ docs/v2.0-solana-plan.md §21.
 | v0.2 | Oracle feeds, rounds, submissions, nodes | Implemented, read-only |
 | v0.3 | Governance proposals, tallies, timelock, votes; vote, queue, execute | Implemented |
 | v0.4 | zk gate, anonymity set, commitments, executed actions, nullifier lookup, in-browser proving | Implemented — proving runs in the browser |
+| v2.0 | Chain switcher; Solana vault with wallet deposits and withdrawals; oracle and governance on both chains; cross-chain proposal timeline; received governance | Implemented |
 
 ## Commands
 
@@ -35,6 +36,17 @@ link names its chain, and every API request sends it. Navigation offers only the
 Chains are identified by name, never by the numeric `chainId` in an API response: Solana's internal ids
 are above 2^53, so all three clusters parse to the same JavaScript number. `src/lib/chains.ts` mirrors
 `backend/pkg/types/chain.go`, and a test compares them.
+
+## Solana
+
+Solana vault reads and writes go straight to the cluster at `NEXT_PUBLIC_SOLANA_RPC_URL`, for the vault
+derived from `NEXT_PUBLIC_SOLANA_VAULT_MINT`. Instructions are encoded from the program's IDL in
+`src/idl/`, which `make frontend-idl-check` holds equal to `solana/idl/`. Browser wallets are found
+through the Wallet Standard. With `NEXT_PUBLIC_TEST_WALLET` including `solana-localnet`, a keypair
+generated in the browser is offered on that cluster only, with an airdrop for fees.
+
+The Solana tests run in Vitest's node environment: `@solana/web3.js` cannot derive addresses under
+jsdom, whose `Uint8Array` is not Node's.
 
 ## Design tokens
 

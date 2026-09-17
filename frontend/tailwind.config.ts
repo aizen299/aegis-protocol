@@ -28,6 +28,7 @@ export default {
         violet: token("violet"),
         arbitrum: token("arbitrum"),
         solana: token("solana"),
+        chart: token("chart"),
         // The pre-redesign names, kept on the new tokens until every page is rebuilt.
         surface: token("background"),
         panel: token("card"),

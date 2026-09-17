@@ -1,9 +1,9 @@
 "use client";
 
 import { VaultDashboard } from "@/components/VaultDashboard";
-import { SolanaVaultPending } from "@/components/vault/SolanaVaultPending";
+import { SolanaVaultDashboard } from "@/components/vault/SolanaVaultDashboard";
 import { useChain } from "@/lib/chainContext";
 
 export default function Home() {
-  return useChain().vm === "svm" ? <SolanaVaultPending /> : <VaultDashboard />;
+  return useChain().vm === "svm" ? <SolanaVaultDashboard /> : <VaultDashboard />;
 }

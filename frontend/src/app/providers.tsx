@@ -12,6 +12,7 @@ import { WagmiProvider } from "wagmi";
 
 import { Toaster } from "@/components/ui/sonner";
 import { useMounted } from "@/hooks/useMounted";
+import { SolanaProviders } from "@/lib/solana/SolanaProviders";
 import { wagmiConfig } from "@/lib/wagmi";
 import { palette } from "@/theme/tokens";
 import { muiTheme } from "@/theme/mui";
@@ -43,7 +44,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
         <WagmiProvider config={wagmiConfig}>
           <QueryClientProvider client={queryClient}>
-            <Themed>{children}</Themed>
+            <SolanaProviders>
+              <Themed>{children}</Themed>
+            </SolanaProviders>
           </QueryClientProvider>
         </WagmiProvider>
       </ThemeProvider>

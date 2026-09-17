@@ -362,6 +362,20 @@ backend-idl: ## Copy Solana program IDLs consumed by the indexer
 		cp solana/idl/$${pair%%:*}.json backend/pkg/contracts/$${pair##*:}/$${pair%%:*}.json; \
 	done
 
+FRONTEND_IDLS := aegis_vault
+
+.PHONY: frontend-idl
+frontend-idl: ## Copy Solana program IDLs the frontend builds transactions from
+	@for p in $(FRONTEND_IDLS); do cp solana/idl/$$p.json frontend/src/idl/$$p.json; done
+
+.PHONY: frontend-idl-check
+frontend-idl-check: ## Fail if a frontend IDL differs from solana/idl
+	@set -e; for p in $(FRONTEND_IDLS); do \
+		diff -u solana/idl/$$p.json frontend/src/idl/$$p.json \
+			|| { echo "IDL DRIFT: frontend/src/idl/$$p.json. Run make frontend-idl."; exit 1; }; \
+		echo "$$p frontend IDL matches solana/idl"; \
+	done
+
 .PHONY: backend-idl-check
 backend-idl-check: ## Fail if an embedded IDL differs from solana/idl
 	@set -e; for pair in $(BACKEND_IDLS); do \

@@ -7,7 +7,12 @@ import { cn } from "@/lib/utils"
 
 const TooltipProvider = TooltipPrimitive.Provider
 
-const Tooltip = TooltipPrimitive.Root
+// Carries its own provider, as later shadcn/ui versions do, so a tooltip renders outside the app shell too.
+const Tooltip = ({ delayDuration = 200, ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) => (
+  <TooltipPrimitive.Provider delayDuration={delayDuration}>
+    <TooltipPrimitive.Root {...props} />
+  </TooltipPrimitive.Provider>
+)
 
 const TooltipTrigger = TooltipPrimitive.Trigger
 

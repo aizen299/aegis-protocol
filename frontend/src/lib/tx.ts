@@ -8,13 +8,14 @@ import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 // inclusion. And "mined" is not "succeeded" either — a reverted transaction has a receipt too, and
 // wagmi resolves it rather than raising an error. The UI previously went green on the hash alone,
 // so a deposit reverted by its own slippage bound looked like a deposit that landed.
+// A hash is an EVM transaction hash or a Solana signature, each in its chain's canonical form.
 export type TxPhase =
   | { kind: "idle" }
   | { kind: "signing" }
-  | { kind: "pending"; hash: `0x${string}` }
-  | { kind: "confirmed"; hash: `0x${string}` }
-  | { kind: "reverted"; hash: `0x${string}` }
-  | { kind: "failed"; reason: string; hash?: `0x${string}` };
+  | { kind: "pending"; hash: string }
+  | { kind: "confirmed"; hash: string }
+  | { kind: "reverted"; hash: string }
+  | { kind: "failed"; reason: string; hash?: string };
 
 export function txPhase(input: {
   signing: boolean;

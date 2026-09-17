@@ -29,6 +29,8 @@ export const palette = {
     violet: "#8B5CF6",
     arbitrum: "#28A0F0",
     solana: "#14F195",
+    // A series mark: validated for lightness band, chroma, and contrast against the dark card.
+    chart: "#C98005",
   },
   light: {
     background: "#F8FAFC",
@@ -56,6 +58,7 @@ export const palette = {
     violet: "#6D28D9",
     arbitrum: "#1B7FC4",
     solana: "#0B8F5A",
+    chart: "#B45309",
   },
 } as const;
 

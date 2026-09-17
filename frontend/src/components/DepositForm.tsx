@@ -83,7 +83,7 @@ export function DepositForm({
         onChange={(e) => setAmount(e.target.value)}
         inputMode="decimal"
         placeholder={`0.0 ${symbol ?? ""}`.trim()}
-        className="mb-3 w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-border"
+        className="mb-3 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
       {parsed !== null ? (
         <p className="mb-3 text-xs text-muted-foreground" data-testid="deposit-floor">

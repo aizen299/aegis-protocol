@@ -1,13 +1,17 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Landmark, Layers, ShieldCheck } from "lucide-react";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 
 import { erc20Abi, vaultEngineAbi } from "@/lib/abi";
 import { env } from "@/lib/env";
 import { failed, loading, resolve, value as valueOf, type ReadState } from "@/lib/readState";
 import { formatAmount, shareDecimals } from "@/lib/units";
+import { ChainValue } from "./common/Address";
+import { StatCard } from "./common/StatCard";
 import { Panel, Stat } from "./Panel";
+import { PageHeader } from "./shell/PageHeader";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 
@@ -90,19 +94,24 @@ export function VaultDashboard() {
 
   if (!vault) {
     return (
-      <Panel title="Configuration">
-        <p className="text-sm text-muted-foreground">
-          NEXT_PUBLIC_VAULT_ADDRESS is not set. Deploy the vault and point the UI at it.
-        </p>
-      </Panel>
+      <>
+        <PageHeader title="Vault" />
+        <Panel title="Configuration">
+          <p className="text-sm text-muted-foreground">
+            NEXT_PUBLIC_VAULT_ADDRESS is not set. Deploy the vault and point the UI at it.
+          </p>
+        </Panel>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex justify-end">
-        <ConnectButton />
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Vault"
+        description="Deposit the vault's asset for shares, priced on-chain, with a slippage floor on every fill."
+        actions={<ChainValue kind="address" value={vault} />}
+      />
 
       {readsFailed ? (
         <Notice
@@ -116,39 +125,24 @@ export function VaultDashboard() {
       {paused ? <Notice text="Deposits are paused. Withdrawals remain open." /> : null}
       {withdrawalsFrozen ? <Notice text="Withdrawals are frozen by protocol admin." /> : null}
 
-      <Panel title="Vault">
-        <Stat
-          label="Total assets"
-          state={vaultStat(() => formatAmount(totalAssets, decimals, symbol))}
-        />
-        <Stat
-          label="Total shares"
-          state={vaultStat(() => formatAmount(totalShares, shareScale, "shares"))}
-        />
-        <Stat
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard label="Total assets" icon={Landmark} state={vaultStat(() => formatAmount(totalAssets, decimals, symbol))} />
+        <StatCard label="Total shares" icon={Layers} state={vaultStat(() => formatAmount(totalShares, shareScale, "shares"))} />
+        <StatCard
           label="Deposit cap"
-          state={
-            depositCap === 0n
-              ? valueOf("uncapped")
-              : vaultStat(() => formatAmount(depositCap, decimals, symbol))
-          }
+          icon={ShieldCheck}
+          state={depositCap === 0n ? valueOf("uncapped") : vaultStat(() => formatAmount(depositCap, decimals, symbol))}
         />
-      </Panel>
+      </div>
 
       {isConnected ? (
         <>
           <Panel title="Your position">
-            <Stat
-              label="Shares"
-              state={resolve(sharesQuery, () => formatAmount(shares, shareScale, "shares"))}
-            />
-            <Stat
-              label="Redeemable"
-              state={resolve(claimQuery, () => formatAmount(claim, decimals, symbol))}
-            />
+            <Stat label="Shares" state={resolve(sharesQuery, () => formatAmount(shares, shareScale, "shares"))} />
+            <Stat label="Redeemable" state={resolve(claimQuery, () => formatAmount(claim, decimals, symbol))} />
           </Panel>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <DepositForm
               disabled={Boolean(paused)}
               decimals={decimals}
@@ -167,7 +161,10 @@ export function VaultDashboard() {
         </>
       ) : (
         <Panel title="Your position">
-          <p className="text-sm text-muted-foreground">Connect a wallet to deposit or withdraw.</p>
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <p className="text-sm text-muted-foreground">Connect a wallet to deposit or withdraw.</p>
+            <ConnectButton />
+          </div>
         </Panel>
       )}
     </div>
@@ -181,7 +178,7 @@ function Notice({ text, tone = "warning" }: { text: string; tone?: "warning" | "
       : "border-warning/40 bg-warning/10 text-warning";
 
   return (
-    <p className={`rounded border px-4 py-2 text-sm ${palette}`} role="alert">
+    <p className={`rounded-lg border px-4 py-3 text-sm ${palette}`} role="alert">
       {text}
     </p>
   );

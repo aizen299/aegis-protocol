@@ -16,7 +16,17 @@ export function testWalletAccount(input: {
   flag: string | undefined;
   chainId: number;
 }): `0x${string}` | undefined {
-  if (input.flag !== "anvil") return undefined;
+  if (!flagNames(input.flag).includes("anvil")) return undefined;
   if (input.chainId !== ANVIL_CHAIN_ID) return undefined;
   return ANVIL_ACCOUNT;
+}
+
+function flagNames(flag: string | undefined): string[] {
+  return (flag ?? "").split(",").map((s) => s.trim());
+}
+
+// The Solana test wallet holds a keypair generated in this browser, which no one else has, and is
+// offered only on solana-localnet: its airdrops and its funds exist nowhere else.
+export function solanaTestWalletEnabled(input: { flag: string | undefined; chain: string }): boolean {
+  return flagNames(input.flag).includes("solana-localnet") && input.chain === "solana-localnet";
 }

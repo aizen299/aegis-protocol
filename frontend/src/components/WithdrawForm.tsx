@@ -63,7 +63,7 @@ export function WithdrawForm({
           onChange={(e) => setAmount(e.target.value)}
           inputMode="decimal"
           placeholder="0.0 shares"
-          className="w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-border"
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
         <button
           type="button"
@@ -72,7 +72,7 @@ export function WithdrawForm({
             shareScale !== undefined &&
             setAmount(formatUnits(shares, shareScale))
           }
-          className="shrink-0 rounded border border-edge px-2 py-2 text-xs text-muted-foreground hover:text-foreground"
+          className="shrink-0 rounded-md border px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           Max
         </button>

@@ -12,7 +12,7 @@ export function ApiHealth() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span role="status" aria-label={label} className="flex h-9 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground">
+        <span role="status" aria-label={label} className="flex h-9 items-center gap-2 rounded-md px-1.5 text-xs text-muted-foreground sm:px-2">
           <span
             aria-hidden="true"
             className={cn(

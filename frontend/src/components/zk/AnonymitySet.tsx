@@ -23,7 +23,7 @@ export function AnonymitySet() {
 
           return (
             <>
-              <p className={`mb-4 rounded border px-4 py-3 text-sm ${tones[verdict.tone]}`} role="status">
+              <p className={`mb-4 rounded-lg border px-4 py-3 text-sm ${tones[verdict.tone]}`} role="status">
                 <strong className="block">{verdict.headline}</strong>
                 {verdict.detail}
               </p>

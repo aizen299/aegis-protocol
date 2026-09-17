@@ -146,7 +146,7 @@ export function ProveAction() {
             id="prove-action"
             value={actionId}
             onChange={(e) => setActionId(e.target.value)}
-            className="mb-3 w-full rounded border border-edge bg-black/40 px-3 py-2 text-sm text-foreground"
+            className="mb-3 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Choose an action</option>
             {registered.map((a) => (
@@ -166,7 +166,7 @@ export function ProveAction() {
             spellCheck={false}
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
-            className="mb-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-foreground"
+            className="mb-2 font-mono flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <p className="mb-3 text-xs text-muted-foreground">
             Used only inside this page. It is not stored and is never sent anywhere.

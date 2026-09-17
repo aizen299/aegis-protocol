@@ -32,6 +32,8 @@ MIRRORED = {
     "PrivateAction": "PrivateAction",
     "AnonymitySet": "AnonymitySet",
     "RemoteAction": "RemoteAction",
+    "VaultPosition": "VaultPosition",
+    "VaultDeposit": "VaultDeposit",
 }
 
 

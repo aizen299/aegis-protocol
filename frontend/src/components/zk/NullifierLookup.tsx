@@ -24,7 +24,7 @@ export function NullifierLookup() {
         onChange={(event) => setInput(event.target.value)}
         placeholder="0x…"
         spellCheck={false}
-        className="mt-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-foreground"
+        className="mt-2 font-mono flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
 
       {trimmed !== "" && !wellFormed ? (

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./api";
 import { useChain } from "./chainContext";
+import type { ChainName } from "./chains";
 
 // Indexed data moves on the indexer's poll, not the browser's. Ten seconds is under the poll
 // interval, so a refetch costs little and a stale figure is short-lived.
@@ -68,9 +69,17 @@ export function useOracleNodes() {
   return useQuery({ queryKey: [chain, "oracle", "nodes"], queryFn: () => api.oracleNodes(chain), ...shared });
 }
 
-export function useProposals() {
-  const chain = useChain().name;
-  return useQuery({ queryKey: [chain, "governance", "proposals"], queryFn: () => api.proposals(chain), ...shared });
+// `on` reads another chain's proposals, as received governance does to link back to its source; passing
+// null disables the query.
+export function useProposals(on?: ChainName | null) {
+  const current = useChain().name;
+  const chain = on ?? current;
+  return useQuery({
+    queryKey: [chain, "governance", "proposals"],
+    queryFn: () => api.proposals(chain),
+    ...shared,
+    enabled: on !== null,
+  });
 }
 
 export function useProposal(id: string) {
@@ -145,4 +154,14 @@ export function useRemoteActions(status?: string) {
 
 export function useApiHealth() {
   return useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 15_000, retry: false });
+}
+
+export function useVaultDeposits(owner: string | undefined) {
+  const chain = useChain().name;
+  return useQuery({
+    queryKey: [chain, "vault", "deposits", owner ?? ""],
+    queryFn: () => api.vaultDeposits(chain, owner!),
+    ...shared,
+    enabled: Boolean(owner),
+  });
 }

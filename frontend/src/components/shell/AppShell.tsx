@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { TestWalletButton } from "@/components/TestWalletButton";
+import { EvmWalletButton } from "@/components/wallet/EvmWalletButton";
+import { SolanaWalletButton } from "@/components/wallet/SolanaWalletButton";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -55,8 +57,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="ml-auto flex min-w-0 items-center gap-1">
               <ApiHealth />
               <ThemeToggle />
-              {chain.vm === "evm" ? <TestWalletButton /> : null}
               <ChainSwitcher />
+              {chain.vm === "evm" ? (
+                <>
+                  <TestWalletButton />
+                  <EvmWalletButton />
+                </>
+              ) : (
+                <SolanaWalletButton />
+              )}
             </div>
           </header>
           <main id="content" className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
