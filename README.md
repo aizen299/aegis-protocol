@@ -18,6 +18,7 @@ Architecture and conventions are locked in [`docs/`](docs/) — read
 | v1.1 | Protocol-wide UI | **Released** — tagged `v1.1.0` |
 | v1.2 | Vault slippage bounds | **Released** — tagged `v1.2.0` (breaking) |
 | v1.3 | Write actions, browser proving, missed-round slashing | **Released** — tagged `v1.3.0` (breaking) |
+| v2.0 | Solana: vault, oracle, and governance through Wormhole; both chains in the UI | **Released** — tagged `v2.0.0` (breaking) |
 
 **v1.0 is production-ready and has never been deployed.** No AWS account exists for this project, so
 the staging deployment named in `docs/project-spec.md` §5 and the Arbitrum Sepolia target in §7 did
@@ -25,8 +26,8 @@ not happen — a recorded deviation, with the infrastructure defined and validat
 No external audit; the review in [`docs/v1.0-audit-simulation.md`](docs/v1.0-audit-simulation.md) is
 the authors reviewing their own work. No mainnet, no real funds, no custody of value.
 
-[`docs/v1.3-release-notes.md`](docs/v1.3-release-notes.md) covers the current release, which changes
-two oracle event signatures and drops a database column.
+[`docs/v2.0-release-notes.md`](docs/v2.0-release-notes.md) covers the current release, which adds
+Solana and changes what the Timelock does with an operation for another chain.
 [`docs/v1.1-release-notes.md`](docs/v1.1-release-notes.md) states precisely what the protocol
 is and is not. v1.1 closes the High-severity finding v1.0 shipped with — a zk proof could be
 submitted by anyone who saw it — and gives every module a read-only UI. It changes nothing about the
@@ -107,6 +108,13 @@ against the gate address deployment produced — not a fixture — executed on a
 replay refused; a proof made for one gate is refused by another even when both trees hold the same
 root.
 
+**v2.0 — Solana.** Anchor programs for the vault and the oracle, indexed and aggregated by the same Go
+services through `internal/chain/svm`. Governance stays on Arbitrum: a proposal for Solana is
+dispatched through Wormhole and executed by a receiver program after a delay, within an allowlist, a
+voted account list, and caps on measured treasury outflow. The UI serves both chains, with Solana
+wallet deposits and a timeline of each dispatched proposal. The plan and what each step found are in
+[`docs/v2.0-solana-plan.md`](docs/v2.0-solana-plan.md).
+
 Current: **367 contract tests**, **21 circuit tests**, **26 zk service tests**, **93 Solana tests**, **142 frontend tests**, 16 backend packages, **45 end-to-end tests**, Slither clean.
 [`docs/v1.0-production-plan.md`](docs/v1.0-production-plan.md) tracks the current work and the decisions behind it;
 v0.2 onward, each version has a plan document beside it in [`docs/`](docs/) recording the decisions
@@ -118,8 +126,8 @@ it took and where it deviated from the locked specs.
 contracts/   Solidity + Foundry      settlement layer
 backend/     Go                      indexing, aggregation, APIs
 zk/          Rust + Noir circuits    proof generation
-solana/      Rust + Anchor           Solana programs (v2.0, in progress)
-frontend/    Next.js                 vault, oracle, governance, and zk privacy (read-only)
+solana/      Rust + Anchor           Solana vault, oracle, and governance receiver
+frontend/    Next.js                 every module, on Arbitrum and Solana
 infra/       Terraform               AWS
 tools/       Node                    generators for committed artifacts
 ```

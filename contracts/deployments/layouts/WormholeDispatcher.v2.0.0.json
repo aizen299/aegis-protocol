@@ -1,0 +1,82 @@
+{
+  "contract": "WormholeDispatcher",
+  "release": "v2.0.0",
+  "storage": [
+    {
+      "label": "_wormhole",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_contract(IWormhole)2145"
+    },
+    {
+      "label": "_routes",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_mapping(t_uint256,t_struct(Route)2153_storage)"
+    },
+    {
+      "label": "__gap",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_array(t_uint256)48_storage"
+    }
+  ],
+  "types": {
+    "t_array(t_uint256)48_storage": {
+      "base": "t_uint256",
+      "encoding": "inplace",
+      "label": "uint256[48]",
+      "numberOfBytes": "1536"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IWormhole)2145": {
+      "encoding": "inplace",
+      "label": "contract IWormhole",
+      "numberOfBytes": "20"
+    },
+    "t_mapping(t_uint256,t_struct(Route)2153_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct IWormholeDispatcher.Route)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Route)2153_storage"
+    },
+    "t_struct(Route)2153_storage": {
+      "encoding": "inplace",
+      "label": "struct IWormholeDispatcher.Route",
+      "members": [
+        {
+          "astId": 2150,
+          "contract": "src/bridge/WormholeDispatcher.sol:WormholeDispatcher",
+          "label": "wormholeChainId",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "astId": 2152,
+          "contract": "src/bridge/WormholeDispatcher.sol:WormholeDispatcher",
+          "label": "receiver",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_bytes32"
+        }
+      ],
+      "numberOfBytes": "64"
+    },
+    "t_uint16": {
+      "encoding": "inplace",
+      "label": "uint16",
+      "numberOfBytes": "2"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    }
+  }
+}
