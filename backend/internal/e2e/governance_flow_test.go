@@ -77,41 +77,42 @@ func TestGovernanceProposalReachesExecution(t *testing.T) {
 	}
 }
 
-// The §7 branch on a real chain: a proposal for another chain passes and queues like any other,
-// and then refuses to perform a local call.
+// A remote proposal never performs a local call: with no route it cannot even be proposed, and with
+// one it is dispatched, not executed.
 func TestGovernanceRemoteProposalNeverPerformsALocalCall(t *testing.T) {
 	requireDeps(t)
 	d := deployGovernance(t)
 
 	delegateVotes(t, deployerKey, d.AegisToken, deployerAddr)
-
 	payload := cast(t, "calldata", "setValue(uint256)", "99")
-	remoteAction := action(chainID+1, d.GovernedTarget, "0", payload)
+
+	sendExpectingFailure(t, deployerKey, d.Governor,
+		"propose((uint256,bytes32,uint256,bytes),string,string)",
+		action(chainID+2, d.GovernedTarget, "0", payload), "Unrouted", "no route")
 
 	send(t, deployerKey, d.Governor,
 		"propose((uint256,bytes32,uint256,bytes),string,string)",
-		remoteAction, "Remote", "another chain")
+		action(chainID+1, d.GovernedTarget, "0", payload), "Remote", "another chain")
 
 	proposalID := "1"
 	advanceTime(t, votingDelaySeconds+1)
 	send(t, deployerKey, d.Governor, "castVote(uint256,uint8,string)", proposalID, "1", "")
 	advanceTime(t, votingPeriodSeconds+1)
-
 	send(t, deployerKey, d.Governor, "queue(uint256)", proposalID)
 	advanceTime(t, timelockSeconds+1)
-
-	sendExpectingFailure(t, deployerKey, d.Governor, "execute(uint256)", proposalID)
+	send(t, deployerKey, d.Governor, "execute(uint256)", proposalID)
 
 	if got := toInt(t, call(t, d.GovernedTarget, "value()(uint256)")); got != 0 {
 		t.Fatalf("a remote action landed locally: target value = %d", got)
 	}
-	if got := proposalState(t, d, proposalID); got != stateQueued {
-		t.Fatalf("state after a refused execution = %d, want still queued", got)
+	if got := proposalState(t, d, proposalID); got != stateDispatched {
+		t.Fatalf("state = %d, want dispatched", got)
+	}
+	if got := operationState(t, d, proposalOperationID(t, d, proposalID)); got != opDispatched {
+		t.Fatalf("operation state = %d, want dispatched", got)
 	}
 }
 
-// A guardian stopping a passed proposal has to clear the timelock queue too, or the action stays
-// executable by anything else holding the executor role.
 func TestGovernanceCancelledProposalClearsTheQueue(t *testing.T) {
 	requireDeps(t)
 	d := deployGovernance(t)

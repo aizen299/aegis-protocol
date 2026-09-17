@@ -3,9 +3,9 @@ name: Contracts CI
 on:
   push:
     branches: [main]
-    paths: ["contracts/**", "tools/poseidon/**", "Makefile", ".github/workflows/contracts.yml"]
+    paths: ["contracts/**", "tools/poseidon/**", "scripts/check-evm-layouts.py", "scripts/test_check_evm_layouts.py", "Makefile", ".github/workflows/contracts.yml"]
   pull_request:
-    paths: ["contracts/**", "tools/poseidon/**", "Makefile", ".github/workflows/contracts.yml"]
+    paths: ["contracts/**", "tools/poseidon/**", "scripts/check-evm-layouts.py", "scripts/test_check_evm_layouts.py", "Makefile", ".github/workflows/contracts.yml"]
 
 concurrency:
   group: contracts-${{ github.ref }}

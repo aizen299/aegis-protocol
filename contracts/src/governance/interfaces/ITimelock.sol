@@ -10,7 +10,9 @@ interface ITimelock {
         NONE,
         SCHEDULED,
         EXECUTED,
-        CANCELLED
+        CANCELLED,
+        /// @dev Published for another chain. Not EXECUTED: whether it ran there is observed there. §16.5.
+        DISPATCHED
     }
 
     /// @dev The destination is a (chain, target, payload) triple: 32-byte target, never an address.
@@ -34,6 +36,10 @@ interface ITimelock {
     );
     event OperationExecuted(uint256 indexed operationId);
     event OperationCancelled(uint256 indexed operationId);
+    /// @dev Carries Wormhole's sequence, which is what correlates this operation with its execution on
+    ///      the destination chain. docs/v2.0-solana-plan.md §2.10.
+    event OperationDispatched(uint256 indexed operationId, uint256 indexed targetChainId, uint64 sequence);
+    event DispatcherUpdated(address indexed previousValue, address indexed newValue);
     event DelayUpdated(uint256 previousValue, uint256 newValue);
 
     error ZeroAddress();
@@ -66,4 +72,7 @@ interface ITimelock {
     ) external view returns (Operation memory);
 
     function delay() external view returns (uint256);
+
+    /// @notice The dispatcher remote actions are published through; zero while none is set.
+    function dispatcher() external view returns (address);
 }

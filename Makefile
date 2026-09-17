@@ -259,33 +259,21 @@ contracts-layout: ## Dump the current storage layout
 # Every upgradeable contract with a released baseline. A contract absent from this list is not
 # checked, so adding one here is part of releasing it.
 #
-# Types are compared with AST node ids stripped from struct, contract, and enum references: those
-# ids shift when unrelated files enter the compilation unit. Array lengths are deliberately NOT
-# stripped — a gap that changes size is a real layout change.
-LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock CommitmentTree ZkVaultGate
+# The rules live in scripts/check-evm-layouts.py: existing variables keep slot, offset, and type, and
+# new ones may only be carved from the trailing __gap. Its own tests run first, since a check that
+# has quietly become permissive is worse than none.
+LAYOUT_CONTRACTS ?= VaultEngine OracleStaking OracleRounds Governor Timelock CommitmentTree ZkVaultGate WormholeDispatcher
 
 .PHONY: contracts-layout-check
 contracts-layout-check: ## Fail if any storage layout diverges from its released baseline (run before any UUPS upgrade)
+	@python3 scripts/test_check_evm_layouts.py >/dev/null 2>&1 || { python3 scripts/test_check_evm_layouts.py; exit 1; }
 	@set -e; for contract in $(LAYOUT_CONTRACTS); do \
 		baseline=$$(ls contracts/deployments/layouts/$$contract.*.json 2>/dev/null | sort | tail -1); \
 		if [ -z "$$baseline" ]; then echo "$$contract: no baseline recorded yet, skipping"; continue; fi; \
-		(cd contracts && forge inspect $$contract storage-layout --json \
-			| jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]') > /tmp/layout-current.json; \
-		jq -S '[.storage[] | {label, slot, offset, type: (.type | gsub("(?<a>t_(struct|contract|enum)\\([^)]*\\))[0-9]+"; .a))}]' "$$baseline" > /tmp/layout-baseline.json; \
-		current_len=$$(jq -e 'length' /tmp/layout-current.json 2>/dev/null || echo ""); \
-		baseline_len=$$(jq -e 'length' /tmp/layout-baseline.json 2>/dev/null || echo ""); \
-		if [ -z "$$current_len" ] || [ -z "$$baseline_len" ] || [ "$$current_len" = "0" ] || [ "$$baseline_len" = "0" ]; then \
-			echo "$$contract: storage layout could not be read (current='$$current_len' baseline='$$baseline_len')."; \
-			echo "  This is not a divergence. Run 'forge clean' and try again."; \
-			exit 1; \
-		fi; \
-		if diff -u /tmp/layout-baseline.json /tmp/layout-current.json > /tmp/layout-diff.txt; then \
-			echo "$$contract matches $$(basename $$baseline)"; \
-		else \
-			cat /tmp/layout-diff.txt; \
-			echo "STORAGE LAYOUT DIVERGED: $$contract vs $$(basename $$baseline). Append-only: never remove or reorder a variable."; \
-			exit 1; \
-		fi; \
+		(cd contracts && forge inspect $$contract storage-layout --json) > /tmp/layout-current.json; \
+		python3 scripts/check-evm-layouts.py "$$baseline" /tmp/layout-current.json \
+			|| { echo "  $$contract vs $$(basename $$baseline)"; exit 1; }; \
+		echo "$$contract matches $$(basename $$baseline)"; \
 	done
 
 .PHONY: contracts-layout-record
@@ -389,6 +377,24 @@ migrate-up:
 .PHONY: migrate-down
 migrate-down:
 	migrate -path backend/migrations -database "$(DB_DSN)" down 1
+
+# --- wormhole (local tests only) ---
+
+WORMHOLE_OZ_COMMIT := dc44c9f1a4c3b10af99492eed84f83ed244203f6
+
+.PHONY: wormhole-local-deps
+wormhole-local-deps: ## Fetch OpenZeppelin 4.9.6 for the vendored Wormhole core, at a pinned commit
+	@set -e; dir=tools/wormhole/lib/openzeppelin-contracts; \
+	if [ "$$(git -C $$dir rev-parse HEAD 2>/dev/null)" != "$(WORMHOLE_OZ_COMMIT)" ]; then \
+		rm -rf $$dir; \
+		git clone --quiet --depth 1 --branch v4.9.6 https://github.com/OpenZeppelin/openzeppelin-contracts.git $$dir; \
+	fi; \
+	got=$$(git -C $$dir rev-parse HEAD); \
+	[ "$$got" = "$(WORMHOLE_OZ_COMMIT)" ] || { echo "OpenZeppelin is at $$got, want $(WORMHOLE_OZ_COMMIT)"; exit 1; }
+
+.PHONY: wormhole-local-build
+wormhole-local-build: wormhole-local-deps
+	cd tools/wormhole && forge build
 
 # --- zk ---
 

@@ -26,6 +26,8 @@ contract GovernanceHandler is CommonBase, StdCheats, StdUtils {
 
     uint256[] public proposalIds;
     mapping(uint256 proposalId => bool remote) public isRemote;
+    uint256[] internal dispatchedIds;
+    uint256 public ghostDispatchedCount;
     mapping(uint256 proposalId => address proposer) public proposerOf;
     uint256[] public cancelledIds;
     uint256[] public executedIds;
@@ -143,9 +145,15 @@ contract GovernanceHandler is CommonBase, StdCheats, StdUtils {
 
         try governor.execute(proposalId) {
             if (!elapsed) ghostExecutedEarly = true;
-            if (isRemote[proposalId]) ghostRemoteCallLandedLocally = true;
-            executedIds.push(proposalId);
-            ghostExecutedCount += 1;
+            if (isRemote[proposalId]) {
+                // A remote action is published, never performed here.
+                if (target.value() != valueBefore) ghostRemoteCallLandedLocally = true;
+                dispatchedIds.push(proposalId);
+                ghostDispatchedCount += 1;
+            } else {
+                executedIds.push(proposalId);
+                ghostExecutedCount += 1;
+            }
 
             // A second execution must be refused.
             try governor.execute(proposalId) {
@@ -167,7 +175,7 @@ contract GovernanceHandler is CommonBase, StdCheats, StdUtils {
         IGovernor.ProposalState current = governor.state(proposalId);
         if (
             current == IGovernor.ProposalState.EXECUTED || current == IGovernor.ProposalState.CANCELLED
-                || current == IGovernor.ProposalState.NONE
+                || current == IGovernor.ProposalState.DISPATCHED || current == IGovernor.ProposalState.NONE
         ) {
             return;
         }
@@ -250,5 +258,15 @@ contract GovernanceHandler is CommonBase, StdCheats, StdUtils {
     ) private view returns (bool, uint256) {
         if (proposalIds.length == 0) return (false, 0);
         return (true, proposalIds[seed % proposalIds.length]);
+    }
+
+    function dispatchedCount() external view returns (uint256) {
+        return dispatchedIds.length;
+    }
+
+    function dispatchedAt(
+        uint256 index
+    ) external view returns (uint256) {
+        return dispatchedIds[index];
     }
 }

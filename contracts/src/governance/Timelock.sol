@@ -10,6 +10,7 @@ import {
     ReentrancyGuardUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+import {IWormholeDispatcher} from "../bridge/interfaces/IWormholeDispatcher.sol";
 import {Roles} from "../shared/access/Roles.sol";
 import {ITimelock} from "./interfaces/ITimelock.sol";
 
@@ -27,9 +28,11 @@ contract Timelock is
     uint48 private _delay;
     uint256 private _operationCount;
     mapping(uint256 operationId => Operation operation) private _operations;
+    /// @dev v2.0, taken from the gap below. docs/v2.0-solana-plan.md §16.8.
+    IWormholeDispatcher private _dispatcher;
 
     // slither-disable-next-line unused-state
-    uint256[40] private __gap;
+    uint256[39] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -77,10 +80,9 @@ contract Timelock is
     }
 
     /// @inheritdoc ITimelock
-    /// @dev Branches on the destination chain. The local branch is the direct call it would have
-    ///      been anyway; a non-local destination has nowhere to go in Phase 1 and reverts. The
-    ///      branch exists so that "local" is not baked into the type — see docs/project-spec.md §7.
-    ///      No dispatcher is built here, deliberately.
+    /// @dev Branches on the destination chain. The local branch is the direct call. A non-local action
+    ///      is published through the dispatcher, which refuses a chain with no route; with no dispatcher
+    ///      set it reverts as it did in Phase 1. docs/v2.0-solana-plan.md §16.
     function execute(
         uint256 operationId
     ) external onlyRole(Roles.TIMELOCK_EXECUTOR_ROLE) nonReentrant {
@@ -95,7 +97,8 @@ contract Timelock is
         }
 
         if (operation.targetChainId != block.chainid) {
-            revert CrossChainDispatchUnavailable(operation.targetChainId);
+            _dispatch(operationId, operation);
+            return;
         }
 
         uint256 value = operation.value;
@@ -136,6 +139,11 @@ contract Timelock is
     // --- views ---
 
     /// @inheritdoc ITimelock
+    function dispatcher() external view returns (address) {
+        return address(_dispatcher);
+    }
+
+    /// @inheritdoc ITimelock
     function operationOf(
         uint256 operationId
     ) external view returns (Operation memory) {
@@ -163,7 +171,44 @@ contract Timelock is
         _delay = value;
     }
 
+    function setDispatcher(
+        address value
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit DispatcherUpdated(address(_dispatcher), value);
+        _dispatcher = IWormholeDispatcher(value);
+    }
+
     // --- internals ---
+
+    /// @dev A remote action moves no ETH: its value is a declaration the receiver caps, carried in the
+    ///      message. What leaves this contract is exactly Wormhole's fee, from the treasury it holds.
+    ///      §16.4, §16.6.
+    function _dispatch(
+        uint256 operationId,
+        Operation storage operation
+    ) private {
+        IWormholeDispatcher dispatcher_ = _dispatcher;
+        if (address(dispatcher_) == address(0)) {
+            revert CrossChainDispatchUnavailable(operation.targetChainId);
+        }
+
+        uint256 fee = dispatcher_.messageFee();
+        if (fee > address(this).balance) revert InsufficientBalance(fee, address(this).balance);
+
+        // Marked before the call, as the local branch is: a dispatch that reenters must not find this
+        // operation still scheduled.
+        operation.state = OperationState.DISPATCHED;
+
+        // The recipient is the dispatcher governance set, and the amount is exactly Wormhole's fee.
+        // slither-disable-next-line arbitrary-send-eth
+        uint64 sequence = dispatcher_.dispatch{value: fee}(
+            operationId, operation.targetChainId, operation.target, operation.value, operation.payload
+        );
+
+        // The event carries the sequence the call returns. The callee is the dispatcher governance set.
+        // slither-disable-next-line reentrancy-events
+        emit OperationDispatched(operationId, operation.targetChainId, sequence);
+    }
 
     /// @dev Narrows a 32-byte target to a local address, rejecting anything that does not fit. The
     ///      same check types.Identity.EVMAddress performs in the backend.

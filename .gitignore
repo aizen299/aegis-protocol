@@ -34,3 +34,6 @@ crash.log
 lcov.info
 /contracts/coverage/
 /frontend/coverage/
+
+# Python bytecode from running the check scripts.
+__pycache__/

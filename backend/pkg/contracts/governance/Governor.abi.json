@@ -1101,6 +1101,17 @@
   },
   {
     "type": "error",
+    "name": "NoRouteForChain",
+    "inputs": [
+      {
+        "name": "targetChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NoVotingPower",
     "inputs": [
       {

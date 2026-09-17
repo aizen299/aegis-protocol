@@ -5,6 +5,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 
+import {WormholeDispatcher} from "../src/bridge/WormholeDispatcher.sol";
 import {AegisToken} from "../src/governance/AegisToken.sol";
 import {Governor} from "../src/governance/Governor.sol";
 import {Timelock} from "../src/governance/Timelock.sol";
@@ -25,7 +26,13 @@ contract DeployGovernanceLocal is Script {
 
     function run()
         external
-        returns (address token, address timelockProxy, address governorProxy, address target)
+        returns (
+            address token,
+            address timelockProxy,
+            address governorProxy,
+            address target,
+            address dispatcher
+        )
     {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
@@ -69,9 +76,30 @@ contract DeployGovernanceLocal is Script {
         Governor(governorProxy).grantRole(Roles.UPGRADER_ROLE, deployer);
         Timelock(payable(timelockProxy)).grantRole(Roles.UPGRADER_ROLE, deployer);
 
+        // With a Wormhole core given, remote actions get a dispatcher and one route. Without it the
+        // deployment is Phase 1's, where a remote proposal is refused.
+        address core = vm.envOr("WORMHOLE_CORE", address(0));
+        if (core != address(0)) {
+            dispatcher = address(
+                new ERC1967Proxy(
+                    address(new WormholeDispatcher()),
+                    abi.encodeCall(WormholeDispatcher.initialize, (deployer, core))
+                )
+            );
+            WormholeDispatcher(dispatcher).grantRole(Roles.DISPATCHER_CALLER_ROLE, timelockProxy);
+            WormholeDispatcher(dispatcher).grantRole(Roles.UPGRADER_ROLE, deployer);
+            WormholeDispatcher(dispatcher)
+                .setRoute(
+                    vm.envUint("ROUTE_CHAIN_ID"),
+                    uint16(vm.envUint("ROUTE_WORMHOLE_CHAIN")),
+                    vm.envBytes32("ROUTE_RECEIVER")
+                );
+            Timelock(payable(timelockProxy)).setDispatcher(dispatcher);
+        }
+
         vm.stopBroadcast();
 
-        _writeArtifact(token, timelockProxy, governorProxy, target);
+        _writeArtifact(token, timelockProxy, governorProxy, target, dispatcher);
 
         console2.log("AegisToken:     ", token);
         console2.log("Timelock:       ", timelockProxy);
@@ -83,13 +111,15 @@ contract DeployGovernanceLocal is Script {
         address token,
         address timelockProxy,
         address governorProxy,
-        address target
+        address target,
+        address dispatcher
     ) internal {
         string memory key = "governance";
         vm.serializeAddress(key, "aegisToken", token);
         vm.serializeAddress(key, "timelock", timelockProxy);
         vm.serializeAddress(key, "governor", governorProxy);
         vm.serializeAddress(key, "governedTarget", target);
+        vm.serializeAddress(key, "dispatcher", dispatcher);
         vm.serializeUint(key, "chainId", block.chainid);
         string memory out = vm.serializeUint(key, "deployedAtBlock", block.number);
 

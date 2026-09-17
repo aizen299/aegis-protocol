@@ -12,6 +12,7 @@ import {
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {IWormholeDispatcher} from "../bridge/interfaces/IWormholeDispatcher.sol";
 import {Roles} from "../shared/access/Roles.sol";
 import {IGovernor} from "./interfaces/IGovernor.sol";
 import {ITimelock} from "./interfaces/ITimelock.sol";
@@ -95,6 +96,7 @@ contract Governor is
         string calldata description
     ) external returns (uint256 proposalId) {
         if (bytes(title).length == 0) revert EmptyTitle();
+        _requireReachable(action.targetChainId);
 
         uint256 weight = _token.getPastVotes(msg.sender, block.timestamp - 1);
         // The comparison is on vote weight; the timestamp only selects which checkpoint to read.
@@ -117,6 +119,18 @@ contract Governor is
         // reconstruct a proposal without a contract read, and ten arguments plus this function's
         // locals overflow the stack when inlined.
         _emitCreated(proposalId, action, title, description, voteStart, voteEnd);
+    }
+
+    /// @dev A vote on an action that cannot be delivered is attention spent on nothing. The route is
+    ///      checked again at execution, since routes can change while a vote runs. §16.4.
+    function _requireReachable(
+        uint256 targetChainId
+    ) private view {
+        if (targetChainId == block.chainid) return;
+        address dispatcher_ = _timelock.dispatcher();
+        if (dispatcher_ == address(0) || !IWormholeDispatcher(dispatcher_).hasRoute(targetChainId)) {
+            revert NoRouteForChain(targetChainId);
+        }
     }
 
     function _emitCreated(
@@ -214,12 +228,21 @@ contract Governor is
             revert ProposalNotQueued(proposalId, proposal.state);
         }
 
-        // Marked executed before the call: a proposal that reenters must not find itself queued.
-        proposal.state = ProposalState.EXECUTED;
+        // A remote action is published, not performed: its proposal is DISPATCHED, and whether it ran is
+        // observed on the destination chain. docs/v2.0-solana-plan.md §16.5.
+        uint256 targetChainId = proposal.action.targetChainId;
+        bool remote = targetChainId != block.chainid;
+
+        // Marked before the call: a proposal that reenters must not find itself queued.
+        proposal.state = remote ? ProposalState.DISPATCHED : ProposalState.EXECUTED;
 
         _timelock.execute(proposal.operationId);
 
-        emit ProposalExecuted(proposalId);
+        if (remote) {
+            emit ProposalDispatched(proposalId, targetChainId);
+        } else {
+            emit ProposalExecuted(proposalId);
+        }
     }
 
     /// @inheritdoc IGovernor
@@ -235,7 +258,12 @@ contract Governor is
         if (msg.sender != proposal.proposer && !isGuardian) revert NotProposerOrGuardian(msg.sender);
 
         ProposalState current = _liveState(proposalId, proposal);
-        if (current == ProposalState.EXECUTED || current == ProposalState.CANCELLED) {
+        // A dispatched message has left this chain; marking its proposal cancelled would record a
+        // stop that did not happen.
+        if (
+            current == ProposalState.EXECUTED || current == ProposalState.CANCELLED
+                || current == ProposalState.DISPATCHED
+        ) {
             revert ProposalNotCancellable(proposalId, current);
         }
 

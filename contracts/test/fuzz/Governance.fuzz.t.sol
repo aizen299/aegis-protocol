@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IWormholeDispatcher} from "../../src/bridge/interfaces/IWormholeDispatcher.sol";
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
 import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {Roles} from "../../src/shared/access/Roles.sol";
@@ -71,7 +72,8 @@ contract GovernanceFuzzTest is GovernorFixture {
         assertEq(uint8(timelock.operationOf(operationId).state), uint8(ITimelock.OperationState.EXECUTED));
     }
 
-    /// Any chain that is not this one is refused, whatever its id.
+    /// Whatever the chain id: the local chain is called, the routed chain is dispatched, and every
+    /// other chain is refused. No non-local id ever performs a local call.
     function testFuzz_onlyTheLocalChainExecutes(
         uint256 chainId
     ) public {
@@ -83,9 +85,18 @@ contract GovernanceFuzzTest is GovernorFixture {
 
         skip(TIMELOCK_DELAY + 1);
 
+        if (chainId == _remoteChain()) {
+            vm.prank(proposerEoa);
+            timelock.execute(operationId);
+            assertEq(
+                uint8(timelock.operationOf(operationId).state), uint8(ITimelock.OperationState.DISPATCHED)
+            );
+            assertEq(target.value(), 0, "a dispatched action landed locally");
+            return;
+        }
         if (chainId != block.chainid) {
             vm.prank(proposerEoa);
-            vm.expectRevert(abi.encodeWithSelector(ITimelock.CrossChainDispatchUnavailable.selector, chainId));
+            vm.expectRevert(abi.encodeWithSelector(IWormholeDispatcher.NoRoute.selector, chainId));
             timelock.execute(operationId);
             assertEq(target.value(), 0, "a remote action landed locally");
             return;

@@ -94,6 +94,7 @@ interface IGovernor {
     error ProposalNotCancellable(uint256 proposalId, ProposalState state);
     error InvalidQuorumNumerator(uint256 numerator);
     error ZeroValue();
+    error NoRouteForChain(uint256 targetChainId);
 
     function propose(
         Action calldata action,

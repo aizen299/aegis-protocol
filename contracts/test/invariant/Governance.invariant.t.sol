@@ -98,6 +98,19 @@ contract GovernanceInvariantTest is GovernorFixture {
         assertFalse(handler.ghostRemoteCallLandedLocally(), "a remote action landed locally");
     }
 
+    /// A dispatched proposal and its operation agree, and neither is recorded as executed. §16.5.
+    function invariant_dispatchedProposalsMatchDispatchedOperations() public view {
+        uint256 count = handler.dispatchedCount();
+        for (uint256 i = 0; i < count; i++) {
+            uint256 proposalId = handler.dispatchedAt(i);
+            assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.DISPATCHED));
+            uint256 operationId = governor.proposalOf(proposalId).operationId;
+            assertEq(
+                uint8(timelock.operationOf(operationId).state), uint8(ITimelock.OperationState.DISPATCHED)
+            );
+        }
+    }
+
     /// Only a queued proposal executes: an executed one always carries the operation that ran it,
     /// and that operation is executed in the timelock too. The two records cannot disagree.
     function invariant_executedProposalsMatchExecutedOperations() public view {

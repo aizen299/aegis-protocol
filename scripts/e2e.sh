@@ -63,6 +63,9 @@ for _ in $(seq 1 30); do
 done
 cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null
 
+echo "==> fetching Wormhole core dependencies"
+make -C "$ROOT" wormhole-local-deps >/dev/null
+
 echo "==> starting solana-test-validator"
 SOLANA_DIR=$(mktemp -d)
 "$ROOT/scripts/solana-validator.sh" "$SOLANA_DIR"

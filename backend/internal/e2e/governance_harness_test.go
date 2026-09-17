@@ -39,7 +39,14 @@ const (
 	opScheduled
 	opExecuted
 	opCancelled
+	opDispatched
 )
+
+// The Wormhole devnet guardian, a published development key that no real guardian set contains.
+const testGuardianAddr = "0xbeFA429d57cD18b7F8A4d91A2da9AB4AF05d0FBe"
+
+// remoteReceiver stands in for the Solana governance receiver, which is step 6.
+const remoteReceiver = "0x00000000000000000000000000000000000000000000000000000000000000ee"
 
 type governanceDeployment struct {
 	AegisToken      string `json:"aegisToken"`
@@ -48,17 +55,35 @@ type governanceDeployment struct {
 	GovernedTarget  string `json:"governedTarget"`
 	Governor        string `json:"governor"`
 	Timelock        string `json:"timelock"`
+	Dispatcher      string `json:"dispatcher"`
+	WormholeCore    string `json:"-"`
 }
 
+// deployGovernance deploys governance with a dispatcher routed to chainID+1, the remote chain the
+// governance tests use.
 func deployGovernance(t *testing.T) governanceDeployment {
+	t.Helper()
+	return deployGovernanceRoutedTo(t, chainID+1)
+}
+
+// deployGovernanceRoutedTo deploys Wormhole's core, then governance with a dispatcher and one route.
+// The core is Wormhole's own, from tools/wormhole, so a dispatch publishes through the real contract.
+func deployGovernanceRoutedTo(t *testing.T, routeChain int64) governanceDeployment {
 	t.Helper()
 	root := repoRoot(t)
 
+	core := deployWormholeCore(t)
 	cmd := exec.Command("forge", "script",
 		"script/DeployGovernanceLocal.s.sol:DeployGovernanceLocal",
 		"--rpc-url", anvilRPC, "--broadcast", "--silent")
 	cmd.Dir = filepath.Join(root, "contracts")
-	cmd.Env = append(os.Environ(), "PRIVATE_KEY="+deployerKey)
+	cmd.Env = append(os.Environ(),
+		"PRIVATE_KEY="+deployerKey,
+		"WORMHOLE_CORE="+core,
+		fmt.Sprintf("ROUTE_CHAIN_ID=%d", routeChain),
+		"ROUTE_WORMHOLE_CHAIN=1",
+		"ROUTE_RECEIVER="+remoteReceiver,
+	)
 
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("governance deploy failed: %v\n%s", err, out)
@@ -81,7 +106,45 @@ func deployGovernance(t *testing.T) governanceDeployment {
 	d.Governor = canonical(t, d.Governor)
 	d.Timelock = canonical(t, d.Timelock)
 	d.GovernedTarget = canonical(t, d.GovernedTarget)
+	if d.Dispatcher == "" || d.Dispatcher == "0x0000000000000000000000000000000000000000" {
+		t.Fatalf("governance deployment has no dispatcher: %s", raw)
+	}
+	d.Dispatcher = canonical(t, d.Dispatcher)
+	d.WormholeCore = core
 	return d
+}
+
+func deployWormholeCore(t *testing.T) string {
+	t.Helper()
+	root := repoRoot(t)
+	dir := filepath.Join(root, "tools", "wormhole")
+	if err := os.MkdirAll(filepath.Join(dir, "deployments"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	artifact := filepath.Join(dir, "deployments", "wormhole-31337.json")
+
+	cmd := exec.Command("forge", "script", "script/DeployWormholeLocal.s.sol:DeployWormholeLocal",
+		"--rpc-url", anvilRPC, "--broadcast", "--silent")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"PRIVATE_KEY="+deployerKey,
+		"WORMHOLE_GUARDIAN="+testGuardianAddr,
+		"WORMHOLE_ARTIFACT="+artifact,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("wormhole core deploy failed (run `make wormhole-local-deps`): %v\n%s", err, out)
+	}
+	raw, err := os.ReadFile(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Core string `json:"core"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil || out.Core == "" {
+		t.Fatalf("wormhole artifact: %s", raw)
+	}
+	return canonical(t, out.Core)
 }
 
 // advanceTime moves the chain clock forward and mines, which is what makes the timestamp visible.

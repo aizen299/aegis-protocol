@@ -85,6 +85,22 @@ reasons, the appeal window — never the key itself.
 
 ---
 
+## The Wormhole dispatcher (v2.0)
+
+`WormholeDispatcher` follows the same stages, with one role that never leaves the Timelock:
+
+- **`DISPATCHER_CALLER_ROLE`** belongs to the Timelock from deployment and to nothing else, ever. A
+  second holder could publish a governance message no vote chose, which the Solana receiver would
+  treat as governance.
+- **`DEFAULT_ADMIN_ROLE`** sets routes. A route decides which receiver a governance message reaches,
+  so it migrates last, like every other admin role.
+- **`UPGRADER_ROLE`** migrates in the usual order.
+
+The Timelock's own `setDispatcher` is covered by the Timelock's `DEFAULT_ADMIN_ROLE`. It stays out of
+reach of the multisig once that role migrates.
+
+---
+
 ## Suggested sequence
 
 | Order | Role | Why here |

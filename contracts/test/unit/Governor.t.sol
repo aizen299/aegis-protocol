@@ -59,14 +59,15 @@ contract GovernorTest is GovernorFixture {
 
     // --- the §7 constraint ---
 
-    /// A non-local destination has nowhere to go in Phase 1, but the branch exists so that "local"
-    /// is not baked into the type. See docs/project-spec.md §7.
-    function test_crossChainProposalCannotExecuteLocally() public {
+    /// A remote action is published, not performed: the proposal is DISPATCHED, the message carries
+    /// the action, and nothing runs locally. docs/v2.0-solana-plan.md §16.
+    function test_crossChainProposalIsDispatchedNotExecuted() public {
         _fund(alice, PROPOSAL_THRESHOLD);
         _fund(bob, SUPPLY / 10);
 
         IGovernor.Action memory action = _localAction(42);
-        action.targetChainId = block.chainid + 1;
+        action.targetChainId = _remoteChain();
+        action.value = 7;
 
         vm.prank(alice);
         uint256 proposalId = governor.propose(action, "Remote", "");
@@ -75,12 +76,97 @@ contract GovernorTest is GovernorFixture {
         governor.queue(proposalId);
         skip(TIMELOCK_DELAY + 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ITimelock.CrossChainDispatchUnavailable.selector, block.chainid + 1)
-        );
+        vm.expectEmit(true, true, false, false, address(governor));
+        emit IGovernor.ProposalDispatched(proposalId, _remoteChain());
         governor.execute(proposalId);
 
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.DISPATCHED));
+        uint256 operationId = governor.proposalOf(proposalId).operationId;
+        assertEq(uint8(timelock.operationOf(operationId).state), uint8(ITimelock.OperationState.DISPATCHED));
         assertEq(target.value(), 0, "a remote proposal performed a local call");
+        assertEq(wormhole.published(), 1, "nothing was published");
+        assertEq(wormhole.lastEmitter(), address(dispatcher), "the emitter is not the dispatcher");
+        assertEq(address(target).balance, 0, "a remote action moved ETH");
+        assertEq(
+            wormhole.lastPayload(),
+            dispatcher.encodeMessage(operationId, _remoteChain(), action.target, 7, action.payload),
+            "the published message is not the action"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IGovernor.ProposalNotQueued.selector, proposalId, IGovernor.ProposalState.DISPATCHED
+            )
+        );
+        governor.execute(proposalId);
+    }
+
+    /// A vote on an action that cannot be delivered is refused before anyone spends it. §16.4.
+    function test_aRemoteProposalWithNoRouteIsRefused() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        IGovernor.Action memory action = _localAction(42);
+        action.targetChainId = block.chainid + 2;
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IGovernor.NoRouteForChain.selector, block.chainid + 2));
+        governor.propose(action, "Nowhere", "");
+
+        vm.prank(admin);
+        timelock.setDispatcher(address(0));
+        action.targetChainId = _remoteChain();
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IGovernor.NoRouteForChain.selector, _remoteChain()));
+        governor.propose(action, "No dispatcher", "");
+    }
+
+    /// Routes can change during a vote. A route removed before execution refuses it and leaves the
+    /// proposal queued, where it can be cancelled.
+    function test_aRouteRemovedDuringTheVoteRefusesExecution() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+        IGovernor.Action memory action = _localAction(42);
+        action.targetChainId = _remoteChain();
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(action, "Remote", "");
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+        skip(TIMELOCK_DELAY + 1);
+
+        vm.prank(admin);
+        dispatcher.removeRoute(_remoteChain());
+
+        vm.expectRevert();
+        governor.execute(proposalId);
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.QUEUED));
+        assertEq(wormhole.published(), 0);
+
+        vm.prank(guardian);
+        governor.cancel(proposalId);
+        assertEq(uint8(governor.state(proposalId)), uint8(IGovernor.ProposalState.CANCELLED));
+    }
+
+    /// Once the message has left, the proposal cannot be recorded as cancelled.
+    function test_aDispatchedProposalCannotBeCancelled() public {
+        _fund(alice, PROPOSAL_THRESHOLD);
+        _fund(bob, SUPPLY / 10);
+        IGovernor.Action memory action = _localAction(42);
+        action.targetChainId = _remoteChain();
+
+        vm.prank(alice);
+        uint256 proposalId = governor.propose(action, "Remote", "");
+        _passProposal(proposalId, _voters(bob), uint8(IGovernor.Support.FOR));
+        governor.queue(proposalId);
+        skip(TIMELOCK_DELAY + 1);
+        governor.execute(proposalId);
+
+        vm.prank(guardian);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IGovernor.ProposalNotCancellable.selector, proposalId, IGovernor.ProposalState.DISPATCHED
+            )
+        );
+        governor.cancel(proposalId);
     }
 
     /// A 32-byte target that does not fit an address must be rejected rather than truncated. The

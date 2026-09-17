@@ -119,8 +119,9 @@ contract GovernanceProbeTest is GovernorFixture {
     }
 
     /// The remote branch has to be reachable, or invariant_remoteProposalNeverPerformsALocalCall
-    /// is proving something about an input the fuzzer never produces.
-    function test_handlerCanDriveARemoteProposalToARefusedExecution() public {
+    /// and invariant_dispatchedProposalsMatchDispatchedOperations prove something about an input the
+    /// fuzzer never produces.
+    function test_handlerCanDriveARemoteProposalToDispatch() public {
         handler.propose(0, 99, true);
         uint256 proposalId = handler.proposalAt(0);
         assertTrue(handler.isRemote(proposalId), "the remote branch was not taken");
@@ -136,6 +137,7 @@ contract GovernanceProbeTest is GovernorFixture {
 
         handler.execute(0);
         assertEq(handler.ghostExecutedCount(), 0, "a remote proposal executed");
+        assertEq(handler.ghostDispatchedCount(), 1, "the remote proposal was not dispatched");
         assertEq(target.value(), 0, "a remote action landed locally");
         assertFalse(handler.ghostRemoteCallLandedLocally());
     }

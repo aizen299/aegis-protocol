@@ -4,12 +4,14 @@ pragma solidity 0.8.28;
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Test} from "forge-std/Test.sol";
 
+import {WormholeDispatcher} from "../../src/bridge/WormholeDispatcher.sol";
 import {AegisToken} from "../../src/governance/AegisToken.sol";
 import {Governor} from "../../src/governance/Governor.sol";
 import {Timelock} from "../../src/governance/Timelock.sol";
 import {IGovernor} from "../../src/governance/interfaces/IGovernor.sol";
 import {ITimelock} from "../../src/governance/interfaces/ITimelock.sol";
 import {Roles} from "../../src/shared/access/Roles.sol";
+import {MockWormhole} from "./MockWormhole.sol";
 
 /// @dev A contract a proposal can act on, so execution is observable rather than inferred.
 contract GovernedTarget {
@@ -55,6 +57,15 @@ abstract contract GovernorFixture is Test {
     Governor internal governor;
     Timelock internal timelock;
     GovernedTarget internal target;
+    MockWormhole internal wormhole;
+    WormholeDispatcher internal dispatcher;
+
+    uint16 internal constant REMOTE_WORMHOLE_CHAIN = 1;
+    bytes32 internal constant REMOTE_RECEIVER = bytes32(uint256(0xbeef));
+
+    function _remoteChain() internal view returns (uint256) {
+        return block.chainid + 1;
+    }
 
     function setUp() public virtual {
         token = new AegisToken(treasury, SUPPLY);
@@ -91,6 +102,22 @@ abstract contract GovernorFixture is Test {
         timelock.grantRole(Roles.TIMELOCK_PROPOSER_ROLE, address(governor));
         timelock.grantRole(Roles.TIMELOCK_EXECUTOR_ROLE, address(governor));
         timelock.grantRole(Roles.TIMELOCK_CANCELLER_ROLE, address(governor));
+        vm.stopPrank();
+
+        // A route to one remote chain, so remote proposals can be voted on and dispatched.
+        wormhole = new MockWormhole();
+        dispatcher = WormholeDispatcher(
+            address(
+                new ERC1967Proxy(
+                    address(new WormholeDispatcher()),
+                    abi.encodeCall(WormholeDispatcher.initialize, (admin, address(wormhole)))
+                )
+            )
+        );
+        vm.startPrank(admin);
+        dispatcher.grantRole(Roles.DISPATCHER_CALLER_ROLE, address(timelock));
+        dispatcher.setRoute(block.chainid + 1, REMOTE_WORMHOLE_CHAIN, REMOTE_RECEIVER);
+        timelock.setDispatcher(address(dispatcher));
         vm.stopPrank();
 
         // Start well past zero so snapshots can look backwards.

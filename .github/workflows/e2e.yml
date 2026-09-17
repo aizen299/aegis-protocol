@@ -86,6 +86,8 @@ jobs:
           sh /tmp/solana-install.sh
           cargo install anchor-cli --version 1.1.2 --locked
       - run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Fetch Wormhole core dependencies
+        run: make wormhole-local-deps
       - name: Build the Solana vault program
         run: make solana-build
       - name: Start solana-test-validator
@@ -137,7 +139,8 @@ jobs:
             TestZkReindexingIsIdempotent \
             TestTheAnonymitySetTracksTheTree \
             TestASolanaDepositIsIndexedAndServedBesideAnArbitrumOne \
-            TestASolanaOracleRoundIsSubmittedFromGoAndIndexed; do
+            TestASolanaOracleRoundIsSubmittedFromGoAndIndexed \
+            TestGovernanceSolanaProposalIsDispatchedThroughWormhole; do
             grep -q -- "--- PASS: $required" /tmp/e2e.log || {
               echo "::error::$required did not run."
               exit 1
