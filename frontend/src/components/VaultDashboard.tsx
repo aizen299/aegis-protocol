@@ -91,7 +91,7 @@ export function VaultDashboard() {
   if (!vault) {
     return (
       <Panel title="Configuration">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           NEXT_PUBLIC_VAULT_ADDRESS is not set. Deploy the vault and point the UI at it.
         </p>
       </Panel>
@@ -167,7 +167,7 @@ export function VaultDashboard() {
         </>
       ) : (
         <Panel title="Your position">
-          <p className="text-sm text-zinc-400">Connect a wallet to deposit or withdraw.</p>
+          <p className="text-sm text-muted-foreground">Connect a wallet to deposit or withdraw.</p>
         </Panel>
       )}
     </div>
@@ -177,8 +177,8 @@ export function VaultDashboard() {
 function Notice({ text, tone = "warning" }: { text: string; tone?: "warning" | "error" }) {
   const palette =
     tone === "error"
-      ? "border-red-900/60 bg-red-950/40 text-red-200"
-      : "border-amber-900/60 bg-amber-950/40 text-amber-200";
+      ? "border-destructive/40 bg-destructive/10 text-destructive"
+      : "border-warning/40 bg-warning/10 text-warning";
 
   return (
     <p className={`rounded border px-4 py-2 text-sm ${palette}`} role="alert">

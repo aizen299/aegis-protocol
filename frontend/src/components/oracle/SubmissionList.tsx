@@ -26,9 +26,9 @@ export function SubmissionList({ roundId }: { roundId: string }) {
                 </Cell>
                 <Cell>
                   {submission.isOutlier ? (
-                    <span className="text-amber-300">outlier</span>
+                    <span className="text-warning">outlier</span>
                   ) : (
-                    <span className="text-zinc-500">—</span>
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </Cell>
                 <Cell>
@@ -36,9 +36,9 @@ export function SubmissionList({ roundId }: { roundId: string }) {
                       nonce was emitted cannot be checked, and slashing for it would punish a node
                       for an indexing gap. */}
                   {submission.nonceKnown ? (
-                    <span className="text-zinc-400">verifiable</span>
+                    <span className="text-muted-foreground">verifiable</span>
                   ) : (
-                    <span className="text-zinc-500" title="indexed before the nonce was emitted">
+                    <span className="text-muted-foreground" title="indexed before the nonce was emitted">
                       unverifiable
                     </span>
                   )}

@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Async } from "@/components/Async";
 import { Panel } from "@/components/Panel";
 import { Cell, Row, Table } from "@/components/Table";
+import { useChainHref } from "@/lib/chainContext";
 import { shortId } from "@/lib/format";
 import { useOracleFeeds } from "@/lib/queries";
 
 export function FeedList() {
+  const chainHref = useChainHref();
   const feeds = useOracleFeeds();
 
   return (
@@ -20,8 +22,8 @@ export function FeedList() {
               <Row key={feed.feedId}>
                 <Cell>
                   <Link
-                    className="text-sky-300 hover:underline"
-                    href={`/oracle/feeds/${feed.feedId}`}
+                    className="text-info hover:underline"
+                    href={chainHref(`/oracle/feeds/${feed.feedId}`)}
                   >
                     {feed.name}
                   </Link>

@@ -31,7 +31,7 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                   <StateBadge state={data.state} />
                 </div>
                 {data.description ? (
-                  <p className="mb-4 whitespace-pre-wrap text-sm text-zinc-400">
+                  <p className="mb-4 whitespace-pre-wrap text-sm text-muted-foreground">
                     {data.description}
                   </p>
                 ) : null}
@@ -63,7 +63,7 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                     />
                   </>
                 ) : (
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-muted-foreground">
                     Not queued. A proposal reaches the timelock only after it succeeds.
                   </p>
                 )}
@@ -77,7 +77,7 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                 <Stat label="Target chain" state={valueOf(String(data.action.targetChainId))} />
                 <Stat label="Target" state={valueOf(data.action.target)} />
                 <Stat label="Value" state={valueOf(data.action.value)} />
-                <p className="mt-3 break-all font-mono text-xs text-zinc-400">
+                <p className="mt-3 break-all font-mono text-xs text-muted-foreground">
                   {data.action.calldata}
                 </p>
               </Panel>

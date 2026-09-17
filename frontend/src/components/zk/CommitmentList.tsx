@@ -31,7 +31,7 @@ export function CommitmentList() {
         </Async>
       </Panel>
 
-      <p className="rounded border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-400">
+      <p className="rounded border border-border bg-muted/60 px-4 py-2 text-sm text-muted-foreground">
         There is no depositor column, and that is the design rather than an omission. A table joining
         a commitment to the account that inserted it would turn correlating deposits with spends from
         log archaeology into a single lookup.

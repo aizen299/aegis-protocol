@@ -63,7 +63,7 @@ export function WithdrawForm({
           onChange={(e) => setAmount(e.target.value)}
           inputMode="decimal"
           placeholder="0.0 shares"
-          className="w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-zinc-500"
+          className="w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-border"
         />
         <button
           type="button"
@@ -72,18 +72,18 @@ export function WithdrawForm({
             shareScale !== undefined &&
             setAmount(formatUnits(shares, shareScale))
           }
-          className="shrink-0 rounded border border-edge px-2 py-2 text-xs text-zinc-400 hover:text-zinc-200"
+          className="shrink-0 rounded border border-edge px-2 py-2 text-xs text-muted-foreground hover:text-foreground"
         >
           Max
         </button>
       </div>
       {parsed !== null && !exceedsBalance ? (
-        <p className="mb-3 text-xs text-zinc-500" data-testid="withdraw-floor">
+        <p className="mb-3 text-xs text-muted-foreground" data-testid="withdraw-floor">
           {floorText === undefined ? (
             "Cannot price this withdrawal yet — the transaction is disabled until it can."
           ) : (
             <>
-              Reverts below <span className="font-mono text-zinc-400">{floorText}</span>, a{" "}
+              Reverts below <span className="font-mono text-muted-foreground">{floorText}</span>, a{" "}
               {formatTolerance(DEFAULT_TOLERANCE_BPS)} tolerance on the current rate.
             </>
           )}

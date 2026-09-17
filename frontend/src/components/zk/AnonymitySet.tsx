@@ -7,9 +7,9 @@ import { useAnonymitySet } from "@/lib/queries";
 import { value as valueOf } from "@/lib/readState";
 
 const tones = {
-  none: "border-red-900/60 bg-red-950/40 text-red-200",
-  weak: "border-amber-900/60 bg-amber-950/40 text-amber-200",
-  moderate: "border-zinc-800 bg-zinc-900/60 text-zinc-300",
+  none: "border-destructive/40 bg-destructive/10 text-destructive",
+  weak: "border-warning/40 bg-warning/10 text-warning",
+  moderate: "border-border bg-muted/60 text-foreground",
 };
 
 export function AnonymitySet() {

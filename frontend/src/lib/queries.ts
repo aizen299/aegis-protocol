@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./api";
+import { useChain } from "./chainContext";
 
 // Indexed data moves on the indexer's poll, not the browser's. Ten seconds is under the poll
 // interval, so a refetch costs little and a stale figure is short-lived.
@@ -18,95 +19,110 @@ const retryDelay = 500;
 const shared = { staleTime, retry, retryDelay };
 
 export function useOracleFeeds() {
-  return useQuery({ queryKey: ["oracle", "feeds"], queryFn: api.oracleFeeds, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "oracle", "feeds"], queryFn: () => api.oracleFeeds(chain), ...shared });
 }
 
 export function useOracleFeed(feedId: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["oracle", "feed", feedId],
-    queryFn: () => api.oracleFeed(feedId),
+    queryKey: [chain, "oracle", "feed", feedId],
+    queryFn: () => api.oracleFeed(chain, feedId),
     ...shared,
     enabled: Boolean(feedId),
   });
 }
 
 export function useOracleRounds(feedId: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["oracle", "rounds", feedId],
-    queryFn: () => api.oracleRounds(feedId),
+    queryKey: [chain, "oracle", "rounds", feedId],
+    queryFn: () => api.oracleRounds(chain, feedId),
     ...shared,
     enabled: Boolean(feedId),
   });
 }
 
 export function useOracleRound(roundId: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["oracle", "round", roundId],
-    queryFn: () => api.oracleRound(roundId),
+    queryKey: [chain, "oracle", "round", roundId],
+    queryFn: () => api.oracleRound(chain, roundId),
     ...shared,
     enabled: Boolean(roundId),
   });
 }
 
 export function useOracleSubmissions(roundId: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["oracle", "submissions", roundId],
-    queryFn: () => api.oracleSubmissions(roundId),
+    queryKey: [chain, "oracle", "submissions", roundId],
+    queryFn: () => api.oracleSubmissions(chain, roundId),
     ...shared,
     enabled: Boolean(roundId),
   });
 }
 
 export function useOracleNodes() {
-  return useQuery({ queryKey: ["oracle", "nodes"], queryFn: api.oracleNodes, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "oracle", "nodes"], queryFn: () => api.oracleNodes(chain), ...shared });
 }
 
 export function useProposals() {
-  return useQuery({ queryKey: ["governance", "proposals"], queryFn: api.proposals, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "governance", "proposals"], queryFn: () => api.proposals(chain), ...shared });
 }
 
 export function useProposal(id: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["governance", "proposal", id],
-    queryFn: () => api.proposal(id),
+    queryKey: [chain, "governance", "proposal", id],
+    queryFn: () => api.proposal(chain, id),
     ...shared,
     enabled: Boolean(id),
   });
 }
 
 export function useProposalVotes(id: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["governance", "votes", id],
-    queryFn: () => api.proposalVotes(id),
+    queryKey: [chain, "governance", "votes", id],
+    queryFn: () => api.proposalVotes(chain, id),
     ...shared,
     enabled: Boolean(id),
   });
 }
 
 export function useZkGate() {
-  return useQuery({ queryKey: ["zk", "gate"], queryFn: api.zkGate, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "zk", "gate"], queryFn: () => api.zkGate(chain), ...shared });
 }
 
 export function useAnonymitySet() {
-  return useQuery({ queryKey: ["zk", "anonymity"], queryFn: api.anonymitySet, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "zk", "anonymity"], queryFn: () => api.anonymitySet(chain), ...shared });
 }
 
 export function useCommitments() {
-  return useQuery({ queryKey: ["zk", "commitments"], queryFn: api.commitments, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "zk", "commitments"], queryFn: () => api.commitments(chain), ...shared });
 }
 
 export function useZkActions() {
-  return useQuery({ queryKey: ["zk", "actions"], queryFn: api.zkActions, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "zk", "actions"], queryFn: () => api.zkActions(chain), ...shared });
 }
 
 export function usePrivateActions() {
-  return useQuery({ queryKey: ["zk", "private-actions"], queryFn: api.privateActions, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "zk", "private-actions"], queryFn: () => api.privateActions(chain), ...shared });
 }
 
 export function useNullifierStatus(nullifier: string) {
+  const chain = useChain().name;
   return useQuery({
-    queryKey: ["zk", "nullifier", nullifier],
-    queryFn: () => api.nullifierStatus(nullifier),
+    queryKey: [chain, "zk", "nullifier", nullifier],
+    queryFn: () => api.nullifierStatus(chain, nullifier),
     ...shared,
     enabled: /^0x[0-9a-f]{64}$/.test(nullifier),
     retry: false,
@@ -114,5 +130,19 @@ export function useNullifierStatus(nullifier: string) {
 }
 
 export function useGovernor() {
-  return useQuery({ queryKey: ["governance", "governor"], queryFn: api.governor, ...shared });
+  const chain = useChain().name;
+  return useQuery({ queryKey: [chain, "governance", "governor"], queryFn: () => api.governor(chain), ...shared });
+}
+
+export function useRemoteActions(status?: string) {
+  const chain = useChain().name;
+  return useQuery({
+    queryKey: [chain, "governance", "remote-actions", status ?? ""],
+    queryFn: () => api.remoteActions(chain, status),
+    ...shared,
+  });
+}
+
+export function useApiHealth() {
+  return useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 15_000, retry: false });
 }

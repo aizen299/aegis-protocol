@@ -1,26 +1,42 @@
+import { cn } from "@/lib/utils";
+
 // Round and proposal states share a renderer: both are state machines whose current position is the
 // first thing a reader needs, and both have terminal states that must not look like live ones.
-const palettes: Record<string, string> = {
-  open: "border-sky-900/60 bg-sky-950/40 text-sky-200",
-  quorum_met: "border-sky-900/60 bg-sky-950/40 text-sky-200",
-  active: "border-sky-900/60 bg-sky-950/40 text-sky-200",
-  pending: "border-zinc-700 bg-zinc-900 text-zinc-300",
-  settled: "border-emerald-900/60 bg-emerald-950/40 text-emerald-200",
-  succeeded: "border-emerald-900/60 bg-emerald-950/40 text-emerald-200",
-  executed: "border-emerald-900/60 bg-emerald-950/40 text-emerald-200",
-  queued: "border-amber-900/60 bg-amber-950/40 text-amber-200",
-  failed: "border-red-900/60 bg-red-950/40 text-red-200",
-  defeated: "border-red-900/60 bg-red-950/40 text-red-200",
-  cancelled: "border-red-900/60 bg-red-950/40 text-red-200",
-  expired: "border-red-900/60 bg-red-950/40 text-red-200",
+const tone: Record<string, string> = {
+  open: "info",
+  quorum_met: "info",
+  active: "info",
+  pending: "neutral",
+  settled: "success",
+  succeeded: "success",
+  executed: "success",
+  queued: "warning",
+  dispatched: "violet",
+  failed: "danger",
+  defeated: "danger",
+  cancelled: "danger",
+  expired: "danger",
+};
+
+const tones: Record<string, string> = {
+  info: "border-info/30 bg-info/10 text-info",
+  success: "border-success/30 bg-success/10 text-success",
+  warning: "border-warning/30 bg-warning/10 text-warning",
+  danger: "border-destructive/30 bg-destructive/10 text-destructive",
+  violet: "border-violet/30 bg-violet/10 text-violet",
+  neutral: "border-border bg-muted text-muted-foreground",
 };
 
 export function StateBadge({ state }: { state: string }) {
   const key = state.toLowerCase();
-  const palette = palettes[key] ?? "border-zinc-700 bg-zinc-900 text-zinc-300";
-
   return (
-    <span className={`rounded border px-2 py-0.5 font-mono text-xs uppercase ${palette}`}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
+        tones[tone[key] ?? "neutral"],
+      )}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {state.replace(/_/g, " ")}
     </span>
   );

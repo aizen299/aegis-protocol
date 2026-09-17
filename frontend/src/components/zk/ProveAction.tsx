@@ -1,5 +1,6 @@
 "use client";
 
+import { useChain } from "@/lib/chainContext";
 import { useEffect, useState } from "react";
 import { bytesToHex } from "viem";
 import { useAccount, useChainId, usePublicClient } from "wagmi";
@@ -28,6 +29,7 @@ export function ProveAction() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const client = usePublicClient();
+  const chain = useChain().name;
 
   const gate = useZkGate();
   const actions = useZkActions();
@@ -62,7 +64,7 @@ export function ProveAction() {
         functionName: "leafCount",
       });
       const leaves = await fetchAllLeaves(
-        async (limit, offset) => (await api.commitmentsPage(limit, offset)).items,
+        async (limit, offset) => (await api.commitmentsPage(chain, limit, offset)).items,
         leafCount,
       );
 
@@ -126,25 +128,25 @@ export function ProveAction() {
   return (
     <Panel title="Use a deposit privately">
       {verdict ? (
-        <p className="mb-4 text-sm text-zinc-400" role="note" data-testid="prove-anonymity">
-          <strong className="text-zinc-300">{verdict.headline}.</strong> {verdict.detail}
+        <p className="mb-4 text-sm text-muted-foreground" role="note" data-testid="prove-anonymity">
+          <strong className="text-foreground">{verdict.headline}.</strong> {verdict.detail}
         </p>
       ) : null}
 
       {!isConnected ? (
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Connect a wallet. The proof is bound to the account that submits it.
         </p>
       ) : (
         <>
-          <label className="mb-1 block text-sm text-zinc-500" htmlFor="prove-action">
+          <label className="mb-1 block text-sm text-muted-foreground" htmlFor="prove-action">
             Action
           </label>
           <select
             id="prove-action"
             value={actionId}
             onChange={(e) => setActionId(e.target.value)}
-            className="mb-3 w-full rounded border border-edge bg-black/40 px-3 py-2 text-sm text-zinc-200"
+            className="mb-3 w-full rounded border border-edge bg-black/40 px-3 py-2 text-sm text-foreground"
           >
             <option value="">Choose an action</option>
             {registered.map((a) => (
@@ -154,7 +156,7 @@ export function ProveAction() {
             ))}
           </select>
 
-          <label className="mb-1 block text-sm text-zinc-500" htmlFor="prove-secret">
+          <label className="mb-1 block text-sm text-muted-foreground" htmlFor="prove-secret">
             Deposit secret
           </label>
           <input
@@ -164,9 +166,9 @@ export function ProveAction() {
             spellCheck={false}
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
-            className="mb-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-zinc-200"
+            className="mb-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-foreground"
           />
-          <p className="mb-3 text-xs text-zinc-500">
+          <p className="mb-3 text-xs text-muted-foreground">
             Used only inside this page. It is not stored and is never sent anywhere.
           </p>
 
@@ -177,12 +179,12 @@ export function ProveAction() {
       )}
 
       {step.kind === "working" ? (
-        <p className="mt-3 text-xs text-zinc-400" data-testid="prove-step">
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="prove-step">
           {step.label}
         </p>
       ) : null}
       {step.kind === "refused" ? (
-        <p className="mt-3 text-xs text-red-400" role="alert" data-testid="prove-refused">
+        <p className="mt-3 text-xs text-destructive" role="alert" data-testid="prove-refused">
           {step.reason}
         </p>
       ) : null}

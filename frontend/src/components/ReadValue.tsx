@@ -3,7 +3,7 @@ import type { ReadState } from "@/lib/readState";
 export function ReadValue({ state }: { state: ReadState }) {
   if (state.kind === "loading") {
     return (
-      <span className="font-mono text-sm text-zinc-500" aria-busy="true" data-testid="stat-loading">
+      <span className="font-mono text-sm text-muted-foreground" aria-busy="true" data-testid="stat-loading">
         loading…
       </span>
     );
@@ -12,7 +12,7 @@ export function ReadValue({ state }: { state: ReadState }) {
   if (state.kind === "failed") {
     return (
       <span
-        className="font-mono text-sm text-amber-300"
+        className="font-mono text-sm text-warning"
         role="status"
         title={state.reason}
         data-testid="stat-failed"
@@ -23,7 +23,7 @@ export function ReadValue({ state }: { state: ReadState }) {
   }
 
   return (
-    <span className="font-mono text-sm text-zinc-200" data-testid="stat-value">
+    <span className="font-mono text-sm text-foreground" data-testid="stat-value">
       {state.text}
     </span>
   );

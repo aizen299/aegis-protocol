@@ -153,7 +153,7 @@ export function ProposalActions({
   return (
     <Panel title="Act on this proposal">
       <section className="mb-5">
-        <h3 className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Vote</h3>
+        <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Vote</h3>
         <VotingPower eligibility={vote} decimals={decimals} />
         <div className="mt-3 grid grid-cols-3 gap-2">
           <TxButton disabled={!vote.allowed} pending={tx.busy} onClick={() => castVote(1)}>
@@ -176,7 +176,7 @@ export function ProposalActions({
       </section>
 
       <section className="mb-5">
-        <h3 className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Queue</h3>
+        <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Queue</h3>
         <Reason availability={queue} />
         <TxButton disabled={!queue.allowed} pending={tx.busy} onClick={() => send("queue")}>
           Queue in the timelock
@@ -184,7 +184,7 @@ export function ProposalActions({
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Execute</h3>
+        <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Execute</h3>
         <Reason availability={execute} />
         <TxButton disabled={!execute.allowed} pending={tx.busy} onClick={() => send("execute")}>
           Execute
@@ -205,7 +205,7 @@ function VotingPower({
 }) {
   if (eligibility.allowed) {
     return (
-      <p className="text-sm text-zinc-300" data-testid="vote-allowed">
+      <p className="text-sm text-foreground" data-testid="vote-allowed">
         You can vote with{" "}
         <span className="font-mono">{formatAmount(eligibility.weight, decimals) ?? "…"}</span> votes —
         your power at this proposal&apos;s snapshot.
@@ -213,7 +213,7 @@ function VotingPower({
     );
   }
   return (
-    <p className="text-sm text-zinc-400" role="status" data-testid="vote-reason">
+    <p className="text-sm text-muted-foreground" role="status" data-testid="vote-reason">
       {eligibility.reason}
     </p>
   );
@@ -222,7 +222,7 @@ function VotingPower({
 function Reason({ availability }: { availability: Availability }) {
   if (availability.allowed) return null;
   return (
-    <p className="mb-2 text-sm text-zinc-500" role="status">
+    <p className="mb-2 text-sm text-muted-foreground" role="status">
       {availability.reason}
     </p>
   );

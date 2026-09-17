@@ -1,3 +1,4 @@
+import type { ChainName } from "./chains";
 import { env } from "./env";
 
 // Indexed history comes from the backend, not the chain: the UI must not re-implement indexing.
@@ -104,6 +105,27 @@ export type Proposal = {
   txHash: string;
   logIndex: number;
   blockNumber: number;
+  remote?: RemoteAction;
+};
+
+// Mirrors backend/pkg/types.RemoteAction: a governance action received on another chain.
+export type RemoteAction = {
+  chainId: number;
+  receiver: string;
+  emitterChain: number;
+  sequence: string;
+  sourceChainId: number;
+  operationId: string;
+  target: string;
+  declaredValue: string;
+  accountsHash: string;
+  status: "pending" | "executed" | "cancelled";
+  executableAt: string;
+  receivedAt: string;
+  receivedTx: string;
+  closedAt?: string;
+  closedTx?: string;
+  closedBy?: string;
 };
 
 export type Vote = {
@@ -188,10 +210,12 @@ export type GovernorMetadata = {
 // Throws rather than returning null. A caller handed null cannot tell "the API is unreachable" from
 // "there is nothing here", which is the same collapse the vault dashboard was fixed for; throwing
 // hands react-query a real error it can report.
-async function get<T>(path: string): Promise<T> {
+async function get<T>(chain: ChainName, path: string): Promise<T> {
+  const url = new URL(`${env.apiUrl}${path}`);
+  url.searchParams.set("chain", chain);
   let res: Response;
   try {
-    res = await fetch(`${env.apiUrl}${path}`, { cache: "no-store" });
+    res = await fetch(url, { cache: "no-store" });
   } catch (cause) {
     throw new Error(`${env.apiUrl} is unreachable`, { cause });
   }
@@ -201,31 +225,43 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+type C = ChainName;
+
 export const api = {
-  tvl: (vault: string) => get<Tvl>(`/v1/vault/${vault}/tvl`),
+  health: async (): Promise<boolean> => {
+    try {
+      return (await fetch(`${env.apiUrl}/health`, { cache: "no-store" })).ok;
+    } catch {
+      return false;
+    }
+  },
 
-  oracleFeeds: () => get<Paged<OracleFeed>>("/v1/oracle/feeds"),
-  oracleFeed: (feedId: string) => get<OracleFeed>(`/v1/oracle/feeds/${feedId}`),
-  oracleRounds: (feedId: string) => get<Paged<OracleRound>>(`/v1/oracle/feeds/${feedId}/rounds`),
-  oracleRound: (roundId: string) => get<OracleRound>(`/v1/oracle/rounds/${roundId}`),
-  oracleSubmissions: (roundId: string) =>
-    get<Paged<OracleSubmission>>(`/v1/oracle/rounds/${roundId}/submissions`),
-  oracleNodes: () => get<Paged<OracleNode>>("/v1/oracle/nodes"),
+  tvl: (c: C, vault: string) => get<Tvl>(c, `/v1/vault/${vault}/tvl`),
 
-  governor: () => get<GovernorMetadata>("/v1/governance/governor"),
-  proposals: () => get<Paged<Proposal>>("/v1/governance/proposals"),
-  proposal: (id: string) => get<Proposal>(`/v1/governance/proposals/${id}`),
-  proposalVotes: (id: string) => get<Paged<Vote>>(`/v1/governance/proposals/${id}/votes`),
+  oracleFeeds: (c: C) => get<Paged<OracleFeed>>(c, "/v1/oracle/feeds"),
+  oracleFeed: (c: C, feedId: string) => get<OracleFeed>(c, `/v1/oracle/feeds/${feedId}`),
+  oracleRounds: (c: C, feedId: string) => get<Paged<OracleRound>>(c, `/v1/oracle/feeds/${feedId}/rounds`),
+  oracleRound: (c: C, roundId: string) => get<OracleRound>(c, `/v1/oracle/rounds/${roundId}`),
+  oracleSubmissions: (c: C, roundId: string) =>
+    get<Paged<OracleSubmission>>(c, `/v1/oracle/rounds/${roundId}/submissions`),
+  oracleNodes: (c: C) => get<Paged<OracleNode>>(c, "/v1/oracle/nodes"),
 
-  zkGate: () => get<ZkGateMetadata>("/v1/zk/gate"),
-  anonymitySet: () => get<AnonymitySet>("/v1/zk/anonymity-set"),
-  commitments: () => get<Paged<Commitment>>("/v1/zk/commitments"),
+  governor: (c: C) => get<GovernorMetadata>(c, "/v1/governance/governor"),
+  proposals: (c: C) => get<Paged<Proposal>>(c, "/v1/governance/proposals"),
+  proposal: (c: C, id: string) => get<Proposal>(c, `/v1/governance/proposals/${id}`),
+  proposalVotes: (c: C, id: string) => get<Paged<Vote>>(c, `/v1/governance/proposals/${id}/votes`),
+  remoteActions: (c: C, status?: string) =>
+    get<Paged<RemoteAction>>(c, `/v1/governance/remote-actions${status ? `?status=${status}` : ""}`),
+
+  zkGate: (c: C) => get<ZkGateMetadata>(c, "/v1/zk/gate"),
+  anonymitySet: (c: C) => get<AnonymitySet>(c, "/v1/zk/anonymity-set"),
+  commitments: (c: C) => get<Paged<Commitment>>(c, "/v1/zk/commitments"),
   // Paged by limit and offset only. There is no lookup by commitment, deliberately: asking which leaf
   // holds a commitment would tell the server which deposit is about to be spent.
-  commitmentsPage: (limit: number, offset: number) =>
-    get<Paged<Commitment>>(`/v1/zk/commitments?limit=${limit}&offset=${offset}`),
-  zkActions: () => get<Paged<ZkAction>>("/v1/zk/actions"),
-  privateActions: () => get<Paged<PrivateAction>>("/v1/zk/private-actions"),
-  nullifierStatus: (nullifier: string) =>
-    get<NullifierStatus>(`/v1/zk/nullifiers/${nullifier}`),
+  commitmentsPage: (c: C, limit: number, offset: number) =>
+    get<Paged<Commitment>>(c, `/v1/zk/commitments?limit=${limit}&offset=${offset}`),
+  zkActions: (c: C) => get<Paged<ZkAction>>(c, "/v1/zk/actions"),
+  privateActions: (c: C) => get<Paged<PrivateAction>>(c, "/v1/zk/private-actions"),
+  nullifierStatus: (c: C, nullifier: string) =>
+    get<NullifierStatus>(c, `/v1/zk/nullifiers/${nullifier}`),
 };

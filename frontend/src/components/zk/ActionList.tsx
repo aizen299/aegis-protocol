@@ -22,7 +22,7 @@ export function ActionList() {
                   {action.registered ? (
                     "registered"
                   ) : (
-                    <span className="text-zinc-500" title="No new proof can be presented for it">
+                    <span className="text-muted-foreground" title="No new proof can be presented for it">
                       deregistered
                     </span>
                   )}

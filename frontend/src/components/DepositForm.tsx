@@ -83,15 +83,15 @@ export function DepositForm({
         onChange={(e) => setAmount(e.target.value)}
         inputMode="decimal"
         placeholder={`0.0 ${symbol ?? ""}`.trim()}
-        className="mb-3 w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-zinc-500"
+        className="mb-3 w-full rounded border border-edge bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-border"
       />
       {parsed !== null ? (
-        <p className="mb-3 text-xs text-zinc-500" data-testid="deposit-floor">
+        <p className="mb-3 text-xs text-muted-foreground" data-testid="deposit-floor">
           {floorText === undefined ? (
             "Cannot price this deposit yet — the transaction is disabled until it can."
           ) : (
             <>
-              Reverts below <span className="font-mono text-zinc-400">{floorText}</span>, a{" "}
+              Reverts below <span className="font-mono text-muted-foreground">{floorText}</span>, a{" "}
               {formatTolerance(DEFAULT_TOLERANCE_BPS)} tolerance on the current rate.
             </>
           )}

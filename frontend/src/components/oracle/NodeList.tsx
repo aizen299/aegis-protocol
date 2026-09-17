@@ -41,7 +41,7 @@ export function NodeList() {
           are stated here so an operator can predict their own penalty. See
           docs/v1.3-missed-round-slashing-plan.md. */}
       <div
-        className="rounded border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-400"
+        className="rounded border border-border bg-muted/60 px-4 py-2 text-sm text-muted-foreground"
         data-testid="missed-round-rules"
       >
         <p>

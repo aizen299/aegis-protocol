@@ -3,23 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useChainHref } from "@/lib/chainContext";
+import { cn } from "@/lib/utils";
+
 export function SubNav({ links }: { links: { href: string; label: string }[] }) {
   const pathname = usePathname();
+  const href = useChainHref();
 
   return (
-    <nav className="flex gap-3 text-xs">
+    <nav aria-label="Section" className="inline-flex w-fit gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
       {links.map((link) => {
         const active = pathname === link.href;
         return (
           <Link
             key={link.href}
-            href={link.href}
+            href={href(link.href)}
             aria-current={active ? "page" : undefined}
-            className={
-              active
-                ? "rounded border border-edge bg-zinc-900 px-2 py-1 text-zinc-100"
-                : "rounded border border-transparent px-2 py-1 text-zinc-500 hover:text-zinc-300"
-            }
+            className={cn(
+              "rounded-md px-3 py-1.5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
           >
             {link.label}
           </Link>

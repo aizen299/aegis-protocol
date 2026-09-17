@@ -15,7 +15,7 @@ export function NullifierLookup() {
 
   return (
     <Panel title="Nullifier status">
-      <label className="block text-sm text-zinc-500" htmlFor="nullifier">
+      <label className="block text-sm text-muted-foreground" htmlFor="nullifier">
         Check whether a nullifier has been spent
       </label>
       <input
@@ -24,11 +24,11 @@ export function NullifierLookup() {
         onChange={(event) => setInput(event.target.value)}
         placeholder="0x…"
         spellCheck={false}
-        className="mt-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-zinc-200"
+        className="mt-2 w-full rounded border border-edge bg-black/40 px-3 py-2 font-mono text-xs text-foreground"
       />
 
       {trimmed !== "" && !wellFormed ? (
-        <p className="mt-3 text-sm text-amber-300" role="status">
+        <p className="mt-3 text-sm text-warning" role="status">
           A nullifier is 0x followed by 64 lowercase hex characters.
         </p>
       ) : null}
@@ -36,18 +36,18 @@ export function NullifierLookup() {
       {wellFormed ? (
         <p className="mt-3 text-sm" role="status" data-testid="nullifier-result">
           {status.isPending ? (
-            <span className="text-zinc-500">checking…</span>
+            <span className="text-muted-foreground">checking…</span>
           ) : status.isError || status.data === undefined ? (
-            <span className="text-red-200">
+            <span className="text-destructive">
               Could not check this nullifier. That is a failure to read, not a statement about
               whether it is spent.
             </span>
           ) : status.data.spent ? (
-            <span className="text-zinc-200">
+            <span className="text-foreground">
               Spent. This nullifier has been used and cannot be used again.
             </span>
           ) : (
-            <span className="text-zinc-200">Not spent on this gate.</span>
+            <span className="text-foreground">Not spent on this gate.</span>
           )}
         </p>
       ) : null}

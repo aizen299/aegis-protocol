@@ -17,7 +17,7 @@ export function TestWalletButton() {
 
   if (isConnected && connector?.type === "mock") {
     return (
-      <p className="rounded border border-amber-900/60 bg-amber-950/40 px-3 py-1 text-xs text-amber-200">
+      <p className="rounded border border-warning/40 bg-warning/10 px-3 py-1 text-xs text-warning">
         Test wallet — Anvil development account, local chain only
       </p>
     );
@@ -27,7 +27,7 @@ export function TestWalletButton() {
     <button
       type="button"
       onClick={() => connect({ connector: testConnector })}
-      className="rounded border border-amber-900/60 px-3 py-1 text-xs text-amber-200 hover:bg-amber-950/40"
+      className="rounded border border-warning/40 px-3 py-1 text-xs text-warning hover:bg-warning/10"
     >
       Connect test wallet (Anvil)
     </button>

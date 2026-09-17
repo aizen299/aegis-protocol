@@ -1,21 +1,25 @@
 import type { ReactNode } from "react";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReadState } from "@/lib/readState";
 import { ReadValue } from "./ReadValue";
 
-export function Panel({ title, children }: { title: string; children: ReactNode }) {
+export function Panel({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
   return (
-    <section className="rounded-lg border border-edge bg-panel p-5">
-      <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-zinc-400">{title}</h2>
-      {children}
-    </section>
+    <Card className="shadow-none">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
+        <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
+        {actions}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
 export function Stat({ label, state }: { label: string; state: ReadState }) {
   return (
-    <div className="flex items-baseline justify-between border-b border-edge py-2 last:border-0">
-      <span className="text-sm text-zinc-500">{label}</span>
+    <div className="flex items-baseline justify-between gap-4 border-b py-2.5 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
       <ReadValue state={state} />
     </div>
   );

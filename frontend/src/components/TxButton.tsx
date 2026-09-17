@@ -20,7 +20,7 @@ export function TxButton({
       type="button"
       disabled={disabled || pending}
       onClick={onClick}
-      className="w-full rounded bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+      className="w-full rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
     >
       {pending ? "Confirming…" : children}
     </button>
@@ -33,31 +33,31 @@ export function TxStatus({ phase }: { phase: TxPhase }) {
       return null;
     case "signing":
       return (
-        <p className="mt-2 text-xs text-zinc-400" data-testid="tx-signing">
+        <p className="mt-2 text-xs text-muted-foreground" data-testid="tx-signing">
           Waiting for your wallet…
         </p>
       );
     case "pending":
       return (
-        <p className="mt-2 text-xs text-zinc-400" data-testid="tx-pending">
+        <p className="mt-2 text-xs text-muted-foreground" data-testid="tx-pending">
           Submitted, not yet included: <Hash value={phase.hash} />
         </p>
       );
     case "confirmed":
       return (
-        <p className="mt-2 text-xs text-emerald-400" data-testid="tx-confirmed">
+        <p className="mt-2 text-xs text-success" data-testid="tx-confirmed">
           Confirmed: <Hash value={phase.hash} />
         </p>
       );
     case "reverted":
       return (
-        <p className="mt-2 text-xs text-red-400" role="alert" data-testid="tx-reverted">
+        <p className="mt-2 text-xs text-destructive" role="alert" data-testid="tx-reverted">
           Included but reverted — nothing changed: <Hash value={phase.hash} />
         </p>
       );
     case "failed":
       return (
-        <p className="mt-2 break-words text-xs text-red-400" role="alert" data-testid="tx-failed">
+        <p className="mt-2 break-words text-xs text-destructive" role="alert" data-testid="tx-failed">
           {phase.reason}
         </p>
       );

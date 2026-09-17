@@ -6,11 +6,13 @@ import { Async } from "@/components/Async";
 import { Panel } from "@/components/Panel";
 import { StateBadge } from "@/components/StateBadge";
 import { Cell, Row, Table } from "@/components/Table";
+import { useChainHref } from "@/lib/chainContext";
 import { formatUnixTime, shortAddress } from "@/lib/format";
 import { useProposals } from "@/lib/queries";
 import { formatRaw } from "@/lib/units";
 
 export function ProposalList() {
+  const chainHref = useChainHref();
   const proposals = useProposals();
 
   return (
@@ -25,8 +27,8 @@ export function ProposalList() {
               <Row key={proposal.proposalId}>
                 <Cell>
                   <Link
-                    className="text-sky-300 hover:underline"
-                    href={`/governance/${proposal.proposalId}`}
+                    className="text-info hover:underline"
+                    href={chainHref(`/governance/${proposal.proposalId}`)}
                   >
                     {proposal.title || proposal.proposalId}
                   </Link>

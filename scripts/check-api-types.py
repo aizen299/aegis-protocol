@@ -31,6 +31,7 @@ MIRRORED = {
     "ZkAction": "ZkAction",
     "PrivateAction": "PrivateAction",
     "AnonymitySet": "AnonymitySet",
+    "RemoteAction": "RemoteAction",
 }
 
 
