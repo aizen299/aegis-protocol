@@ -355,7 +355,7 @@ backend-abi: ## Re-export contract ABIs consumed by the indexer
 		> ../backend/pkg/contracts/zk/ZkVaultGate.abi.json
 
 .PHONY: backend-idl
-BACKEND_IDLS := aegis_vault:solvault aegis_oracle:soloracle
+BACKEND_IDLS := aegis_vault:solvault aegis_oracle:soloracle aegis_governance_receiver:solreceiver
 
 backend-idl: ## Copy Solana program IDLs consumed by the indexer
 	@for pair in $(BACKEND_IDLS); do \
@@ -421,6 +421,8 @@ solana-toolchain-check: ## Fail if anchor or solana differ from the pins in sola
 .PHONY: solana-build
 solana-build: solana-toolchain-check
 	cd solana && anchor build
+	cd solana && cargo build-sbf --manifest-path programs/aegis_governance_receiver/Cargo.toml \
+		--features localnet --sbf-out-dir target/localnet
 
 # The instruction tests load the program built above, so they run after it rather than alongside.
 .PHONY: solana-test

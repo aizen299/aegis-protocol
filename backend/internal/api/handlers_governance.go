@@ -18,6 +18,11 @@ type GovernanceService interface {
 	Governor(ctx context.Context) (types.GovernorMetadata, error)
 }
 
+// RemoteGovernanceService is the read surface for governance actions received from another chain.
+type RemoteGovernanceService interface {
+	RemoteActions(ctx context.Context, status string, limit, offset int) ([]types.RemoteAction, error)
+}
+
 // validProposalStates are the filter values a caller may pass. An unknown one is rejected rather
 // than silently returning everything: a typo that quietly widens a filter is worse than an error.
 var validProposalStates = map[string]bool{
@@ -120,4 +125,30 @@ func (h *handlers) getGovernor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, governor)
+}
+
+var validRemoteStatuses = map[string]bool{
+	types.RemoteActionPending:   true,
+	types.RemoteActionExecuted:  true,
+	types.RemoteActionCancelled: true,
+}
+
+func (h *handlers) listRemoteActions(w http.ResponseWriter, r *http.Request) {
+	limit, offset, err := h.pagination(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_PAGINATION", err.Error())
+		return
+	}
+	status := r.URL.Query().Get("status")
+	if status != "" && !validRemoteStatuses[status] {
+		writeError(w, http.StatusBadRequest, "INVALID_STATUS", "unknown remote action status")
+		return
+	}
+	actions, err := chainOf(r).RemoteGovernance.RemoteActions(r.Context(), status, limit, offset)
+	if err != nil {
+		h.log.Error().Err(err).Str("status", status).Msg("list remote actions failed")
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "failed to load remote actions")
+		return
+	}
+	writeJSON(w, http.StatusOK, page(chainOf(r).ID, limit, offset, actions))
 }

@@ -19,12 +19,20 @@ PROGRAMS=()
 for idl in "$ROOT"/solana/idl/*.json; do
   name=$(basename "$idl" .json)
   so="$ROOT/solana/target/deploy/$name.so"
+  # A program with a localnet build uses it here; see its `localnet` feature.
+  [ -f "$ROOT/solana/target/localnet/$name.so" ] && so="$ROOT/solana/target/localnet/$name.so"
   [ -f "$so" ] || { echo "solana-validator: $so is missing; run 'make solana-build'" >&2; exit 1; }
   address=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['address'])" "$idl")
   PROGRAMS+=(--upgradeable-program "$address" "$so" "$AUTHORITY")
 done
 
-nohup solana-test-validator --reset --quiet --ledger "$DIR/ledger" "${PROGRAMS[@]}" \
+# Wormhole's mainnet programs, at their mainnet addresses. solana/external/README.md.
+PROGRAMS+=(--bpf-program worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth "$ROOT/solana/external/wormhole_core_bridge.so")
+PROGRAMS+=(--bpf-program EFaNWErqAtVWufdNb7yofSHHfWFos843DFpu4JBw24at "$ROOT/solana/external/wormhole_verify_vaa_shim.so")
+
+# The default keeps 10,000 shreds, and a suite that indexes from slot 1 outlives that: the indexer then
+# rightly refuses the pruned range. Local history is kept for the whole run.
+nohup solana-test-validator --reset --quiet --ledger "$DIR/ledger" --limit-ledger-size 2000000 "${PROGRAMS[@]}" \
   >"$DIR/validator.log" 2>&1 &
 echo $! > "$DIR/validator.pid"
 

@@ -111,3 +111,23 @@ func (s *Service) fill(ctx context.Context, key string, value any, ttl time.Dura
 		s.log.Debug().Err(err).Str("key", key).Msg("governance cache fill failed")
 	}
 }
+
+// RemoteReader is the storage surface for governance actions received on this chain.
+type RemoteReader interface {
+	ListRemoteActions(ctx context.Context, chainID int64, status string, limit, offset int) ([]types.RemoteAction, error)
+}
+
+// RemoteService serves the governance actions this chain received from another. Not cached, for the
+// same reason proposals are not: what is waiting to execute is what an operator watches.
+type RemoteService struct {
+	store   RemoteReader
+	chainID int64
+}
+
+func NewRemoteService(store RemoteReader, chainID int64) *RemoteService {
+	return &RemoteService{store: store, chainID: chainID}
+}
+
+func (s *RemoteService) RemoteActions(ctx context.Context, status string, limit, offset int) ([]types.RemoteAction, error) {
+	return s.store.ListRemoteActions(ctx, s.chainID, status, limit, offset)
+}

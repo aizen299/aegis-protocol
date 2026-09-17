@@ -58,8 +58,8 @@ const qMarkProposalQueued = `
 	  AND state IN ('pending', 'active', 'succeeded')
 `
 
-// Reachable only once a destination chain exists. `dispatched` is not terminal: the indexer
-// resolves it on confirmation from that chain, and an unresolved one is an operational alert.
+// `dispatched` is the proposal's last state on this chain. What became of it on the destination is
+// indexed there, into governance_remote_actions, and joined in when the proposal is read.
 const qMarkProposalDispatched = `
 	UPDATE governance_proposals
 	SET state = 'dispatched', dispatched_at = $3

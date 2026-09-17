@@ -127,7 +127,7 @@ func truncateGovernance(t *testing.T, dsn string) {
 	}
 	defer conn.Close(ctx)
 
-	const q = `TRUNCATE governance_votes, governance_proposals, governors, vaults, assets,
+	const q = `TRUNCATE governance_votes, governance_proposals, governors, governance_remote_actions, vaults, assets,
 	           indexer_cursors RESTART IDENTITY CASCADE`
 	if _, err := conn.Exec(ctx, q); err != nil {
 		t.Fatalf("truncate governance tables: %v", err)

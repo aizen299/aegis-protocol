@@ -116,7 +116,14 @@ func (s *Store) ListProposals(ctx context.Context, chainID int64, state string, 
 		}
 		out = append(out, p)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if err := s.attachRemoteActions(ctx, chainID, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) Proposal(ctx context.Context, chainID int64, proposalID types.Raw) (types.Proposal, error) {
@@ -124,7 +131,14 @@ func (s *Store) Proposal(ctx context.Context, chainID int64, proposalID types.Ra
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, ErrNotFound
 	}
-	return p, err
+	if err != nil {
+		return p, err
+	}
+	one := []types.Proposal{p}
+	if err := s.attachRemoteActions(ctx, chainID, one); err != nil {
+		return p, err
+	}
+	return one[0], nil
 }
 
 func (s *Store) ListProposalVotes(ctx context.Context, chainID int64, proposalID types.Raw, limit, offset int) ([]types.Vote, error) {

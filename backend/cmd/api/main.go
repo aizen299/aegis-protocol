@@ -58,7 +58,8 @@ func main() {
 	defer redis.Close()
 
 	// The API reads no chain state, so it opens no RPC connection: an address needs only its chain's
-	// encoding. Governance and zk are not on Solana, so they are left nil and answer 404 there. §10.8.
+	// encoding. The governor and zk are not on Solana, so they are left nil and answer 404 there; Solana
+	// serves the governance actions it received instead. §10.8, §18.8.
 	deps := make([]api.ChainDeps, 0, len(chains))
 	for _, c := range chains {
 		d := api.ChainDeps{ID: c.ID, Vault: vault.NewService(store, redis, log, c.ID)}
@@ -66,6 +67,7 @@ func main() {
 		case types.VMSVM:
 			d.Codec = svm.Codec{}
 			d.Oracle = oracle.NewService(store, redis, log, c.ID)
+			d.RemoteGovernance = governance.NewRemoteService(store, c.ID)
 		default:
 			d.Codec = evm.Codec{}
 			d.Oracle = oracle.NewService(store, redis, log, c.ID)

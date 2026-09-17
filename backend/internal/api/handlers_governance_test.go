@@ -307,3 +307,87 @@ func TestGovernancePaginationIsClampedAndValidated(t *testing.T) {
 		}
 	}
 }
+
+// --- remote actions ---
+
+type stubRemote struct {
+	actions   []types.RemoteAction
+	gotStatus string
+	called    bool
+}
+
+func (s *stubRemote) RemoteActions(_ context.Context, status string, _, _ int) ([]types.RemoteAction, error) {
+	s.gotStatus, s.called = status, true
+	return s.actions, nil
+}
+
+func newRemoteServer(t *testing.T, stub *stubRemote) http.Handler {
+	t.Helper()
+	cfg := &config.Config{}
+	cfg.API.MaxPageSize = 100
+	cfg.API.WriteTimeout = 5 * time.Second
+	cfg.Chain.ChainID = testChainID
+	h := &handlers{
+		chains:      chainMap([]ChainDeps{{ID: testChainID, Codec: chainStub{}, RemoteGovernance: stub}}),
+		maxPageSize: cfg.API.MaxPageSize,
+		log:         zerolog.New(io.Discard),
+	}
+	return routes(cfg, h, zerolog.New(io.Discard))
+}
+
+func TestRemoteActionsServeTheirCorrelationAsStrings(t *testing.T) {
+	closed := time.Unix(1_700_000_100, 0).UTC()
+	stub := &stubRemote{actions: []types.RemoteAction{{
+		ChainID: testChainID, EmitterChain: 23, Sequence: raw(t, "18446744073709551615"), SourceChainID: 42161,
+		OperationID: raw(t, "4"), DeclaredValue: raw(t, "0"), AccountsHash: "0x01",
+		Status: types.RemoteActionExecuted, ClosedAt: &closed, ClosedBy: "executor",
+	}}}
+	code, body := get(t, newRemoteServer(t, stub), "/v1/governance/remote-actions?status=executed")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if stub.gotStatus != types.RemoteActionExecuted {
+		t.Errorf("status filter = %q", stub.gotStatus)
+	}
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %#v", body["items"])
+	}
+	item := items[0].(map[string]any)
+	if item["sequence"] != "18446744073709551615" || item["operationId"] != "4" || item["sourceChainId"] != float64(42161) {
+		t.Errorf("correlation = %v", item)
+	}
+	if item["status"] != "executed" || item["closedBy"] != "executor" {
+		t.Errorf("outcome = %v", item)
+	}
+}
+
+func TestUnknownRemoteStatusIsRejected(t *testing.T) {
+	stub := &stubRemote{}
+	code, body := get(t, newRemoteServer(t, stub), "/v1/governance/remote-actions?status=done")
+	if code != http.StatusBadRequest || body["code"] != "INVALID_STATUS" || stub.called {
+		t.Errorf("status %d, body %v, store called %v", code, body, stub.called)
+	}
+}
+
+// Arbitrum has a governor and no receiver; the route answers 404 there rather than an empty list.
+func TestRemoteActionsAreNotServedWhereNothingIsReceived(t *testing.T) {
+	code, _ := get(t, newGovernanceServer(t, &stubGovernance{}), "/v1/governance/remote-actions")
+	if code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", code)
+	}
+}
+
+func TestADispatchedProposalCarriesItsRemoteOutcome(t *testing.T) {
+	stub := &stubGovernance{proposal: types.Proposal{
+		ChainID: testChainID, ProposalID: raw(t, "1"), State: types.ProposalStateDispatched,
+		VotesFor: raw(t, "0"), VotesAgainst: raw(t, "0"), VotesAbstain: raw(t, "0"),
+		Remote: &types.RemoteAction{ChainID: 7, Sequence: raw(t, "3"), OperationID: raw(t, "1"),
+			DeclaredValue: raw(t, "0"), Status: types.RemoteActionPending},
+	}}
+	code, body := get(t, newGovernanceServer(t, stub), "/v1/governance/proposals/1")
+	remote, ok := body["remote"].(map[string]any)
+	if code != http.StatusOK || !ok || remote["status"] != "pending" || remote["chainId"] != float64(7) {
+		t.Errorf("status %d, remote %#v", code, body["remote"])
+	}
+}

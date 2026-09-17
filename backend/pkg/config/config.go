@@ -67,6 +67,9 @@ type Config struct {
 		Governor      string `env:"CONTRACT_GOVERNOR"`
 		ZkTree        string `env:"CONTRACT_ZK_TREE"`
 		ZkGate        string `env:"CONTRACT_ZK_GATE"`
+
+		// The Solana program that receives and executes governance messages dispatched from Arbitrum.
+		GovernanceReceiver string `env:"CONTRACT_GOVERNANCE_RECEIVER"`
 	}
 
 	API struct {
@@ -233,6 +236,19 @@ func (c *Config) ValidateSolanaContracts() error {
 		return fmt.Errorf("on Solana one program holds staking and rounds: CONTRACT_ORACLE_ROUNDS and CONTRACT_ORACLE_STAKING must be the same program id")
 	}
 	return nil
+}
+
+// ValidateEVMContracts checks the contract settings make sense for an EVM chain.
+func (c *Config) ValidateEVMContracts() error {
+	if c.GovernanceReceiverEnabled() {
+		return fmt.Errorf("the governance receiver is a Solana program; unset CONTRACT_GOVERNANCE_RECEIVER")
+	}
+	return nil
+}
+
+// GovernanceReceiverEnabled reports whether the Solana governance receiver was configured for indexing.
+func (c *Config) GovernanceReceiverEnabled() bool {
+	return c.Contracts.GovernanceReceiver != ""
 }
 
 // OracleEnabled reports whether oracle contracts were configured for indexing.

@@ -33,7 +33,9 @@ type ChainDeps struct {
 	Vault      *vault.Service
 	Oracle     OracleService
 	Governance GovernanceService
-	Zk         ZkService
+	// Governance actions this chain received from another, where the governor is elsewhere.
+	RemoteGovernance RemoteGovernanceService
+	Zk               ZkService
 }
 
 type Deps struct {
@@ -110,6 +112,11 @@ func routes(cfg *config.Config, h *handlers, log zerolog.Logger) http.Handler {
 			r.Get("/governance/proposals/{proposalId}", h.getProposal)
 			r.Get("/governance/proposals/{proposalId}/votes", h.listProposalVotes)
 			r.Get("/governance/voters/{address}/votes", h.listVoterVotes)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(requireModule("remote governance", func(c *ChainDeps) bool { return c.RemoteGovernance != nil }))
+			r.Get("/governance/remote-actions", h.listRemoteActions)
 		})
 
 		r.Group(func(r chi.Router) {

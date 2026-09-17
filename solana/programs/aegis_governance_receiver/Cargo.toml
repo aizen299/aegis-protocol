@@ -17,6 +17,8 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-debug = []
 custom-heap = []
 custom-panic = []
+# For the local end-to-end validator only, whose clock cannot be advanced: lowers the delay floor.
+localnet = []
 
 [dependencies]
 solana-keccak-hasher = "3"

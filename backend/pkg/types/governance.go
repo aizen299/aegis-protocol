@@ -75,6 +75,34 @@ type Proposal struct {
 	TxHash          string         `json:"txHash"`
 	LogIndex        uint           `json:"logIndex"`
 	BlockNumber     uint64         `json:"blockNumber"`
+	// What became of a dispatched proposal on its destination chain, once that chain has indexed it.
+	Remote *RemoteAction `json:"remote,omitempty"`
+}
+
+const (
+	RemoteActionPending   = "pending"
+	RemoteActionExecuted  = "executed"
+	RemoteActionCancelled = "cancelled"
+)
+
+// RemoteAction is a governance action received on another chain, keyed where it runs.
+type RemoteAction struct {
+	ChainID       int64      `json:"chainId"`
+	Receiver      string     `json:"receiver"`
+	EmitterChain  uint16     `json:"emitterChain"`
+	Sequence      Raw        `json:"sequence"`
+	SourceChainID int64      `json:"sourceChainId"`
+	OperationID   Raw        `json:"operationId"`
+	Target        string     `json:"target"`
+	DeclaredValue Raw        `json:"declaredValue"`
+	AccountsHash  string     `json:"accountsHash"`
+	Status        string     `json:"status"`
+	ExecutableAt  time.Time  `json:"executableAt"`
+	ReceivedAt    time.Time  `json:"receivedAt"`
+	ReceivedTx    string     `json:"receivedTx"`
+	ClosedAt      *time.Time `json:"closedAt,omitempty"`
+	ClosedTx      string     `json:"closedTx,omitempty"`
+	ClosedBy      string     `json:"closedBy,omitempty"`
 }
 
 // Vote is the indexed view of a cast vote.

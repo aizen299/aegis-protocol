@@ -220,3 +220,19 @@ func TestSolanaContractsRefuseModulesNotOnSolana(t *testing.T) {
 		}
 	}
 }
+
+func TestTheGovernanceReceiverIsSolanaOnly(t *testing.T) {
+	cfg := &Config{}
+	cfg.Contracts.VaultEngine = "vault"
+	cfg.Contracts.GovernanceReceiver = "receiver"
+	if err := cfg.ValidateSolanaContracts(); err != nil {
+		t.Errorf("receiver on Solana: %v", err)
+	}
+	if err := cfg.ValidateEVMContracts(); err == nil {
+		t.Error("receiver accepted on an EVM chain")
+	}
+	cfg.Contracts.GovernanceReceiver = ""
+	if err := cfg.ValidateEVMContracts(); err != nil {
+		t.Errorf("no receiver on an EVM chain: %v", err)
+	}
+}

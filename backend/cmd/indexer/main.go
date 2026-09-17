@@ -20,6 +20,7 @@ import (
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/governance"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/oracle"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/soloracle"
+	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/solreceiver"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/solvault"
 	"github.com/aizen299/aegis-protocol/backend/pkg/contracts/vaultengine"
 	zkcontracts "github.com/aizen299/aegis-protocol/backend/pkg/contracts/zk"
@@ -67,6 +68,7 @@ func main() {
 	log.Info().
 		Bool("oracle", cfg.OracleEnabled()).
 		Bool("governance", cfg.GovernanceEnabled()).
+		Bool("governance_receiver", cfg.GovernanceReceiverEnabled()).
 		Bool("zk", cfg.ZkEnabled()).
 		Int("handlers", len(handlers)).
 		Msg("handlers wired")
@@ -89,6 +91,9 @@ func main() {
 
 // evmHandlers builds the EVM client and every handler its configured contracts need.
 func evmHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log zerolog.Logger) (chain.Client, []indexer.Handler) {
+	if err := cfg.ValidateEVMContracts(); err != nil {
+		log.Fatal().Err(err).Msg("invalid configuration")
+	}
 	vaultAddress, err := types.IdentityFromEVMHex(cfg.Contracts.VaultEngine)
 	if err != nil {
 		log.Fatal().Err(err).Str("value", cfg.Contracts.VaultEngine).Msg("invalid vault address")
@@ -168,8 +173,8 @@ func evmHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log z
 	return client, handlers
 }
 
-// solanaHandlers builds the Solana client. Only the vault exists on Solana so far, so a configured
-// oracle, governance, or zk contract is refused rather than silently not indexed.
+// solanaHandlers builds the Solana client. The governor and zk contracts are not on Solana, so
+// configuring one is refused rather than silently not indexed.
 func solanaHandlers(ctx context.Context, cfg *config.Config, store *db.Store, log zerolog.Logger) (chain.Client, []indexer.Handler) {
 	if err := cfg.ValidateSolanaContracts(); err != nil {
 		log.Fatal().Err(err).Msg("invalid configuration")
@@ -208,6 +213,13 @@ func solanaHandlers(ctx context.Context, cfg *config.Config, store *db.Store, lo
 		stakeMint = mint
 	}
 
+	var receiverProgram types.Identity
+	if cfg.GovernanceReceiverEnabled() {
+		var receiverIDL *svm.IDL
+		receiverProgram, receiverIDL = programFor(cfg.Contracts.GovernanceReceiver, "CONTRACT_GOVERNANCE_RECEIVER", solreceiver.IDL)
+		registrations = append(registrations, svm.Registration{IDL: receiverIDL})
+	}
+
 	client, err := svm.New(ctx, svm.Options{
 		RPCURL:   cfg.Chain.RPCURL,
 		ChainID:  cfg.Chain.ChainID,
@@ -222,6 +234,9 @@ func solanaHandlers(ctx context.Context, cfg *config.Config, store *db.Store, lo
 		handlers = append(handlers,
 			indexer.NewOracleRoundsHandler(store, client, oracleProgram),
 			indexer.NewOracleStakingHandler(store, client, oracleProgram, stakeMint))
+	}
+	if cfg.GovernanceReceiverEnabled() {
+		handlers = append(handlers, indexer.NewGovernanceReceiverHandler(store, client, receiverProgram))
 	}
 	return client, handlers
 }

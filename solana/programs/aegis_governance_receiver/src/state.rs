@@ -11,7 +11,11 @@ pub const TREASURY_SEED: &[u8] = b"treasury";
 pub const WINDOW_SEED: &[u8] = b"window";
 
 pub const ACCOUNT_VERSION: u8 = 1;
+#[cfg(not(feature = "localnet"))]
 pub const MIN_DELAY: i64 = 60 * 60;
+// The local validator's clock follows wall time, so an end-to-end test cannot wait out an hour.
+#[cfg(feature = "localnet")]
+pub const MIN_DELAY: i64 = 5;
 pub const MAX_TREASURIES: u8 = 8;
 /// The mint a treasury uses for the authority's own lamports.
 pub const LAMPORTS_MINT: Pubkey = Pubkey::new_from_array([0; 32]);
